@@ -1,6 +1,6 @@
 package com.anpetna.board.dto.createComment;
 
-import com.anpetna.board.domain.CommentEntity;
+import com.anpetna.board.dto.CommentDTO;
 import lombok.*;
 
 @Getter
@@ -11,5 +11,5 @@ import lombok.*;
 @ToString
 public class CreateCommRes {
 
-    private CommentEntity createComm;
+    private CommentDTO createComm;
 }
