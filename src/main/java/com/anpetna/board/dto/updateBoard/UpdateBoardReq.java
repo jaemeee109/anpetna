@@ -1,6 +1,8 @@
 package com.anpetna.board.dto.updateBoard;
 
 import com.anpetna.coreDto.ImageDTO;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.*;
 
 import java.util.List;
@@ -10,11 +12,18 @@ import java.util.List;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class UpdateBoardReq {
 
+    @JsonProperty("bno")
     private Long bno;
+
+    @JsonProperty("bTitle")
     private String bTitle;
+
+    @JsonProperty("bContent")
     private String bContent;
 
+    @JsonProperty("images")
     private List<ImageDTO> images;
 }

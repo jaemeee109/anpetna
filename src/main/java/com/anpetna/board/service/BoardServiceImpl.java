@@ -132,7 +132,7 @@ public class BoardServiceImpl implements BoardService {
     }
 
     //=================================================================================
-
+    @Transactional
     @Override
     public UpdateBoardRes updateBoard(UpdateBoardReq updateBoardReq) {
 
@@ -162,6 +162,7 @@ public class BoardServiceImpl implements BoardService {
                 .build();
     }
     //=================================================================================
+    @Transactional
     @Override
     public DeleteBoardRes deleteBoard(DeleteBoardReq deleteBoardReq) {
 

@@ -9,6 +9,7 @@ import lombok.*;
 @NoArgsConstructor
 public class ReadAllBoardReq {
 
+
     private Integer page;
     private Integer size;
 
