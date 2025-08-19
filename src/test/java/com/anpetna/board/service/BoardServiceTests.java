@@ -15,6 +15,7 @@ import com.anpetna.coreDomain.ImageEntity;
 import com.anpetna.coreDto.ImageDTO;
 import com.anpetna.coreDto.PageRequestDTO;
 import com.anpetna.coreDto.PageResponseDTO;
+import lombok.extern.log4j.Log4j2;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,6 +30,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest
 @Transactional
 @Rollback(false)
+@Log4j2
 public class BoardServiceTests {
 
     @Autowired
@@ -39,7 +41,7 @@ public class BoardServiceTests {
 
     private BoardEntity savedBoard;
 
-   /* @BeforeEach //테스트용
+   @BeforeEach //테스트용
     void setUp() {
         // 게시글 + 이미지 생성
         List<ImageDTO> imageList = List.of(
@@ -62,7 +64,7 @@ public class BoardServiceTests {
         // 초기 조회수 0으로 세팅
         savedBoard.setBViewCount(0);
         boardJpaRepository.flush();
-    }*/
+    }
 
     @Test
     void testCreate() {
@@ -109,28 +111,35 @@ public class BoardServiceTests {
 
     @Test
     void testReadAll() {
+
         PageRequestDTO pageRequestDTO = new PageRequestDTO();
         pageRequestDTO.setPage(1);
         pageRequestDTO.setSize(5);
+        pageRequestDTO.setType("t");       // 제목 검색
+        pageRequestDTO.setKeyword("테스트"); // 검색 키워드
 
+        // 2. 서비스 호출
         PageResponseDTO<BoardDTO> page = boardService.readAllBoard(pageRequestDTO);
 
+        // 3. 기본 검증
         assertNotNull(page);
         assertTrue(page.getDtoList().size() <= pageRequestDTO.getSize());
         assertTrue(page.getTotal() >= page.getDtoList().size());
 
+        // 4. 검색된 결과 검증
         page.getDtoList().forEach(dto -> {
             assertNotNull(dto.getBno());
             assertNotNull(dto.getBTitle());
-            // 이미지 DTO 확인
-            assertNotNull(dto.getImageUrls());
+            assertTrue(dto.getBTitle().contains("테스트"),
+                    "제목에 '테스트'가 포함되어야 함: " + dto.getBTitle());
         });
     }
+
 
     @Test
     void testUpdateExistingBoard() {
         // DB에 이미 존재하는 게시글 번호
-        Long existingBno = 19L;
+        Long existingBno = 1L;
 
         // DB에서 게시글 조회
         BoardEntity board = boardJpaRepository.findById(existingBno)
@@ -163,7 +172,7 @@ public class BoardServiceTests {
     @Test
     void testLike() {
         // DB에 이미 존재하는 게시글 번호
-        Long existingBno = 20L;
+        Long existingBno = 2L;
 
         // DB에서 게시글 조회
         BoardEntity board = boardJpaRepository.findById(existingBno)
@@ -180,7 +189,7 @@ public class BoardServiceTests {
 
     @Test
     void testDeleteExistingBoard() {
-        Long existingBno = 21L; // DB에 존재하는 게시글 번호
+        Long existingBno = 3L; // DB에 존재하는 게시글 번호
 
         DeleteBoardReq delReq = DeleteBoardReq.builder().bno(existingBno).build();
         boardService.deleteBoard(delReq);

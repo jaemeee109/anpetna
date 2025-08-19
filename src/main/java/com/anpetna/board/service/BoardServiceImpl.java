@@ -16,6 +16,7 @@ import com.anpetna.board.repository.BoardJpaRepository;
 import com.anpetna.coreDomain.ImageEntity;
 import com.anpetna.coreDto.PageRequestDTO;
 import com.anpetna.coreDto.PageResponseDTO;
+import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
 import org.springframework.data.domain.Page;
@@ -35,7 +36,30 @@ public class BoardServiceImpl implements BoardService {
     private final BoardJpaRepository boardJpaRepository; // 의존성 주입
 
     //=================================================================================
-    @Override
+    @Transactional
+    public CreateBoardRes createBoard(CreateBoardReq req) {
+
+        BoardEntity board = BoardEntity.builder()
+                .bWriter(req.getBWriter())
+                .bTitle(req.getBTitle())
+                .bContent(req.getBContent())
+                .boardType(req.getBoardType())
+                .noticeFlag(Boolean.TRUE.equals(req.getNoticeFlag()))
+                .isSecret(Boolean.TRUE.equals(req.getIsSecret()))
+                .bViewCount(req.getBViewCount() == null ? 0 : req.getBViewCount())
+                .bLikeCount(req.getBLikeCount() == null ? 0 : req.getBLikeCount())
+                .build();
+
+        if (req.getImages() != null) {
+            for (var img : req.getImages()) {
+                ImageEntity.forBoard(img.getFileName(), img.getUrl(), board, img.getSortOrder());
+            }
+        }
+
+        var saved = boardJpaRepository.save(board);
+        return CreateBoardRes.builder().createBoard(saved).build();
+    }
+    /* @Override
     public CreateBoardRes createBoard(CreateBoardReq createBoardReq) {
 
         ModelMapper modelMapper = new ModelMapper();
@@ -61,24 +85,23 @@ public class BoardServiceImpl implements BoardService {
         return CreateBoardRes.builder()
                 .createBoard(saved)
                 .build();
-    }
+    }*/
 
-    /*var createBoard = modelMapper.map(createBoardReq, BoardEntity.class);
-    var boardEntity = boardJpaRepository.save(createBoard);
 
-    return CreateBoardRes.builder()
-            .createBoard(boardEntity)
-            .build();*/
     //=================================================================================
     @Override
     public PageResponseDTO<BoardDTO> readAllBoard(PageRequestDTO pageRequestDTO) {
 
         var pageable = pageRequestDTO.getPageable("createDate"); // 최신순 정렬
-        var page = boardJpaRepository.findAll(pageable); // JPA 페이징 조회
+        var types = pageRequestDTO.getTypes();
+        var keyword = pageRequestDTO.getKeyword();
+
+        // 검색 메서드 사용
+        var page = boardJpaRepository.search(pageable, types, keyword);
 
         // BoardEntity -> BoardDTO 변환
         List<BoardDTO> dtoList = page.stream()
-                .map(BoardDTO::new) // BoardDTO(BoardEntity entity) 생성자 사용
+                .map(BoardDTO::new)
                 .toList();
 
         // PageResponseDTO 생성
@@ -87,16 +110,6 @@ public class BoardServiceImpl implements BoardService {
                 .dtoList(dtoList)
                 .total((int) page.getTotalElements())
                 .build();
-
-
-         /*// 1. 전체 게시글 조회 (최신순 정렬)
-        List<BoardEntity> boardEntityList = boardJpaRepository.findAll(Sort.by("createDate").descending());
-
-        // 2. 결과 DTO 에 담아서 반환
-        return ReadAllBoardRes.builder()
-                .readAllBoard(boardEntityList)
-                .build();*/
-
     }
 
 
