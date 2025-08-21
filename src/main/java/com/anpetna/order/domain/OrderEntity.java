@@ -30,6 +30,7 @@ public class OrderEntity {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "orders_id", nullable = false)
+    @ToString.Exclude
     private OrdersEntity orders;
 }
 
