@@ -1,26 +1,177 @@
-@import "tailwindcss";
-
+/* ================= Base & Container ================= */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --apn-container: 1300px;   /* 본문 최대 너비 */
+  --apn-logo-height: 200px;  /* 헤더 로고 높이 */
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+html, body { 
+  margin: 0; 
+  padding: 0; 
+  font-family:
+    "Noto Sans KR",            /* 한글 */
+    "Prompt",                  /* 영문/숫자(1순위) */
+    "Chiron Hei HK",           /* 영문/숫자(2순위) */
+    "Apple SD Gothic Neo",     /* macOS 한글 폴백 */
+    "Malgun Gothic",           /* Windows 한글 폴백 */
+    system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-weight: 400;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* 영문 강조용(헤더/버튼/탭 등에 적용하고 싶을 때) */
+.en-font,
+h1, h2, h3,
+.pill,
+.apn-heading b {
+  font-family:
+    "Prompt",
+    "Chiron Hei HK",
+    "Noto Sans KR",
+    system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* 가변 폰트 범위 예시 */
+h1 { font-weight: 700; }
+h2 { font-weight: 600; }
+p  { font-weight: 400; }
+.small { font-weight: 300; }
+
+.container { max-width: var(--apn-container); margin: 0 auto; padding: 0 5px; }
+
+/* ================= Header ================= */
+.apn-header { background:#fff; }
+
+/* 상단 JOIN / LOGIN 바 */
+.apn-topbar{
+  display:flex; justify-content:flex-end; align-items:center;
+  height:38px; font-size:16px; color:#333;
+}
+.apn-auth a { color:#333; text-decoration:none; }
+.apn-auth .sep { margin:0 8px; color:#aaa; }
+.apn-auth .btn-link { background: none; border: 0; padding: 0; color: #333; cursor: pointer; font: inherit; }
+.apn-auth .btn-link:hover { text-decoration: underline; }
+
+
+/* 중앙 로고 */
+.apn-logo{
+  display:flex; justify-content:center; align-items:center;
+  padding: 4px 0 6px;
+}
+.apn-logo-img{
+  display:block;
+  max-height: var(--apn-logo-height);
+  object-fit: contain;
+}
+
+/* 네비(알약 버튼) */
+.apn-nav{
+  display:flex; justify-content:center; gap:34px;
+  padding: 6px 0 10px;
+}
+.pill{
+  display:inline-block; padding:6px 14px; border-radius:8px;
+  border:1px solid #ffffff; background:#f7f7f7; color:#333;
+  font-weight:800; letter-spacing:1px; text-decoration:none;
+  box-shadow: 0 1px 0 rgba(0,0,0,0.08);
+}
+.pill:hover { filter:brightness(0.97); }
+.pill--active{ outline:2px solid #2d2d2d; outline-offset:2px; }
+
+/* 색상(순서/클래스 둘 다 지원) */
+.apn-nav .pill:nth-child(1), .pill--notice { background:#fff1f1; } /* NOTICE */
+.apn-nav .pill:nth-child(2), .pill--store  { background:#fff8cc; } /* STORE  */
+.apn-nav .pill:nth-child(3), .pill--board  { background:#eaf2ff; } /* BOARD  */
+.apn-nav .pill:nth-child(4), .pill--help   { background:#ffeacc; } /* HELP   */
+
+/* 얇은 하단 구분선 */
+.apn-divider { height:1px; background:#000000; }
+
+/* ================= Main ================= */
+.apn-main { min-height:30vh; padding:24px 24px 8px; }
+.apn-main > *:last-child { margin-bottom: 0; }
+.apn-home { padding:50px 0; text-align:center; color:rgb(0, 0, 0); }
+.apn-home h1 { font-size:32px; margin-bottom:12px; }
+
+
+/* ================= Footer ================= */
+.apn-footer{
+  position:relative; overflow:hidden;
+  background:#2e2e2e; color:#eee; padding:28px 0;
+}
+
+/* 전체 워터마크/배경 비활성 */
+.apn-footer::before{ display:none !important; }
+
+/* 좌/우 영역: 왼쪽 유동, 오른쪽 고정폭(시안 기준) */
+.apn3-row{
+  display:grid;
+  grid-template-columns: minmax(0,1fr) 850px; /* ← 필요 시 500~540px 조정 */
+  gap:22px;
+  align-items:flex-start;
+}
+
+/* 왼쪽 정보 영역 */
+.apn3-left{ padding:18px 18px; }
+.apn3-left::before{ display:none !important; } /* 과거 워터마크 완전 제거 */
+.apn3-company p{ margin:4px 0; color:#e2e2e2; line-height:1.58; letter-spacing:.2px; }
+.apn3-copy p   { margin:6px 0; color:#cfcfcf; }
+
+/* 오른쪽 박스 공통 스타일 */
+.apn3-right{ min-width:0; }
+.apn3-panel{
+  background:#3a3a3a;
+  border:1px solid #c9c9c9;
+  border-radius:16px;
+  padding:18px 18px;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
+}
+
+/* ===== 시안 레이아웃: 그림(좌) + 텍스트(우) 2컬럼 ===== */
+.apn3-panel--grid{
+  display:grid;
+  grid-template-columns: 360px 1fr;  /* ← 그림 폭 */
+  gap:14px;                          /* 간격 줄여 세로 길이 ↓ */
+  align-items:stretch;                   /* 그림 하단 정렬 */
+}
+
+/* 제목은 전체폭 */
+.apn3-heading{
+  grid-column: 1 / -1;
+  margin:0 0 6px;
+}
+
+/* 왼쪽 그림 */
+.apn3-illust{                    /* 그림 열을 행 높이만큼 늘리고 */
+  align-self: stretch;
+  display: flex;                 /* 그 안에서 세로 중앙 정렬 */
+  align-items: center;
+  justify-content: center;       /* 가로도 중앙(원하면 제거) */
+}
+.apn3-illust img{ display:block; width:260px; height:auto; }
+
+/* 오른쪽 텍스트 */
+.apn3-team{ align-self: start; }
+.apn3-team ul{ margin:0 0 6px 18px; list-style:disc; }
+.apn3-team li{ margin:2px 0; color:#f0f0f0; }
+.apn3-note{ margin-top:4px; color:#bbb; font-style:italic; }
+
+/* === 과거 워터마크/스플릿 잔재 완전 무력화(충돌 방지) === */
+.apn3-panel--with-art,
+.apn3-panel--with-art::after,
+.apn3-art, .apn3-art img,
+.apn3-panel--split { display:none !important; }
+
+/* ================= Responsive ================= */
+@media (max-width: 1100px){
+  .apn3-row{ grid-template-columns: minmax(0,1fr) 480px; }
+  .apn3-illust img{ width:240px; }
+}
+@media (max-width: 860px){
+  :root { --apn-logo-height: 70px; --apn-container: 100%; }
+  .apn-nav { gap:16px; flex-wrap:wrap; }
+}
+@media (max-width: 768px){
+  .apn3-row{ grid-template-columns: 1fr; }
+  .apn3-panel--grid{ grid-template-columns: 1fr; }
+  .apn3-illust{ justify-self:center; }
+  .apn3-illust img{ width:220px; }
 }
