@@ -1,115 +1,81 @@
 buildscript {
-    ext {
-        queryDslVersion = "5.0.0"
-    }
-} /* 쿼리dsl 추가 설정 : p448쪽 */
-
-plugins {
-    id 'java'
-    id 'org.springframework.boot' version '3.4.7'
-    id 'io.spring.dependency-management' version '1.1.7'
+	ext {
+		queryDslVersion = "5.0.0"
+	}
 }
 
-group = 'com.anpetna'
+plugins {
+	id 'java'
+	id 'org.springframework.boot' version '3.4.8'
+	id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'com'
 version = '0.0.1-SNAPSHOT'
 
 java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(17)
-    }
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(17)
+	}
 }
 
 configurations {
-    compileOnly {
-        extendsFrom annotationProcessor
-    }
+	compileOnly {
+		extendsFrom annotationProcessor
+	}
 }
 
 repositories {
-    mavenCentral()
+	mavenCentral()
 }
 
 dependencies {
-    /* 메이븐 리포지토리에서 코드를 가져와 코끼리를 누르면 가져온다. */
-    // 스프링 시큐리티 추가 : 로그인 처리용 p678 https://mvnrepository.com/artifact/org.springframework.boot/spring-boot-starter-security
-    implementation("org.springframework.boot:spring-boot-starter-security:3.4.7")
+	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+	implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
+	implementation 'org.springframework.boot:spring-boot-starter-security'
+	implementation 'org.springframework.boot:spring-boot-starter-web'
+	developmentOnly 'org.springframework.boot:spring-boot-devtools'
+	runtimeOnly 'org.mariadb.jdbc:mariadb-java-client'
+	annotationProcessor 'org.projectlombok:lombok'
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testImplementation 'org.springframework.security:spring-security-test'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+	implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
+	implementation 'nz.net.ultraq.thymeleaf:thymeleaf-layout-dialect:3.1.0'
 
-    // 스프링 시큐리티6+타임리프 https://mvnrepository.com/artifact/org.thymeleaf.extras/thymeleaf-extras-springsecurity6
-    //  implementation 'org.thymeleaf.extras:thymeleaf-extras-springsecurity6:3.1.1.RELEASE'
+	compileOnly 'org.projectlombok:lombok'                                  /* 롬북 */
+	annotationProcessor 'org.projectlombok:lombok'                          /* 롬북 */
+	testCompileOnly 'org.projectlombok:lombok'                              /* 롬북 */
+	testAnnotationProcessor 'org.projectlombok:lombok'                      /* 롬북 */
 
-    // 시큐리티 테스트 추가Q
-    testImplementation 'org.springframework.security:spring-security-test'
+	implementation 'org.modelmapper:modelmapper:3.1.0'
 
-    // 카카오로그인 oauth2 추가
-    // https://mvnrepository.com/artifact/org.springframework.security/spring-security-oauth2-client
-    implementation 'org.springframework.security:spring-security-oauth2-client'
+	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 
+	implementation 'org.springframework.boot:spring-boot-starter-validation'
 
-    // https://mvnrepository.com/artifact/net.coobird/thumbnailator
-    implementation("net.coobird:thumbnailator:0.4.16")                      /* 파일 섬네일 처리용 p603 */
+	implementation "com.querydsl:querydsl-jpa:${queryDslVersion}:jakarta"
 
-    implementation 'org.springframework.boot:spring-boot-starter-web'       /* string-web */
-    compileOnly 'org.projectlombok:lombok'                                  /* 롬북 */
-    annotationProcessor 'org.projectlombok:lombok'                          /* 롬북 */
-    testCompileOnly 'org.projectlombok:lombok'                              /* 롬북 */
-    testAnnotationProcessor 'org.projectlombok:lombok'                      /* 롬북 */
+	implementation 'io.jsonwebtoken:jjwt-api:0.11.5'	// jwt - security
+	runtimeOnly  'io.jsonwebtoken:jjwt-impl:0.11.5'
+	runtimeOnly  'io.jsonwebtoken:jjwt-jackson:0.11.5'	// JSON 직렬화
 
-    /* DTO와 엔티티 간에 변환 처리용 P460 */
-    // https://mvnrepository.com/artifact/org.modelmapper/modelmapper
-
-    implementation 'org.modelmapper:modelmapper:3.1.0'
-
-    /* 과거에는 엔티티를 DTO로 변환 또는 DTO를 엔티티로 변환 해야 사용해야 함 */
-    /* 프로젝트에 config라는 환경설정용 패키지를 만들고 RootConfig 클래스를 만들어 사용한다. */
-
-    //   developmentOnly 'org.springframework.boot:spring-boot-devtools'         /* boot 개발용 */
-
-    /* 1단계 2단계 설정 -> src/main/resources/application.properties 에서 설정함 */
-    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'  /* 데이터 베이스 관련*/
-    runtimeOnly 'org.mariadb.jdbc:mariadb-java-client'                      /* 마리아 db 드라이버 */
-
-    implementation 'org.springframework.boot:spring-boot-starter-validation' /* p487 추가 서버에서 검증용 */
-    testImplementation 'org.springframework.boot:spring-boot-starter-test'  /* 테스트 junit 메서드 단위 테스트 */
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'            /* junit용 코드 */
-    testImplementation 'org.assertj:assertj-core:3.24.2'
-
-
-    /* 쿼리dsl 문구 추가 p448쪽 6개행 추가 */
-    implementation "com.querydsl:querydsl-jpa:${queryDslVersion}:jakarta"
-
-    annotationProcessor(
-            "jakarta.persistence:jakarta.persistence-api",
-            "jakarta.annotation:jakarta.annotation-api",
-            "com.querydsl:querydsl-apt:${queryDslVersion}:jakarta")
-
+	annotationProcessor(
+			"jakarta.persistence:jakarta.persistence-api",
+			"jakarta.annotation:jakarta.annotation-api",
+			"com.querydsl:querydsl-apt:${queryDslVersion}:jakarta")
 }
 
 tasks.named('test') {
-    useJUnitPlatform()
+	useJUnitPlatform()
 }
-
-/* 쿼리dsl 문구 추가 p448쪽 8개행 추가 */
 sourceSets {
-    main {
-        java {
-            srcDirs = [
-                    "$projectDir/src/main/java",
-                    "$buildDir/generated/sources/annotationProcessor/java/main"
-            ]
-        }
-    }
-}
 
-/* 쿼리 dsl 사용법 -> 오른쪽에 있는 Gradle 메뉴를 열고 task-> other를 찾아서 compileJava 실행*/
-/* 하단에 compile가 된다.
--> 왼쪽 탐색기 -> build-> generated -> main -> domain -> Q로 시작하는 클래스
-쿼리dsl용 객체로 우리가 커스텀 하면 안됨!!!!
-******** 주의사항 : 엔티티나 dto를 건딜면 Q도메인을 다시 생성해야 한다.***********
-삭제 방법 -> 오른쪽 Gradle 메뉴 -> Tasks->build->clean 후 재생성
-*/
+	main {
+		java {
+			srcDirs = ["$projectDir/src/main/java", "$projectDir/build/generated"]
+		}
+	}
+}
 
 compileJava.dependsOn('clean')
-
-tasks.named('processResources') {
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-}
