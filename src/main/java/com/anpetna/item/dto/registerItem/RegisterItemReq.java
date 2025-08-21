@@ -1,17 +1,22 @@
 package com.anpetna.item.dto.registerItem;
 
-import com.anpetna.coreDomain.ImageEntity;
+import com.anpetna.coreDto.ImageDTO;
 import com.anpetna.item.constant.ItemCategory;
 import com.anpetna.item.constant.ItemSaleStatus;
 import com.anpetna.item.constant.ItemSellStatus;
-import jakarta.persistence.*;
+import com.anpetna.item.domain.ItemEntity;
+import com.anpetna.item.dto.BaseReq;
+import lombok.Builder;
+import lombok.Getter;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public class RegisterItemReq {
+@Builder
+@Getter
+public class RegisterItemReq extends BaseReq {
 
-    private Long itemId; // 상품코드
+    //  8개
 
     private String itemName; // 상품명
 
@@ -27,9 +32,6 @@ public class RegisterItemReq {
 
     private ItemCategory itemCategory; // 상품 카테고리
 
-    private List<ImageEntity> itemImages = new ArrayList<>();
-
-    private List<ImageEntity> itemThumbs = new ArrayList<>();
-
+    //썸네일 어케하지
 
 }
