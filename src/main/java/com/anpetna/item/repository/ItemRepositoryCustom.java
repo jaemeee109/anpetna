@@ -11,9 +11,9 @@ public interface ItemRepositoryCustom {
 
     List<ItemEntity> sortByCategory(SearchAllItemsReq req);
 
-    List<ItemEntity> orderByPrice(SearchAllItemsReq req);
+    List<ItemEntity> sortBySales(SearchAllItemsReq req);
 
-    List<ItemEntity> orderBySales(SearchAllItemsReq req);
+    List<ItemEntity> orderByPriceDir(SearchAllItemsReq req);
 
 
 }

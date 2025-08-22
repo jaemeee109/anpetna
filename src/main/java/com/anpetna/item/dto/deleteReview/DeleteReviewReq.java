@@ -5,6 +5,6 @@ import lombok.Getter;
 @Getter
 public class DeleteReviewReq {
 
-    private Long itemId;
+    private Long ReviewId;
 
 }

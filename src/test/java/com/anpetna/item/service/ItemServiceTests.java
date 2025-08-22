@@ -68,25 +68,24 @@ public class ItemServiceTests {
         System.out.println(res);
     }
 
-/*    @Test
+   @Test
     public void searchAllItem() {
+
         SearchAllItemsReq req = new SearchAllItemsReq();
+
         req.setSortBySale(ItemSellStatus.SOLD_OUT);
-        List<ItemDTO> res = itemService.getAllItems(req);
-        System.out.println(res);
-        res.clear();
+        List<ItemDTO> res1 = itemService.getAllItems(req);
+        System.out.println(res1);
+
         req.setSortByCategory(ItemCategory.BATH_PRODUCT);
-        res = itemService.getAllItems(req);
-        System.out.println(res);
-        res.clear();
-        req.setSortByPrice(10000);
-        res = itemService.getAllItems(req);
-        System.out.println(res);
-        res.clear();
-        req.setDirection(SortDirection.ASCENDING);
-        res = itemService.getAllItems(req);
-        System.out.println(res);
-    }*/
+       List<ItemDTO> res2 = itemService.getAllItems(req);
+        System.out.println(res2);
+
+        req.setOrderByPriceDir(SortDirection.ASCENDING);
+       List<ItemDTO> res3 = itemService.getAllItems(req);
+        System.out.println(res3);
+
+    }
 
     @Test
     @Transactional

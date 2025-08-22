@@ -3,24 +3,27 @@ package com.anpetna.item.dto.modifyReview;
 import com.anpetna.coreDomain.ImageEntity;
 import com.anpetna.item.constant.ItemSaleStatus;
 import com.anpetna.item.constant.ItemSellStatus;
+import com.anpetna.item.dto.ItemDTO;
+import com.anpetna.item.dto.registerReview.RegisterReviewRes;
 import lombok.Getter;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
 @Getter
 public class ModifyReviewRes {
 
-    private Long itemId;
+    private Long reviewId;
 
-    private int itemStock; // 재고수량
+    private LocalDateTime modDate;
 
-    private String itemDetail; // 상품 상세설명
+    private ItemDTO itemId;
 
-    private ItemSellStatus itemSellStatus; // 상품 판매상태
+    private String res;
 
-    private ItemSaleStatus itemSaleStatus; // 상품 세일상태
-
-    private List<ImageEntity> itemImages = new ArrayList<>();
-
+    public ModifyReviewRes modified(){
+        this.res = "modified";
+        return this;
+    }
 }

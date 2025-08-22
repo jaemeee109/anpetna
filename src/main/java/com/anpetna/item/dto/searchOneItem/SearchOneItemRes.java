@@ -5,6 +5,7 @@ import com.anpetna.coreDto.ImageDTO;
 import com.anpetna.item.constant.ItemCategory;
 import com.anpetna.item.constant.ItemSaleStatus;
 import com.anpetna.item.constant.ItemSellStatus;
+import com.anpetna.item.dto.BaseReq;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -18,7 +19,7 @@ import java.util.List;
 @Setter
 @NoArgsConstructor
 @ToString
-public class SearchOneItemRes {
+public class SearchOneItemRes extends BaseReq {
 
     private Long itemId; // 상품코드
 
@@ -35,7 +36,5 @@ public class SearchOneItemRes {
     private ItemSaleStatus itemSaleStatus; // 상품 세일상태
 
     private ItemCategory itemCategory; // 상품 카테고리
-
-    private List<ImageDTO> images = new ArrayList<>();
 
 }

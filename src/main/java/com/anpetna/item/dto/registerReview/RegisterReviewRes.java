@@ -8,14 +8,17 @@ import java.util.List;
 
 public class RegisterReviewRes {
 
-    private String content;
-
-    private int rating;
+    private Long reviewId;
 
     private LocalDateTime regDate;
 
     private String itemId;
 
-    private List<ImageDTO> images = new ArrayList<>();
+    private String res;
+
+    public RegisterReviewRes registered(){
+        this.res = "registered";
+        return this;
+    }
 
 }
