@@ -1,13 +1,20 @@
 package com.anpetna.item.dto;
 
+import com.anpetna.coreDomain.ImageEntity;
+import com.anpetna.coreDto.ImageDTO;
 import com.anpetna.item.constant.ItemCategory;
 import com.anpetna.item.constant.ItemSaleStatus;
 import com.anpetna.item.constant.ItemSellStatus;
-import com.anpetna.coreDomain.ImageEntity;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.ToString;
 
 import java.util.ArrayList;
 import java.util.List;
 
+@Getter
+@Builder
+@ToString
 public class ItemDTO {
 
     private Long itemId; // 상품코드
@@ -25,8 +32,8 @@ public class ItemDTO {
     private ItemSaleStatus itemSaleStatus; // 상품 세일상태
 
     private ItemCategory itemCategory; // 상품 카테고리
-
+    @Builder.Default
     private List<ImageEntity> itemImages = new ArrayList<>();
 
-    private List<ImageEntity> itemThumbs = new ArrayList<>();
+
 }

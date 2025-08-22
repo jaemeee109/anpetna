@@ -1,14 +1,20 @@
 package com.anpetna.item.dto.modifyItem;
 
 import com.anpetna.coreDomain.ImageEntity;
+import com.anpetna.coreDto.ImageDTO;
 import com.anpetna.item.constant.ItemSaleStatus;
 import com.anpetna.item.constant.ItemSellStatus;
+import com.anpetna.item.dto.BaseReq;
+import lombok.Builder;
+import lombok.Getter;
 
 import java.util.ArrayList;
 import java.util.List;
+@Builder
+@Getter
+public class ModifyItemReq extends BaseReq {
 
-public class ModifyItemReq {
-
+    private Long itemId;
 
     private int itemStock; // 재고수량
 
@@ -18,8 +24,6 @@ public class ModifyItemReq {
 
     private ItemSaleStatus itemSaleStatus; // 상품 세일상태
 
-    private List<ImageEntity> itemImages = new ArrayList<>();
 
-    private List<ImageEntity> itemThumbs = new ArrayList<>();
 
 }

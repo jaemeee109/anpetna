@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.anpetna.item.repository.ItemRepositoryTests" tests="1" skipped="0" failures="1" errors="0" timestamp="2025-08-18T09:47:07.375Z" hostname="220-10" time="0.571">
+  <properties/>
+  <testcase name="insert()" classname="com.anpetna.item.repository.ItemRepositoryTests" time="0.571">
+    <failure message="java.lang.NullPointerException: Cannot invoke &quot;java.util.List.add(Object)&quot; because the return value of &quot;com.anpetna.item.domain.ItemEntity.getImages()&quot; is null" type="java.lang.NullPointerException">java.lang.NullPointerException: Cannot invoke &quot;java.util.List.add(Object)&quot; because the return value of &quot;com.anpetna.item.domain.ItemEntity.getImages()&quot; is null
+	at com.anpetna.coreDomain.ImageEntity.attachToItem(ImageEntity.java:73)
+	at com.anpetna.item.repository.ItemRepositoryTests.insert(ItemRepositoryTests.java:46)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1511)
+</failure>
+  </testcase>
+  <system-out><![CDATA[18:47:00.135 [Test worker] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [com.anpetna.item.repository.ItemRepositoryTests]: ItemRepositoryTests does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+18:47:00.345 [Test worker] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.anpetna.AnpetnaApplication for test class com.anpetna.item.repository.ItemRepositoryTests
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.4.7)
+
+2025-08-18T18:47:00.948+09:00  INFO 1956 --- [anpetna] [    Test worker] c.a.item.repository.ItemRepositoryTests  : Starting ItemRepositoryTests using Java 17.0.15 with PID 1956 (started by LeeChaeYun in C:\Users\LeeChaeYun\IdeaProjects\anpetna)
+2025-08-18T18:47:00.949+09:00 DEBUG 1956 --- [anpetna] [    Test worker] c.a.item.repository.ItemRepositoryTests  : Running with Spring Boot v3.4.7, Spring v6.2.8
+2025-08-18T18:47:00.950+09:00  INFO 1956 --- [anpetna] [    Test worker] c.a.item.repository.ItemRepositoryTests  : The following 1 profile is active: "test"
+2025-08-18T18:47:02.089+09:00  INFO 1956 --- [anpetna] [    Test worker] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2025-08-18T18:47:02.225+09:00  INFO 1956 --- [anpetna] [    Test worker] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 120 ms. Found 2 JPA repository interfaces.
+2025-08-18T18:47:02.923+09:00  INFO 1956 --- [anpetna] [    Test worker] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+2025-08-18T18:47:03.045+09:00  INFO 1956 --- [anpetna] [    Test worker] org.hibernate.Version                    : HHH000412: Hibernate ORM core version 6.6.18.Final
+2025-08-18T18:47:03.121+09:00  INFO 1956 --- [anpetna] [    Test worker] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
+2025-08-18T18:47:03.640+09:00  INFO 1956 --- [anpetna] [    Test worker] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2025-08-18T18:47:03.701+09:00  INFO 1956 --- [anpetna] [    Test worker] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2025-08-18T18:47:03.824+09:00  INFO 1956 --- [anpetna] [    Test worker] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection org.mariadb.jdbc.Connection@32d22650
+2025-08-18T18:47:03.826+09:00  INFO 1956 --- [anpetna] [    Test worker] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2025-08-18T18:47:03.859+09:00  WARN 1956 --- [anpetna] [    Test worker] org.hibernate.orm.deprecation            : HHH90000025: MySQL8Dialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2025-08-18T18:47:03.861+09:00  WARN 1956 --- [anpetna] [    Test worker] org.hibernate.orm.deprecation            : HHH90000026: MySQL8Dialect has been deprecated; use org.hibernate.dialect.MySQLDialect instead
+2025-08-18T18:47:03.889+09:00  INFO 1956 --- [anpetna] [    Test worker] org.hibernate.orm.connections.pooling    : HHH10001005: Database info:
+	Database JDBC URL [Connecting through datasource 'HikariDataSource (HikariPool-1)']
+	Database driver: undefined/unknown
+	Database version: 8.0
+	Autocommit mode: undefined/unknown
+	Isolation level: undefined/unknown
+	Minimum pool size: undefined/unknown
+	Maximum pool size: undefined/unknown
+2025-08-18T18:47:05.470+09:00  INFO 1956 --- [anpetna] [    Test worker] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2025-08-18T18:47:05.578+09:00  INFO 1956 --- [anpetna] [    Test worker] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+2025-08-18T18:47:06.386+09:00  WARN 1956 --- [anpetna] [    Test worker] JpaBaseConfiguration$JpaWebConfiguration : spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+2025-08-18T18:47:07.075+09:00 TRACE 1956 --- [anpetna] [    Test worker] eGlobalAuthenticationAutowiredConfigurer : Eagerly initializing {org.springframework.boot.autoconfigure.security.servlet.SpringBootWebSecurityConfiguration$WebSecurityEnablerConfiguration=org.springframework.boot.autoconfigure.security.servlet.SpringBootWebSecurityConfiguration$WebSecurityEnablerConfiguration@77e2a5d3}
+2025-08-18T18:47:07.078+09:00 DEBUG 1956 --- [anpetna] [    Test worker] swordEncoderAuthenticationManagerBuilder : No authenticationProviders and no parentAuthenticationManager defined. Returning null.
+2025-08-18T18:47:07.269+09:00 DEBUG 1956 --- [anpetna] [    Test worker] o.s.s.web.DefaultSecurityFilterChain     : Will secure any request with filters: DisableEncodeUrlFilter, WebAsyncManagerIntegrationFilter, SecurityContextHolderFilter, HeaderWriterFilter, CsrfFilter, LogoutFilter, UsernamePasswordAuthenticationFilter, DefaultResourcesFilter, DefaultLoginPageGeneratingFilter, DefaultLogoutPageGeneratingFilter, BasicAuthenticationFilter, RequestCacheAwareFilter, SecurityContextHolderAwareRequestFilter, AnonymousAuthenticationFilter, ExceptionTranslationFilter, AuthorizationFilter
+2025-08-18T18:47:07.347+09:00  INFO 1956 --- [anpetna] [    Test worker] c.a.item.repository.ItemRepositoryTests  : Started ItemRepositoryTests in 6.78 seconds (process running for 8.419)
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
