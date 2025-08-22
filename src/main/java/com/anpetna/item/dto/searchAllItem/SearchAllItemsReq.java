@@ -1,6 +1,7 @@
 package com.anpetna.item.dto.searchAllItem;
 
 import com.anpetna.item.constant.ItemCategory;
+import com.anpetna.item.constant.ItemPrice;
 import com.anpetna.item.constant.ItemSellStatus;
 import lombok.Getter;
 import lombok.Setter;
@@ -14,8 +15,6 @@ public class SearchAllItemsReq {
 
     private ItemCategory sortByCategory; // 상품 카테고리
 
-    private Integer sortByPrice;
-
-    private SortDirection direction; // ASC, DESC (Enum)
+    private SortDirection orderByPriceDir; // 가격순 ASC, DESC (Enum)
 
 }

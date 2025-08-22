@@ -15,7 +15,7 @@ import java.util.List;
 @Getter
 @Builder
 @ToString
-public class ItemDTO {
+public class ItemDTO extends BaseReq {
 
     private Long itemId; // 상품코드
 
@@ -32,8 +32,5 @@ public class ItemDTO {
     private ItemSaleStatus itemSaleStatus; // 상품 세일상태
 
     private ItemCategory itemCategory; // 상품 카테고리
-    @Builder.Default
-    private List<ImageEntity> itemImages = new ArrayList<>();
-
 
 }
