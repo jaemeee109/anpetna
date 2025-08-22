@@ -6,7 +6,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
-public class ReviewDTO {
+public class ReviewDTO extends BaseReq{
 
     private Long reviewId;
 
@@ -17,7 +17,5 @@ public class ReviewDTO {
     private LocalDateTime regDate;
 
     private ItemDTO itemId;
-
-    private List<ImageDTO> images = new ArrayList<>();
 
 }

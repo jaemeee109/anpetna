@@ -1,12 +1,14 @@
 package com.anpetna.item.dto.registerReview;
 
-import com.anpetna.coreDto.ImageDTO;
+import com.anpetna.item.dto.BaseReq;
+import lombok.Getter;
+import lombok.ToString;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
 
-public class RegisterReviewReq {
+@ToString
+@Getter
+public class RegisterReviewReq extends BaseReq {
 
     private String content;
 
@@ -15,7 +17,5 @@ public class RegisterReviewReq {
     private LocalDateTime regDate;
 
     private String itemId;
-
-    private List<ImageDTO> images = new ArrayList<>();
 
 }

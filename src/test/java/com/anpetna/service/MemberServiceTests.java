@@ -44,7 +44,8 @@ import static org.mockito.Mockito.when;
 @Slf4j
 public class MemberServiceTests {
     @InjectMocks
-    private MemberServiceImpl memberService;
+    private MemberService memberService;
+
     @Mock
     private PasswordEncoder passwordEncoder;
     @Mock
@@ -65,9 +66,10 @@ public class MemberServiceTests {
 
     @AfterEach
     public void clearAuthentication() {
-        SecurityContextHolder.clearContext();
-    }
 
+        SecurityContextHolder.clearContext();
+
+    }
 
     @Test
     public void joinTest() throws MemberService.MemberIdExistException {
