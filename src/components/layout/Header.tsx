@@ -86,10 +86,10 @@ export default function Header() {
 
       {/* 네비게이션 (알약 버튼) */}
       <nav className="container apn-nav">
-        <NavLink href="/notice">NOTICE</NavLink>
-        <NavLink href="/store">STORE</NavLink>
-        <NavLink href="/board">BOARD</NavLink>
-        <NavLink href="/help">HELP</NavLink>
+        <NavLink href="/board/NOTICE">NOTICE</NavLink>
+        <NavLink href="/items">STORE</NavLink>
+        <NavLink href="/board/Free">BOARD</NavLink>
+        <NavLink href="/board/QNA">HELP</NavLink>
       </nav>
 
       {/* 얇은 가로선 */}
