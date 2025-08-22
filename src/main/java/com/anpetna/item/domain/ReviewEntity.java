@@ -40,6 +40,8 @@ public class ReviewEntity {
     @OneToMany(mappedBy = "review", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ImageEntity> images = new ArrayList<>();
 
+    //  최대 5장
+
     public void addImage(ImageEntity image) {
         images.add(image);
         image.setReview(this);
