@@ -20,8 +20,5 @@ public class OrderDTO {
 
     private int quantity;   // 주문 수량
 
-    public int getLineAmount() { // 단가 * 수량
-        return price * quantity;
-    }
 
 }

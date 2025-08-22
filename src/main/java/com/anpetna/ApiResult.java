@@ -21,9 +21,6 @@ public class ApiResult<T> {
     private T result;
 
     public ApiResult(T data) {
-
         this.result = data;
-
     }
-
 }

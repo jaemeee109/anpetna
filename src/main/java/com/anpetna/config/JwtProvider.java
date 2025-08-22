@@ -32,18 +32,6 @@ public class JwtProvider {
         this.userDetailsService = userDetailsService;
     }
 
-    public String create(Authentication authentication) {
-        Date now = new Date();
-        Date exp = new Date(now.getTime() + accessTokenValidityMs);
-
-        return Jwts.builder()
-                .setSubject(authentication.getName())
-                .setIssuedAt(now)
-                .setExpiration(exp)
-                .signWith(key, SignatureAlgorithm.HS256)
-                .compact();
-    }
-
     // 🔑 Access Token 발급
     public String createAccessToken(Authentication authentication) {
         return buildToken(authentication.getName(), accessTokenValidityMs);
@@ -52,6 +40,11 @@ public class JwtProvider {
     // 🔑 Refresh Token 발급
     public String createRefreshToken(Authentication authentication) {
         return buildToken(authentication.getName(), refreshTokenValidityMs);
+    }
+
+    // 편의 메서드 추가 (250821_Order)
+    public String create(Authentication authentication) {
+        return createAccessToken(authentication);
     }
 
     private String buildToken(String subject, long validity) {
@@ -90,3 +83,4 @@ public class JwtProvider {
     }
 
 }
+

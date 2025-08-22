@@ -16,9 +16,10 @@ import java.util.List;
 @Table(name="anpetna_item")
 @Getter
 @Builder
+@Setter
 @AllArgsConstructor
 @NoArgsConstructor
-@ToString(exclude = "images")
+@ToString
 public class ItemEntity extends BaseEntity {
 
     @Id
@@ -51,13 +52,12 @@ public class ItemEntity extends BaseEntity {
     @Enumerated(EnumType.STRING)  // DB에 enum의 이름(문자열)으로 저장 (숫자로 저장하는 ORDINAL보다 안전).
     private ItemCategory itemCategory; // 상품 카테고리
 
-/*    @Column(name="item_ThumbsId", nullable=false)
-    private String itemThumbsId;*/
-
     @OneToMany(mappedBy = "item", cascade = CascadeType.ALL, orphanRemoval = true)
-    @Builder.Default
-    private List<ImageEntity> images = new ArrayList<>();
+    private List<ImageEntity> images;
 
+    //  0번 : 썸네일
+    //  1~3번 : 상품이미지 (1번은 대표 이미지)
+    //  4번~ : 상품 상세 설명
 
     public void addImage(ImageEntity image) {
         images.add(image);
@@ -68,43 +68,4 @@ public class ItemEntity extends BaseEntity {
         image.setItem(null);
     }
 
-
-/*    public void modify(String itemName, String itemCategory, String itemDetail, String itemImageUrl,
-                       String itemThumbnail, int itemPrice, String itemSellStatus, int itemStock,
-                       String itemSaleStatus) {
-
-        this.itemName = itemName;
-        this.itemCategory = ItemCategory.valueOf(itemCategory);
-        this.itemImageUrl = itemImageUrl;
-        this.itemThumbnail = itemThumbnail;
-        this.itemPrice = itemPrice;
-        this.itemStock = itemStock;
-        this.itemDetail = itemDetail;
-        this.itemSellStatus = ItemSellStatus.valueOf(itemSellStatus);
-        this.itemSaleStatus = ItemSaleStatus.valueOf(itemSaleStatus);
-        //this.itemRegTime = LocalDateTime.now();
-        this.itemModiTime = LocalDateTime.now();
-
-
-    }*/
-
-/*    public void addItemImage(ImageEntity imageEntity) {
-        this.itemImages.add(imageEntity); // Collection 메서드 //조회용 객체
-        imageEntity.setImageId(ima);
-
-    }*/
-    /*    public void removeStock(int stockNumber){
-        //상품 주문시 재고 감소
-        int restStock = this.stockNumber - stockNumber;
-        if(restStock < 0){
-            throw new OutOfStockException("상품의 재고가 부족합니다, (현재 재고 수량: "+this.stockNumber);
-        } // if종료
-        this.stockNumber = restStock;
-
-    } // removeStock 종료
-
-    public void addStock(int stockNumber){
-        // 상품의 재고를 증가
-        this.stockNumber += stockNumber;
-    }//addStock() 종료*/
 }

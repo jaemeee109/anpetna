@@ -83,7 +83,7 @@ public class ImageEntity {
     // ====== JPA 생명주기에서 유효성 체크 (서비스 실수 방지) ======
     @PrePersist
     @PreUpdate
-    public void validateExactlyOneParent() {
+    private void validateExactlyOneParent() {
         int cnt = 0;
         if (board  != null) cnt++;
         if (member != null) cnt++;
@@ -116,7 +116,7 @@ public class ImageEntity {
         img.setFileName(fileName);
         img.setUrl(url);
         img.setSortOrder(order == null ? 0 : order);
-/*        img.attachToItem(i);*/
+        img.attachToItem(i);
         return img;
     }
     public static ImageEntity forReview(String fileName, String url, ReviewEntity r, Integer order) {
