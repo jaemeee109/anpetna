@@ -1,28 +1,22 @@
+// features/board/hooks/useBoards.ts
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { boardApi } from "../data/board.api";
-import type { CreateBoardReq, UpdateBoardReq } from "../data/board.types";
+import type { CreateBoardReq, UpdateBoardReq, BoardDetail } from "../data/board.types";
 
-/** 목록 훅 (검색/페이징 포함)
- *  - type: 검색 필드 조합 ("t","c","w","tc","tw","tcw")
- *  - keyword: 검색어
- */
 export const useBoardList = (page=1, size=10, type?: string, keyword?: string) =>
   useQuery({
     queryKey: ["board","list", page, size, type ?? "", keyword ?? ""],
     queryFn: () => boardApi.list({ page, size, type, keyword }),
   });
 
-/** 상세 훅
- *  - like=true면 조회와 동시에 좋아요 +1
- */
-export const useBoardDetail = (bno: number, like = false) =>
-  useQuery({
-    queryKey: ["board","detail", bno, like ? "like" : ""],
-    queryFn: () => boardApi.get(bno, like),
-    enabled: typeof bno === "number",
+/** ✅ 상세 훅: BoardDetail 그대로 반환 (select 없음) */
+export const useBoardDetail = (bno: number) =>
+  useQuery<BoardDetail>({
+    queryKey: ["board","detail", bno],
+    queryFn: () => boardApi.get(bno),
+    enabled: Number.isFinite(bno),
   });
 
-/** 생성 훅 */
 export const useCreateBoard = () => {
   const qc = useQueryClient();
   return useMutation({
@@ -33,7 +27,6 @@ export const useCreateBoard = () => {
   });
 };
 
-/** 수정 훅 */
 export const useUpdateBoard = () => {
   const qc = useQueryClient();
   return useMutation({
@@ -47,7 +40,6 @@ export const useUpdateBoard = () => {
   });
 };
 
-/** 삭제 훅 */
 export const useRemoveBoard = () => {
   const qc = useQueryClient();
   return useMutation({
@@ -59,7 +51,6 @@ export const useRemoveBoard = () => {
   });
 };
 
-/** 좋아요 훅 */
 export const useLikeBoard = () => {
   const qc = useQueryClient();
   return useMutation({

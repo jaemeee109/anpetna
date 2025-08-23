@@ -1,5 +1,12 @@
+// features/board/data/board.api.ts
 import { http } from '@/shared/data/http';
-import type { BoardDetail as BoardDTO, CreateBoardReq, UpdateBoardReq, PageRes, BoardDetail } from './board.types';
+import type {
+  BoardDetail as BoardDTO,
+  CreateBoardReq,
+  UpdateBoardReq,
+  PageRes,
+  BoardDetail,
+} from './board.types';
 
 const BASE_PATH = '/anpetna/board';
 
@@ -8,37 +15,59 @@ function unwrap<T>(r: any): T {
 }
 
 export const boardApi = {
-  list: (opts: { page?: number | string; size?: number | string; keyword?: string; boardType?: string; type?: string; }) => {
+  get: async (bno: number): Promise<BoardDetail> => {
+    // ✅ 1차: /readOne/{bno} (PathVariable 방식)
+    try {
+      const r = await http.get(`${BASE_PATH}/readOne/${bno}`);
+      const data = (r as any)?.data ?? r;
+      const result = data?.result ?? data;
+      const detail =
+        result?.readOneBoard ??    // { result: { readOneBoard: {...} } }
+        result?.board ??           // { result: { board: {...} } }
+        result ??                  // { result: {...} } or {...}
+        null;
+      if (!detail) throw new Error('board/readOne invalid response');
+      return detail as BoardDetail;
+    } catch (err) {
+      // ✅ 2차 폴백: /readOne?bno= (RequestParam 방식일 때)
+      const r2 = await http.get(`${BASE_PATH}/readOne`, { params: { bno } });
+      const data2 = (r2 as any)?.data ?? r2;
+      const result2 = data2?.result ?? data2;
+      const detail2 =
+        result2?.readOneBoard ??
+        result2?.board ??
+        result2 ?? null;
+      if (!detail2) throw new Error('board/readOne invalid response (fallback)');
+      return detail2 as BoardDetail;
+    }
+  },
+
+
+  list: (opts: {
+    page?: number | string;
+    size?: number | string;
+    keyword?: string;
+    boardType?: string;
+    type?: string;
+  }) => {
     const page1 = Number(opts.page ?? 1);
     const sizeN = Number(opts.size ?? 10);
-    const boardKind = (opts.boardType ?? opts.type ?? "").toString().trim().toUpperCase() || "NOTICE";
+    const boardKind =
+      (opts.boardType ?? opts.type ?? '').toString().trim().toUpperCase() || 'NOTICE';
 
     return http
       .get(`${BASE_PATH}/readAll`, {
-        params: { page: page1, size: sizeN, type: boardKind, keyword: opts.keyword ?? "" },
+        params: { page: page1, size: sizeN, type: boardKind, keyword: opts.keyword ?? '' },
       })
       .then((r) => unwrap<PageRes<BoardDTO>>(r));
   },
 
-  // ✅ get은 "원본" 그대로: { readOneBoard: BoardDetail }
-  get: (bno: number, like = false): Promise<{ readOneBoard: BoardDetail }> =>
-    http
-      .get(`${BASE_PATH}/readOne/${bno}${like ? '?like=true' : ''}`)
-      .then((r) => unwrap<{ readOneBoard: BoardDetail }>(r)),
-
   create: (payload: CreateBoardReq) =>
-    http.post(`${BASE_PATH}/create`, payload)
-       .then((r) => unwrap<{ createBoard: BoardDTO }>(r)),
-
+    http.post(`${BASE_PATH}/create`, payload).then((r) => unwrap<{ createBoard: BoardDTO }>(r)),
   update: (payload: UpdateBoardReq) =>
-    http.post(`${BASE_PATH}/update/${payload.bno}`, payload)
-       .then((r) => unwrap<{ updateBoard: BoardDTO }>(r)),
-
+    http.post(`${BASE_PATH}/update/${payload.bno}`, payload).then((r) => unwrap<{ updateBoard: BoardDTO }>(r)),
   remove: (bno: number) =>
-    http.post(`${BASE_PATH}/delete/${bno}`)
-       .then((r) => unwrap<{ deleteBoard: BoardDTO }>(r)),
-
+    http.post(`${BASE_PATH}/delete/${bno}`).then((r) => unwrap<{ deleteBoard: BoardDTO }>(r)),
   like: (bno: number) =>
-    http.post(`${BASE_PATH}/like/${bno}`)
-       .then((r) => unwrap<{ updateBoard: BoardDTO }>(r)),
+    http.post(`${BASE_PATH}/like/${bno}`).then((r) => unwrap<{ updateBoard: BoardDTO }>(r)),
 };
