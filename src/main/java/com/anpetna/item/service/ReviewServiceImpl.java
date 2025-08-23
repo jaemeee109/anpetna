@@ -1,25 +1,18 @@
 package com.anpetna.item.service;
 
-import com.anpetna.item.config.ItemMapper;
 import com.anpetna.item.config.ReviewMapper;
-import com.anpetna.item.domain.ItemEntity;
 import com.anpetna.item.domain.ReviewEntity;
-import com.anpetna.item.dto.ItemDTO;
 import com.anpetna.item.dto.ReviewDTO;
-import com.anpetna.item.dto.deleteItem.DeleteItemRes;
 import com.anpetna.item.dto.deleteReview.DeleteReviewReq;
 import com.anpetna.item.dto.deleteReview.DeleteReviewRes;
-import com.anpetna.item.dto.modifyItem.ModifyItemRes;
 import com.anpetna.item.dto.modifyReview.ModifyReviewReq;
 import com.anpetna.item.dto.modifyReview.ModifyReviewRes;
 import com.anpetna.item.dto.registerReview.RegisterReviewReq;
 import com.anpetna.item.dto.registerReview.RegisterReviewRes;
 import com.anpetna.item.dto.searchAllReview.SearchAllReviewsReq;
-import com.anpetna.item.dto.searchAllReview.SearchAllReviewsRes;
 import com.anpetna.item.dto.searchOneReview.SearchOneReviewReq;
 import com.anpetna.item.dto.searchOneReview.SearchOneReviewRes;
-import com.anpetna.item.repository.ItemJpaRepository;
-import com.anpetna.item.repository.ReviewJpaRepository;
+import com.anpetna.item.repository.ReviewRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
@@ -33,11 +26,11 @@ import java.util.Optional;
 @Service
 public class ReviewServiceImpl implements ReviewService {
 
-    private final ReviewJpaRepository repository;
+    private final ReviewRepository repository;
     private final ModelMapper modelMapper;
     private final ReviewMapper reviewMapper;
 
-    public ReviewServiceImpl(ReviewJpaRepository repository, ModelMapper modelMapper, ReviewMapper reviewMapper) {
+    public ReviewServiceImpl(ReviewRepository repository, ModelMapper modelMapper, ReviewMapper reviewMapper) {
         this.repository = repository;
         this.modelMapper = modelMapper;
         this.reviewMapper = reviewMapper;

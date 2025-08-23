@@ -1,21 +1,19 @@
 package com.anpetna.item.dto;
 
-import com.anpetna.coreDomain.ImageEntity;
-import com.anpetna.coreDto.ImageDTO;
+import com.anpetna.coreDto.ImageListDTO;
 import com.anpetna.item.constant.ItemCategory;
 import com.anpetna.item.constant.ItemSaleStatus;
 import com.anpetna.item.constant.ItemSellStatus;
 import lombok.Builder;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.ToString;
 
-import java.util.ArrayList;
-import java.util.List;
-
 @Getter
-@Builder
+
 @ToString
-public class ItemDTO extends BaseReq {
+@NoArgsConstructor
+public class ItemDTO extends ImageListDTO {
 
     private Long itemId; // 상품코드
 

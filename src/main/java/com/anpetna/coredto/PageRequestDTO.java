@@ -19,18 +19,31 @@ import java.net.URLEncoder;
 @NoArgsConstructor
 @Log4j2
 public class PageRequestDTO {
-    // 페이징 처리에 요청용 (프론트에서 요청이오면 동작)
-    // 페이징에 관련된 정보(page,size), 검색 종류(types-> 제목t, 내용c, 작성자w), 키워드(검색단어) 처리용
 
-    @Builder.Default // 빌터페턴시작시 초기값이 들어감.
-    private int page = 1;  // 첫페이지
+    // 페이징
+    private Integer page;       // 페이지 번호 (0부터 시작)
+    private Integer size;       // 한 페이지에 담을 아이템 수
 
-    @Builder.Default
-    private int size = 10; // 게시물 수
+    // 정렬
+    private String sortBy;      // 정렬 기준 (ex: "cartId", "price")
+    private String sortDir;     // asc / desc
 
-    private String type ;  // t, c, w , t c, t w ,t w c  ..... (다중검색용)
+    // 무한 스크롤용 옵션
+    private Long lastId;        // lastId 기반 페이징 (cursor) -> 무한 스크롤 시 필요
 
-    private String keyword ;  // 폼박스에 검색 내용
+    // 입력 검색
+    private String keyword;
+
+    // 편의 메서드: Slice/Page Pageable 변환 가능
+    public Pageable toPageable() {
+        Sort sort = "asc".equalsIgnoreCase(sortDir)
+                ? Sort.by(sortBy).ascending()
+                : Sort.by(sortBy).descending();
+        return PageRequest.of(page != null ? page : 0, size != null ? size : 20, sort);
+    }
+
+
+/*
 
     private String link;  // 프론트에 페이징번호 클릭시 처리되는 문자열
     // list?page=3&type=w&keyword=kkw
@@ -44,9 +57,9 @@ public class PageRequestDTO {
             builder.append("page=" + this.page); // page=1
             builder.append("&size=" + this.size); // page=1&size=10
 
-            if(type != null && type.length() >0 ){
+            if(sortBy != null && sortBy.length() >0 ){
                 // 타입이 있을 때
-                builder.append("&type=" + type); // page=1&size=10&type=???
+                builder.append("&type=" + sortBy); // page=1&size=10&type=???
 
             } // 타입이 있을 때 if문 종료
 
@@ -69,11 +82,11 @@ public class PageRequestDTO {
     // 추가메서드
     public String[] getTypes(){
         // 프론트에서 문자열이 여러개가 넘어오면 배열로 변환
-        if(type==null || type.isEmpty()){
+        if(sortBy==null || sortBy.isEmpty()){
             // 넘어온 값이 널이거나 비어 있으면
             return null;
         }
-        return type.split(""); // 차후에 프론트에 폼박스 확인하고 조절!!!!
+        return sortBy.split(""); // 차후에 프론트에 폼박스 확인하고 조절!!!!
         // 문자열로 넘어온 값일 분할하여 배열에 꼽는다.
     }
 
@@ -83,5 +96,6 @@ public class PageRequestDTO {
         //                    페이지번호     게시물 수    정렬기법
     }
 
+*/
 
 }

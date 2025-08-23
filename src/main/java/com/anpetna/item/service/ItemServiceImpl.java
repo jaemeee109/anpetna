@@ -12,7 +12,7 @@ import com.anpetna.item.dto.registerItem.RegisterItemRes;
 import com.anpetna.item.dto.searchAllItem.SearchAllItemsReq;
 import com.anpetna.item.dto.searchOneItem.SearchOneItemReq;
 import com.anpetna.item.dto.searchOneItem.SearchOneItemRes;
-import com.anpetna.item.repository.ItemJpaRepository;
+import com.anpetna.item.repository.ItemRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
@@ -23,12 +23,12 @@ import java.util.Optional;
 @Service
 public class ItemServiceImpl implements ItemService {
 
-    private final ItemJpaRepository repository;
+    private final ItemRepository repository;
     private final ModelMapper modelMapper;
     private final ItemMapper itemMapper;
 
     //  생성자 주입 관련해 생각해야함..
-    public ItemServiceImpl(ItemJpaRepository repository, ItemMapper itemMapper, ModelMapper modelMapper) {
+    public ItemServiceImpl(ItemRepository repository, ItemMapper itemMapper, ModelMapper modelMapper) {
         this.repository = repository;
         this.itemMapper = itemMapper;
         this.modelMapper = modelMapper;

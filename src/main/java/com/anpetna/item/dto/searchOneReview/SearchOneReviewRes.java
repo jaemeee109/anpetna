@@ -1,16 +1,21 @@
 package com.anpetna.item.dto.searchOneReview;
 
-import com.anpetna.coreDomain.ImageEntity;
-import com.anpetna.item.constant.ItemCategory;
-import com.anpetna.item.constant.ItemSaleStatus;
-import com.anpetna.item.constant.ItemSellStatus;
-import com.anpetna.item.dto.BaseReq;
+import com.anpetna.coreDto.ImageListDTO;
+import com.anpetna.item.dto.ItemDTO;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.time.LocalDateTime;
 
-public class SearchOneReviewRes extends BaseReq {
+public class SearchOneReviewRes extends ImageListDTO {
 
+    private Long reviewId;
+
+    private String content;
+
+    private int rating;
+
+    private LocalDateTime regDate;
+
+    private ItemDTO itemId;
 
 
 }

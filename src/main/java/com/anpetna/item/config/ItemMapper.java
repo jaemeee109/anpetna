@@ -2,26 +2,17 @@ package com.anpetna.item.config;
 
 import com.anpetna.coreDomain.ImageEntity;
 import com.anpetna.coreDto.ImageDTO;
+import com.anpetna.coreDto.ImageListDTO;
 import com.anpetna.item.domain.ItemEntity;
-import com.anpetna.item.dto.BaseReq;
 import com.anpetna.item.dto.ItemDTO;
 import com.anpetna.item.dto.modifyItem.ModifyItemReq;
-import com.anpetna.item.dto.modifyItem.ModifyItemRes;
 import com.anpetna.item.dto.registerItem.RegisterItemReq;
-import com.anpetna.item.dto.registerItem.RegisterItemRes;
-import com.anpetna.item.dto.searchAllItem.SearchAllItemsReq;
-import com.anpetna.item.dto.searchOneItem.SearchOneItemReq;
 import com.anpetna.item.dto.searchOneItem.SearchOneItemRes;
-import jakarta.annotation.PostConstruct;
-import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
 import org.modelmapper.TypeMap;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.stream.Collectors;
 
 @Component
 public class ItemMapper {
@@ -51,7 +42,7 @@ public class ItemMapper {
         return imageToDTO(typeMap);
     }
 
-    public <S extends BaseReq>TypeMap imageToEntity(TypeMap<S, ItemEntity> typeMap) {
+    public <S extends ImageListDTO>TypeMap imageToEntity(TypeMap<S, ItemEntity> typeMap) {
         typeMap.setPostConverter(ctx-> {
             var src = ctx.getSource();
             var des = ctx.getDestination();
@@ -68,7 +59,7 @@ public class ItemMapper {
         return typeMap;
     }
 
-    public <S extends BaseReq>TypeMap imageToDTO(TypeMap<ItemEntity, S> typeMap) {
+    public <S extends ImageListDTO>TypeMap imageToDTO(TypeMap<ItemEntity, S> typeMap) {
         typeMap.setPostConverter(ctx-> {
             var src = ctx.getSource();
             var des = ctx.getDestination();

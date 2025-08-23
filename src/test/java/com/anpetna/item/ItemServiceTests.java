@@ -1,4 +1,4 @@
-package com.anpetna.item.service;
+package com.anpetna.item;
 
 import com.anpetna.coreDto.ImageDTO;
 import com.anpetna.item.constant.ItemCategory;
@@ -14,18 +14,17 @@ import com.anpetna.item.dto.registerItem.RegisterItemRes;
 import com.anpetna.item.dto.searchAllItem.SearchAllItemsReq;
 import com.anpetna.item.dto.searchOneItem.SearchOneItemReq;
 import com.anpetna.item.dto.searchOneItem.SearchOneItemRes;
+import com.anpetna.item.service.ItemService;
 import jakarta.transaction.Transactional;
 import org.hibernate.query.SortDirection;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 import org.springframework.test.context.ActiveProfiles;
 import java.util.List;
 
 @SpringBootTest
-@ActiveProfiles("test")
-@EnableJpaAuditing
+@ActiveProfiles("item")
 public class ItemServiceTests {
 
     @Autowired
@@ -33,6 +32,7 @@ public class ItemServiceTests {
 
     @Test
     public void registerItem() {
+        //given
         ImageDTO image1 = ImageDTO.builder()
                 .fileName("이미지파일1")
                 .url("https://www.baidu.com")
@@ -54,8 +54,11 @@ public class ItemServiceTests {
                 .build();
         req.addImage(image1);
         req.addImage(image2);
+
+        //when
         RegisterItemRes res = itemService.registerItem(req);
 
+        //then
         System.out.println(res);
     }
 

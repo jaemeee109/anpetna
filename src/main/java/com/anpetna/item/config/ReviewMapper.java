@@ -2,21 +2,15 @@ package com.anpetna.item.config;
 
 import com.anpetna.coreDomain.ImageEntity;
 import com.anpetna.coreDto.ImageDTO;
-import com.anpetna.item.domain.ItemEntity;
+import com.anpetna.coreDto.ImageListDTO;
 import com.anpetna.item.domain.ReviewEntity;
-import com.anpetna.item.dto.BaseReq;
-import com.anpetna.item.dto.ItemDTO;
 import com.anpetna.item.dto.ReviewDTO;
-import com.anpetna.item.dto.modifyItem.ModifyItemReq;
 import com.anpetna.item.dto.modifyReview.ModifyReviewReq;
-import com.anpetna.item.dto.registerItem.RegisterItemReq;
 import com.anpetna.item.dto.registerReview.RegisterReviewReq;
-import com.anpetna.item.dto.searchOneItem.SearchOneItemRes;
 import com.anpetna.item.dto.searchOneReview.SearchOneReviewRes;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
 import org.modelmapper.TypeMap;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -48,7 +42,7 @@ public class ReviewMapper {
         return imageToDTO(typeMap);
     }
 
-    public <S extends BaseReq>TypeMap imageToEntity(TypeMap<S, ReviewEntity> typeMap) {
+    public <S extends ImageListDTO>TypeMap imageToEntity(TypeMap<S, ReviewEntity> typeMap) {
         typeMap.setPostConverter(ctx-> {
             var src = ctx.getSource();
             var des = ctx.getDestination();
@@ -65,7 +59,7 @@ public class ReviewMapper {
         return typeMap;
     }
 
-    public <S extends BaseReq>TypeMap imageToDTO(TypeMap<ReviewEntity, S> typeMap) {
+    public <S extends ImageListDTO>TypeMap imageToDTO(TypeMap<ReviewEntity, S> typeMap) {
         typeMap.setPostConverter(ctx-> {
             var src = ctx.getSource();
             var des = ctx.getDestination();

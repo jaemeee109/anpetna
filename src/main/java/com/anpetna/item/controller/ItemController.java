@@ -18,7 +18,6 @@ import lombok.extern.log4j.Log4j2;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -33,7 +32,7 @@ public class ItemController {
 
     @PostMapping
     @PreAuthorize("hasRole('USER')")
-    //컨트롤러나 서비스 메서드 실행 전에 SpEL(Security Expression Language)로 권한 검증
+    //  컨트롤러나 서비스 메서드 실행 전에 SpEL(Security Expression Language)로 권한 검증
     public ResponseEntity<RegisterItemRes> registerItem(@RequestBody RegisterItemReq registerItemReq) {
         var postResult = itemService.registerItem(registerItemReq);
         return new ResponseEntity<>(postResult, HttpStatus.OK);
@@ -62,12 +61,17 @@ public class ItemController {
     }
 
     @GetMapping("/{sortItem}")
-    @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('USER','ADMIN')")
     public ResponseEntity<List<ItemDTO>> searchAllItems(@RequestBody SearchAllItemsReq req) {
         var getAllResult = itemService.getAllItems(req);
         return new ResponseEntity<>(getAllResult, HttpStatus.OK);
     }
 
+
+
+    //  @PreAuthorize("#id == principal.id")            // 요청 파라미터 id와 로그인 사용자 id 같을 때만 허용
+    //  @PreAuthorize("isAuthenticated()")              // 로그인만 되어 있으면 허용
+    //  @PreAuthorize("permitAll()")                    // 모두 허용
     //판매량순, 가격순
     //soldout처리
     //onsale여부

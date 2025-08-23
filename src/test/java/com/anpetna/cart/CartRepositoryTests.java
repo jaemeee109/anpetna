@@ -71,7 +71,7 @@ class CartRepositoryTests {
         item.setItemSellStatus(ItemSellStatus.SELL);
         item.setItemSaleStatus(ItemSaleStatus.ORIGIN);
         item.setItemCategory(ItemCategory.FEED);
-        item.setItemThumbsId("thumb-1");
+      //  item.setItemThumbsId("thumb-1");
         em.persist(item);
 
         cart = new CartEntity();
