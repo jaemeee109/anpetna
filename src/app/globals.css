@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 /* ================= Base & Container ================= */
 :root {
   --apn-container: 1300px;   /* 본문 최대 너비 */
@@ -175,3 +179,42 @@ p  { font-weight: 400; }
   .apn3-illust{ justify-self:center; }
   .apn3-illust img{ width:220px; }
 }
+
+/* 리스트 안쪽에 붙는 남는 아이콘/불릿/밑줄 전부 제거(이 프로젝트 스코프에서만) */
+/* 리스트 내부 기본 링크/아이콘 스타일 무력화 */
+.board-box a { color:#111 !important; text-decoration:none !important; }
+.board-box li::marker { content:'' !important; }
+.board-box li::before, .board-box a::before { content:none !important; }
+
+
+
+/* 3D 버튼 공통 (크기 바꾸고 싶으면 height / padding / font-size 수정) */
+.btn-3d{
+  display:inline-flex;align-items:center;justify-content:center;
+  height:36px;padding:0 12px;font-size:.875rem;border-radius:.375rem;
+  border:1px solid #E5E7EB;background:#fff;color:#111;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.85),0 1.5px 2px rgba(0,0,0,.15);
+  transition:transform .05s ease;
+}
+.btn-3d:active{ transform: translateY(1px); }
+.btn-white{ background:#fff; border-color:#E5E7EB; color:#111; }
+
+
+
+/* 테이블 안 링크 기본 스타일(파란색/밑줄 방지) */
+.board-box a { color:#111; text-decoration:none; }
+
+/* 검색바 전용 스코프 */
+.search-bar .search-input{
+  border: 1px solid #E5E7EB !important; /* gray-200 */
+  outline: none !important;
+  box-shadow: none !important;
+}
+.search-bar .search-input:focus{
+  border-color: #D1D5DB !important;      /* gray-300 */
+}
+
+
+
+
+
