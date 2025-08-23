@@ -1,12 +1,13 @@
 "use client";
 import { use } from "react"; //  Promise 언랩용
 import { useRouter } from "next/navigation";
-import { useBoardDetail, useLikeBoard } from "@/features/board/hooks/useBoards";
+import { useBoardDetail, useLikeBoard, useRemoveBoard } from "@/features/board/hooks/useBoards";
 import {
   useComments,
   useCreateComment,
   useRemoveComment,
   useLikeComment,
+  useUpdateComment,
 } from "@/features/board/hooks/useComments";
 import Link from "next/link";
 import { useState } from "react";
@@ -23,18 +24,23 @@ export default function BoardDetailPage({
 
   const { data: board, isLoading, error } = useBoardDetail(id); // ✅ data: BoardDetail | undefined
   const likeMut = useLikeBoard();
+  const removeBoardMut = useRemoveBoard(); // 삭제
 
   const { data: comm, isLoading: commLoading } = useComments(id, 1, 20);
   const createMut = useCreateComment();
   const removeMut = useRemoveComment(id);
   const likeCommMut = useLikeComment(id);
+  const updateCommMut = useUpdateComment(id);
 
-  const [content, setContent] = useState("");
+
+
 
   const [commWriter, setCommWriter] = useState(() => {
   if (typeof window !== "undefined") return localStorage.getItem("memberId") || "";
   return "";
 });
+const [editingCno, setEditingCno] = useState<number | null>(null);
+const [editText, setEditText] = useState("");
 const [commContent, setCommContent] = useState("");
 
   if (isLoading) return <div>로딩중…</div>;
@@ -74,6 +80,8 @@ const likeCount =
   (board as any).blikeCount ??       // ← 추가
   0;
 
+
+
 // ✅ 댓글 배열 안전 매핑 (page/dtoList 경로 + 키 이름 대소문자 차이 대비)
 const commentList =
   (comm as any)?.page?.dtoList ??
@@ -87,10 +95,31 @@ return (
       <button onClick={() => likeMut.mutate(id)} className="px-3 py-1 border rounded">
   좋아요 👍 {likeCount}
 </button>
-      <Link className="px-3 py-1 border rounded" href={`/board/${type}/${bno}/edit`}>
-        수정
-      </Link>
+        <Link className="px-3 py-1 border rounded" href={`/board/${type}/${bno}/edit`}>
+    수정
+  </Link>
+
+  <button
+    className="px-3 py-1 border rounded text-red-600"
+    disabled={removeBoardMut.isPending}
+    onClick={() => {
+      if (!confirm("정말 이 글을 삭제하시겠습니까?")) return;
+      removeBoardMut.mutate(id, {
+        onSuccess: () => {
+          alert("삭제되었습니다.");
+          router.push(`/board/${type}`); // 목록으로
+        },
+        onError: (err: any) => {
+          const status = err?.response?.status;
+          alert(`삭제 실패 (status: ${status ?? "?"})`);
+        },
+      });
+    }}
+  >
+    {removeBoardMut.isPending ? "삭제 중..." : "삭제"}
+  </button>
     </div>
+    
 
     <div className="text-sm text-gray-500">
       {writer} · {createdText}
@@ -111,48 +140,101 @@ return (
       {commLoading ? (
         <div>댓글 로딩중…</div>
       ) : (
-        <ul className="divide-y my-3">
+       <ul className="divide-y my-3">
   {commentList.map((c: any) => {
     const cw = c.cWriter ?? c.cwriter ?? "anonymous";
     const cc = c.cContent ?? c.ccontent ?? "";
     const lk = c.cLikeCount ?? c.clikeCount ?? 0;
 
-    // 날짜 키(대/소문자 섞여도 안전)
-    const created =
-      c.createDate ?? c.cCreateDate ?? c.regDate ?? c.createdAt ?? null;
-    const updated =
-      c.latestDate ?? c.updateDate ?? c.updatedAt ?? null;
-
-    const createdText = fmtK(created);
-    const edited =
-      updated && created && new Date(updated).getTime() > new Date(created).getTime();
+    // 보기 모드가 기본
+    const isEditing = editingCno === c.cno;
 
     return (
-      <li key={c.cno} className="py-2 flex items-start gap-2">
-        <div className="flex-1">
-          <div className="text-sm">
-            <b>{cw}</b>{" "}
-            <span className="text-gray-500">
-              {createdText}
-              {edited ? " (수정)" : ""}
-            </span>
+      <li key={c.cno} className="py-2">
+        {/* ---- 보기 모드 ---- */}
+        {!isEditing && (
+          <div className="flex items-start gap-2">
+            <div className="flex-1">
+              <div className="text-sm">
+                <b>{cw}</b>
+              </div>
+              <div className="text-gray-800 whitespace-pre-wrap">{cc}</div>
+              <div className="mt-1 flex gap-2">
+                <button
+                  className="px-2 py-1 text-sm border rounded"
+                  onClick={() => likeCommMut.mutate(c.cno)}
+                >
+                  좋아요 {lk}
+                </button>
+                <button
+                  className="px-2 py-1 text-sm border rounded"
+                  onClick={() => {
+                    setEditingCno(c.cno);
+                    setEditText(cc); // 기존 내용 채우기
+                  }}
+                >
+                  수정
+                </button>
+                <button
+                  className="px-2 py-1 text-sm border rounded"
+                  onClick={() => removeMut.mutate(c.cno)}
+                >
+                  삭제
+                </button>
+              </div>
+            </div>
           </div>
-          <div className="text-gray-800 whitespace-pre-wrap">{cc}</div>
-          <div className="mt-1 flex gap-2">
+        )}
+
+        {/* ---- 수정 모드 ---- */}
+        {isEditing && (
+          <form
+            className="flex items-center gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!editText.trim()) {
+                alert("내용을 입력하세요.");
+                return;
+              }
+              // 작성자 변경 안 하면 보낼 필요 없음
+              updateCommMut.mutate(
+                { cno: c.cno, cContent: editText.trim() },
+                {
+                  onSuccess: () => {
+                    setEditingCno(null);
+                    setEditText("");
+                  },
+                  onError: () => alert("댓글 수정 실패"),
+                }
+              );
+            }}
+          >
+            {/* 작성자는 수정 불가(요구사항) → 표시만 */}
+            <span className="text-sm text-gray-600 w-28 shrink-0">{cw}</span>
+            <input
+              className="border px-3 py-2 rounded flex-1"
+              value={editText}
+              onChange={(e) => setEditText(e.target.value)}
+              autoFocus
+            />
             <button
-              className="px-2 py-1 text-sm border rounded"
-              onClick={() => likeCommMut.mutate(c.cno)}
+              className="px-2 py-1 text-sm rounded bg-black text-white"
+              disabled={updateCommMut.isPending}
             >
-              좋아요 {lk}
+              저장
             </button>
             <button
+              type="button"
               className="px-2 py-1 text-sm border rounded"
-              onClick={() => removeMut.mutate(c.cno)}
+              onClick={() => {
+                setEditingCno(null);
+                setEditText("");
+              }}
             >
-              삭제
+              취소
             </button>
-          </div>
-        </div>
+          </form>
+        )}
       </li>
     );
   })}
@@ -208,6 +290,6 @@ function fmtK(dstr?: string | null) {
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
   const hh = String(d.getHours()).padStart(2, "0");
-  /*const mi = String(d.getMinutes()).padStart(2, "0");*/
+  const mi = String(d.getMinutes()).padStart(2, "0");
   return `${yy}.${mm}.${dd} ${hh}:${mi}`;
 }
