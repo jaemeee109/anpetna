@@ -1,5 +1,5 @@
 "use client";
-import { use } from "react"; // ✅ Promise 언랩용
+import { use } from "react"; //  Promise 언랩용
 import { useRouter } from "next/navigation";
 import { useBoardDetail, useLikeBoard } from "@/features/board/hooks/useBoards";
 import {
@@ -30,6 +30,12 @@ export default function BoardDetailPage({
   const likeCommMut = useLikeComment(id);
 
   const [content, setContent] = useState("");
+
+  const [commWriter, setCommWriter] = useState(() => {
+  if (typeof window !== "undefined") return localStorage.getItem("memberId") || "";
+  return "";
+});
+const [commContent, setCommContent] = useState("");
 
   if (isLoading) return <div>로딩중…</div>;
   if (error) return <div>에러가 발생했어요</div>;
@@ -106,65 +112,102 @@ return (
         <div>댓글 로딩중…</div>
       ) : (
         <ul className="divide-y my-3">
-          {commentList.map((c: any) => {
-            const cw = c.cWriter ?? c.cwriter ?? '익명';
-            const cc = c.cContent ?? c.ccontent ?? '';
-            const lk = c.cLikeCount ?? c.clikeCount ?? 0;
-            return (
-              <li key={c.cno} className="py-2 flex items-center gap-2">
-                <div className="flex-1">
-                  <div className="text-sm">
-                    <b>{cw}</b>
-                  </div>
-                  <div className="text-gray-700 whitespace-pre-wrap">
-                    {cc}
-                  </div>
-                </div>
-                <button
-                  className="px-2 py-1 text-sm border rounded"
-                  onClick={() => likeCommMut.mutate(c.cno)}
-                >
-                  좋아요 {lk}
-                </button>
-                <button
-                  className="px-2 py-1 text-sm border rounded"
-                  onClick={() => removeMut.mutate(c.cno)}
-                >
-                  삭제
-                </button>
-              </li>
-            );
-          })}
-          {(commentList.length === 0) && (
-            <li className="py-2 text-gray-500">첫 댓글을 남겨보세요</li>
-          )}
-        </ul>
+  {commentList.map((c: any) => {
+    const cw = c.cWriter ?? c.cwriter ?? "anonymous";
+    const cc = c.cContent ?? c.ccontent ?? "";
+    const lk = c.cLikeCount ?? c.clikeCount ?? 0;
+
+    // 날짜 키(대/소문자 섞여도 안전)
+    const created =
+      c.createDate ?? c.cCreateDate ?? c.regDate ?? c.createdAt ?? null;
+    const updated =
+      c.latestDate ?? c.updateDate ?? c.updatedAt ?? null;
+
+    const createdText = fmtK(created);
+    const edited =
+      updated && created && new Date(updated).getTime() > new Date(created).getTime();
+
+    return (
+      <li key={c.cno} className="py-2 flex items-start gap-2">
+        <div className="flex-1">
+          <div className="text-sm">
+            <b>{cw}</b>{" "}
+            <span className="text-gray-500">
+              {createdText}
+              {edited ? " (수정)" : ""}
+            </span>
+          </div>
+          <div className="text-gray-800 whitespace-pre-wrap">{cc}</div>
+          <div className="mt-1 flex gap-2">
+            <button
+              className="px-2 py-1 text-sm border rounded"
+              onClick={() => likeCommMut.mutate(c.cno)}
+            >
+              좋아요 {lk}
+            </button>
+            <button
+              className="px-2 py-1 text-sm border rounded"
+              onClick={() => removeMut.mutate(c.cno)}
+            >
+              삭제
+            </button>
+          </div>
+        </div>
+      </li>
+    );
+  })}
+  {commentList.length === 0 && (
+    <li className="py-2 text-gray-500">첫 댓글을 남겨보세요</li>
+  )}
+</ul>
       )}
 
       <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          const writer =
-            (typeof window !== "undefined" && localStorage.getItem("memberId")) ||
-            "anonymous";
-          createMut.mutate(
-            { bno: id, cWriter: writer, cContent: content },
-            { onSuccess: () => setContent("") }
-          );
-        }}
-        className="flex gap-2"
-      >
-        <input
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          placeholder="댓글 내용을 입력하세요"
-          className="border px-3 py-2 rounded w-full"
-        />
-        <button className="px-3 py-2 rounded bg-black text-white">
-          등록
-        </button>
-      </form>
+  onSubmit={(e) => {
+    e.preventDefault();
+    // 작성자/내용 모두 필수
+    if (!commWriter.trim() || !commContent.trim()) {
+      alert("작성자와 내용을 입력하세요.");
+      return;
+    }
+    createMut.mutate(
+      { bno: id, cWriter: commWriter.trim(), cContent: commContent.trim() },
+      { onSuccess: () => setCommContent("") }
+    );
+  }}
+  className="flex flex-col gap-2 mt-3"
+>
+  <div className="flex gap-2">
+    <input
+      value={commWriter}
+      onChange={(e) => setCommWriter(e.target.value)}
+      placeholder="작성자"
+      className="border px-3 py-2 rounded w-40"
+    />
+    <input
+      value={commContent}
+      onChange={(e) => setCommContent(e.target.value)}
+      placeholder="댓글 내용을 입력하세요"
+      className="border px-3 py-2 rounded flex-1"
+    />
+    <button className="px-3 py-2 rounded bg-black text-white">
+      등록
+    </button>
+  </div>
+</form>
     </section>
   </div>
 );
+}
+// utils: 날짜 포맷 "25-08-23 17:57"
+function fmtK(dstr?: string | null) {
+  if (!dstr) return "";
+  const d = new Date(dstr);
+  if (isNaN(d.getTime())) return "";
+  const yy = String(d.getFullYear()).slice(-2);
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const hh = String(d.getHours()).padStart(2, "0");
+  /*const mi = String(d.getMinutes()).padStart(2, "0");*/
+  return `${yy}.${mm}.${dd} ${hh}:${mi}`;
 }
