@@ -1,6 +1,6 @@
 package com.anpetna.item.dto.registerReview;
 
-import com.anpetna.item.dto.BaseReq;
+import com.anpetna.coreDto.ImageListDTO;
 import lombok.Getter;
 import lombok.ToString;
 
@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 
 @ToString
 @Getter
-public class RegisterReviewReq extends BaseReq {
+public class RegisterReviewReq extends ImageListDTO {
 
     private String content;
 

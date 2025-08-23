@@ -1,4 +1,4 @@
-package com.anpetna.item.controller;
+package com.anpetna.item;
 
 public class ItemControllerTests {
 }

@@ -1,20 +1,15 @@
 package com.anpetna.item.dto.registerItem;
 
-import com.anpetna.coreDto.ImageDTO;
+import com.anpetna.coreDto.ImageListDTO;
 import com.anpetna.item.constant.ItemCategory;
 import com.anpetna.item.constant.ItemSaleStatus;
 import com.anpetna.item.constant.ItemSellStatus;
-import com.anpetna.item.domain.ItemEntity;
-import com.anpetna.item.dto.BaseReq;
 import lombok.Builder;
 import lombok.Getter;
 
-import java.util.ArrayList;
-import java.util.List;
-
 @Builder
 @Getter
-public class RegisterItemReq extends BaseReq {
+public class RegisterItemReq extends ImageListDTO {
 
     //  8개
 

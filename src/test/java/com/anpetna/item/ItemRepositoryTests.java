@@ -1,16 +1,15 @@
-package com.anpetna.item.repository;
+package com.anpetna.item;
 
 import com.anpetna.coreDomain.ImageEntity;
 import com.anpetna.item.constant.ItemCategory;
 import com.anpetna.item.constant.ItemSaleStatus;
 import com.anpetna.item.constant.ItemSellStatus;
 import com.anpetna.item.domain.ItemEntity;
-import jakarta.transaction.Transactional;
+import com.anpetna.item.repository.ItemRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
-import org.springframework.test.context.ActiveProfiles;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -28,7 +27,7 @@ public class ItemRepositoryTests {
     //  기대 결과 검증
 
     @Autowired
-    ItemJpaRepository itemJPARepository;
+    ItemRepository itemRepository;
 
     @Test
     public void insert() {
@@ -48,17 +47,17 @@ public class ItemRepositoryTests {
 
 
         //  서비스의 메서드 단위로 트랜젝션 처리
-        ItemEntity savedItem = itemJPARepository.save(item);
+        ItemEntity savedItem = itemRepository.save(item);
 
         // Then (확인용 조회)
-        Optional<ItemEntity> foundItem = itemJPARepository.findById(savedItem.getItemId());
+        Optional<ItemEntity> foundItem = itemRepository.findById(savedItem.getItemId());
         assertThat(foundItem).isPresent();
         assertThat(foundItem.get()).isEqualTo(savedItem);
     }
 
     public void selectAll(){
         List<ImageEntity> imageEntities = new ArrayList<>();
-        List<ItemEntity> itemEntities = itemJPARepository.findAll();
+        List<ItemEntity> itemEntities = itemRepository.findAll();
         assertThat(itemEntities).isNotEmpty();
 
     }

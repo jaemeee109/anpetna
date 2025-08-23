@@ -1,12 +1,9 @@
 package com.anpetna.item.dto;
 
-import com.anpetna.coreDto.ImageDTO;
-
+import com.anpetna.coreDto.ImageListDTO;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
 
-public class ReviewDTO extends BaseReq{
+public class ReviewDTO extends ImageListDTO {
 
     private Long reviewId;
 

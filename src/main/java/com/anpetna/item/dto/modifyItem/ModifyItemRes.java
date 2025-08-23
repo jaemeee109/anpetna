@@ -1,7 +1,5 @@
 package com.anpetna.item.dto.modifyItem;
 
-import com.anpetna.item.dto.BaseReq;
-import com.anpetna.item.dto.deleteItem.DeleteItemRes;
 import lombok.Setter;
 import lombok.ToString;
 

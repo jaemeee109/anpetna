@@ -1,7 +1,5 @@
-package com.anpetna.item.dto;
+package com.anpetna.coreDto;
 
-import com.anpetna.coreDto.ImageDTO;
-import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
@@ -12,7 +10,7 @@ import java.util.List;
 @ToString
 @Getter
 @Setter
-public class BaseReq {
+public class ImageListDTO {
 
     public List<ImageDTO> images = new ArrayList<>();
 
