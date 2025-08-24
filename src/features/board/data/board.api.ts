@@ -71,3 +71,25 @@ export const boardApi = {
   like: (bno: number) =>
     http.post(`${BASE_PATH}/like/${bno}`).then((r) => unwrap<{ updateBoard: BoardDTO }>(r)),
 };
+
+// 목록 조회
+export async function fetchBoards(params: {
+  page: number;
+  size: number;
+  boardType: string;  // "NOTICE" | "FREE" | "QNA" | "FAQ"
+  keyword?: string;
+}) {
+  const { page, size, boardType, keyword } = params;
+
+  // ✅ 컨트롤러 URL과 동일 (/anpetna/board/readAll)
+  const { data } = await http.get("/anpetna/board/readAll", {
+    params: {
+      page,
+      size,
+      boardType,             // ✅ 반드시 전송
+      keyword: keyword || "",
+    },
+  });
+
+  return data;
+}

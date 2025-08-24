@@ -7,7 +7,7 @@ import {
   useBoardDetail,
   useUpdateBoard,
 } from "@/features/board/hooks/useBoards";
-
+import { BoardTitle } from "@/shared/ui/BoardTitle";
 const WRAP = "mx-auto w-full max-w-[700px] px-4";
 
 export default function BoardEditPage({

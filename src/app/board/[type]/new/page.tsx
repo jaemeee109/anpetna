@@ -4,7 +4,7 @@ import * as React from "react";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useCreateBoard } from "@/features/board/hooks/useBoards";
-
+import { BoardTitle } from "@/shared/ui/BoardTitle";
 // 상세/목록과 동일한 컨테이너 폭 + 가운데 정렬
 const WRAP = "mx-auto w-full max-w-[700px] px-4";
 

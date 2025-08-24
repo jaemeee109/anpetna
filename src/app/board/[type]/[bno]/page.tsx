@@ -15,7 +15,7 @@ import {
   useUpdateComment,
 } from "@/features/board/hooks/useComments";
 import type { BoardDetail } from "@/features/board/data/board.types";
-
+import { BoardTitle } from "@/shared/ui/BoardTitle";
 const WRAP = "mx-auto w-full max-w-[960px] px-4"; // 목록 페이지와 동일 컨테이너 폭
 
 export default function BoardDetailPage({
