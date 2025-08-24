@@ -169,7 +169,7 @@ export default function BoardDetailPage({
         {commLoading ? (
           <div className="py-8 text-center text-sm text-gray-500">댓글 로딩중…</div>
         ) : commentList.length === 0 ? (
-          <div className="py-8 text-center text-sm text-gray-500">첫 댓글을 남겨보세요</div>
+          <div className="py-8 text-center text-sm text-gray-500 mb-[40px]">댓글이 없습니다</div>
         ) : (
           commentList.map((c: any) => {
             const cw = c.cWriter ?? c.cwriter ?? "anonymous";
