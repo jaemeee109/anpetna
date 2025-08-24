@@ -9,18 +9,19 @@ import com.anpetna.member.dto.joinMember.JoinMemberReq;
 import com.anpetna.member.dto.joinMember.JoinMemberRes;
 import com.anpetna.member.dto.loginMember.LoginMemberReq;
 import com.anpetna.member.dto.loginMember.LoginMemberRes;
+import com.anpetna.member.dto.logoutMember.LogoutMemberReq;
+import com.anpetna.member.dto.logoutMember.LogoutMemberRes;
 import com.anpetna.member.dto.modifyMember.ModifyMemberReq;
 import com.anpetna.member.dto.modifyMember.ModifyMemberRes;
-import com.anpetna.member.dto.readMemberAll.ReadMemberAllReq;
 import com.anpetna.member.dto.readMemberAll.ReadMemberAllRes;
 import com.anpetna.member.dto.readMemberOne.ReadMemberOneReq;
 import com.anpetna.member.dto.readMemberOne.ReadMemberOneRes;
+import com.anpetna.member.refreshToken.entity.TokenEntity;
 import com.anpetna.member.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.java.Log;
 import org.modelmapper.ModelMapper;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.User;
@@ -32,11 +33,11 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
-import java.util.Optional;
 
 @RequiredArgsConstructor
 @Service
 @Transactional
+@Log
 public class MemberServiceImpl implements MemberService {
 
     private final ModelMapper modelMapper;
@@ -79,30 +80,6 @@ public class MemberServiceImpl implements MemberService {
     }
 
     @Override
-    public LoginMemberRes login(LoginMemberReq req) {
-        MemberEntity member = memberRepository.findByMemberId((req.getMemberId()));
-
-        if (member == null) {
-            throw new RuntimeException("아이디가 존재하지 않습니다.");
-        }
-        if (!member.getMemberPw().equals(req.getMemberPw())) {
-            throw new RuntimeException("비밀번호가 올바르지 않습니다.");
-        }
-        LoginMemberRes res = new LoginMemberRes();
-//        res.setMemberId(member.getMemberId());
-//        res.setMemberPw(req.getMemberPw());
-        res.setToken(req.getMemberId());
-        res.setToken(req.getMemberPw());
-        return res;
-    }
-
-//    @Override
-//    public LoginMemberRes logout(LoginMemberReq req){
-//
-//        return null;
-//    }
-
-    @Override
     public ReadMemberOneRes readOne(ReadMemberOneReq readMemberOneReq) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()
@@ -136,6 +113,7 @@ public class MemberServiceImpl implements MemberService {
         String memberId = modifyMemberReq.getMemberId();
 
         MemberEntity member = memberRepository.findById(memberId).orElse(null);
+        System.out.println(member);
         if (member == null) {
             throw new UsernameNotFoundException(memberId);
         }
@@ -147,7 +125,7 @@ public class MemberServiceImpl implements MemberService {
         member.setMemberRoadAddress(modifyMemberReq.getMemberRoadAddress());
         member.setMemberEtc(modifyMemberReq.getEtc());
         member.setMemberHasPet(modifyMemberReq.getMemberHasPet());
-//        member.setImages(modifyMemberReq.getMemberFileImage());
+        member.setImages(modifyMemberReq.getMemberFileImage());
 
         memberRepository.save(member);
 
