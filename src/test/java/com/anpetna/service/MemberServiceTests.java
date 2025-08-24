@@ -4,6 +4,7 @@ import com.anpetna.member.constant.MemberRole;
 import com.anpetna.member.domain.MemberEntity;
 import com.anpetna.member.dto.deleteMember.DeleteMemberReq;
 import com.anpetna.member.dto.joinMember.JoinMemberReq;
+import com.anpetna.member.dto.logoutMember.LogoutMemberRes;
 import com.anpetna.member.dto.modifyMember.ModifyMemberReq;
 import com.anpetna.member.dto.readMemberAll.ReadMemberAllRes;
 import com.anpetna.member.dto.readMemberOne.ReadMemberOneReq;
@@ -23,6 +24,7 @@ import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.modelmapper.ModelMapper;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Bean;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -33,6 +35,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
@@ -43,14 +46,15 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 @Slf4j
 public class MemberServiceTests {
-    @InjectMocks
-    private MemberServiceImpl memberService;
+
     @Mock
     private PasswordEncoder passwordEncoder;
     @Mock
     private MemberRepository memberRepository;
     @Mock
     private ModelMapper modelMapper;
+    @InjectMocks
+    private MemberServiceImpl memberService;
 
     MemberRepository mockRepo = Mockito.mock(MemberRepository.class);
     ModelMapper mockMapper = Mockito.mock(ModelMapper.class);
@@ -79,13 +83,18 @@ public class MemberServiceTests {
                 .memberBirthY("1919")
                 .memberBirthM("01")
                 .memberBirthD("01")
-                .memberEmail("test@test.com")
+                .memberBirthGM("양력")
                 .memberGender("M")
+                .memberEmail("test@test.com")
                 .memberPhone("010-1234-5678")
-                .memberZipCode("00000")
                 .memberRoadAddress("경기도")
+                .memberZipCode("00000")
+                .memberDetailAddress("집")
                 .social(false)
                 .memberHasPet("Y")
+                .memberRole(MemberRole.ADMIN)
+                .emailStsYn("Y")
+                .smsStsYn("Y")
                 .etc("반려견 1마리 키우는 중")
                 .memberFileImage(null)
                 .build();
@@ -94,7 +103,7 @@ public class MemberServiceTests {
         when(passwordEncoder.encode(anyString())).thenReturn("encodedPassword");
 
         // stub2: ModelMapper
-        when(modelMapper.map(any(JoinMemberReq.class), eq(MemberEntity.class)))
+        when(mockMapper.map(any(JoinMemberReq.class), eq(MemberEntity.class)))
                 .thenAnswer(invocation -> {
                     JoinMemberReq req = invocation.getArgument(0);
                     return MemberEntity.builder()
@@ -223,7 +232,7 @@ public class MemberServiceTests {
         assertThat(oldMember.getMemberZipCode()).isEqualTo("00001");
         assertThat(oldMember.getMemberRoadAddress()).isEqualTo("한국");
         assertThat(oldMember.getMemberEtc()).isEqualTo("반려묘 한마리 추가입니다.");
-//        assertThat(oldMember.getImages()).isNull();
+        assertThat(oldMember.getImages()).isNull();
 
         verify(memberRepository).findById(memberId);
         verify(memberRepository).save(oldMember);
@@ -265,6 +274,5 @@ public class MemberServiceTests {
         assertThat(memberRepository.findById("user01")).isEqualTo(Optional.empty());
 
     }
-
 }
 
