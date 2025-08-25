@@ -1,5 +1,6 @@
 package com.anpetna.board.repository;
 
+import com.anpetna.board.constant.BoardType;
 import com.anpetna.board.domain.BoardEntity;
 import com.anpetna.board.repository.search.BoardSearch;
 import org.springframework.data.domain.Page;
@@ -27,4 +28,9 @@ public interface BoardJpaRepository extends JpaRepository<BoardEntity, Long>, Bo
             Pageable pageable
     );
 
+    Page<BoardEntity> findByBoardTypeAndFaqCategory(BoardType type, String faqCategory, Pageable pageable); // ★ ADD
+    //★ 추가
+
+    Page<BoardEntity> findByBoardTypeAndFaqCategoryContainingIgnoreCase(BoardType type, String faqCategory, Pageable pageable);
+    //★ 추가, 부분검색 대소문자 무시
 }

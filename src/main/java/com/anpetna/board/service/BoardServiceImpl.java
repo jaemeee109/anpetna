@@ -1,5 +1,6 @@
 package com.anpetna.board.service;
 
+import com.anpetna.board.constant.BoardType;
 import com.anpetna.board.domain.BoardEntity;
 import com.anpetna.board.dto.BoardDTO;
 import com.anpetna.board.dto.createBoard.CreateBoardReq;
@@ -15,14 +16,15 @@ import com.anpetna.coreDomain.ImageEntity;
 import com.anpetna.coreDto.PageRequestDTO;
 import com.anpetna.coreDto.PageResponseDTO;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 // 권한/인증
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.Authentication;
 
 // 회원 존재 확인용
 import com.anpetna.member.repository.MemberRepository;
@@ -108,6 +110,7 @@ public class BoardServiceImpl implements BoardService {
                 .isSecret(Boolean.TRUE.equals(req.getIsSecret()))
                 .bViewCount(req.getBViewCount() == null ? 0 : req.getBViewCount())
                 .bLikeCount(req.getBLikeCount() == null ? 0 : req.getBLikeCount())
+                .faqCategory(req.getFaqCategory()) // ★ 추가
                 .build();
 
         // 이미지 첨부
@@ -148,6 +151,13 @@ public class BoardServiceImpl implements BoardService {
                 .build();
     }*/
 
+    //★ 추가
+    //================================================================================= 
+    @Override
+    @Transactional
+    public CreateBoardRes create(CreateBoardReq req) {
+        return createBoard(req); // ✔ CreateBoardRes 그대로 리턴
+    }
 
     //=================================================================================
     @Override
@@ -174,6 +184,33 @@ public class BoardServiceImpl implements BoardService {
                 .pageRequestDTO(pageRequestDTO)
                 .dtoList(dtoList)
                 .total((int) page.getTotalElements())
+                .build();
+    }
+
+    //=================================================================================
+    @Override // boardType / category 필터 버전 (앞서 드린 그대로)
+    public PageResponseDTO<BoardDTO> readAll(BoardType type, String category, PageRequestDTO pageRequestDTO) {
+        // 1) 로그인 사용자 가져오기 (반드시 맨 앞에서)
+        requireLoginAndMember();
+
+        Pageable pageable = pageRequestDTO.getPageable("createDate");
+        var types = pageRequestDTO.getTypes();
+        var keyword = pageRequestDTO.getKeyword();
+
+        // 임시: 기존 search() 결과에 메모리 필터
+        var page = boardJpaRepository.search(pageable, types, keyword);
+
+        var filtered = page.getContent().stream()
+                .filter(e -> e.getBoardType() == type)
+                .filter(e -> (category == null || category.isBlank()) || category.equals(e.getFaqCategory()))
+                .toList();
+
+        var dtoList = filtered.stream().map(BoardDTO::new).toList();
+
+        return PageResponseDTO.<BoardDTO>withAll()
+                .pageRequestDTO(pageRequestDTO)
+                .dtoList(dtoList)
+                .total((int) filtered.size()) // 정확 총합 필요하면 레포 필터 방식으로 전환
                 .build();
     }
 

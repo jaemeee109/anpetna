@@ -1,27 +1,33 @@
 package com.anpetna.board.service;
 
+import com.anpetna.board.constant.BoardType;
 import com.anpetna.board.dto.BoardDTO;
 import com.anpetna.board.dto.createBoard.CreateBoardReq;
 import com.anpetna.board.dto.createBoard.CreateBoardRes;
 import com.anpetna.board.dto.deleteBoard.DeleteBoardReq;
 import com.anpetna.board.dto.deleteBoard.DeleteBoardRes;
-import com.anpetna.board.dto.readAllBoard.ReadAllBoardReq;
-import com.anpetna.board.dto.readAllBoard.ReadAllBoardRes;
 import com.anpetna.board.dto.readOneBoard.ReadOneBoardReq;
 import com.anpetna.board.dto.readOneBoard.ReadOneBoardRes;
 import com.anpetna.board.dto.updateBoard.UpdateBoardReq;
 import com.anpetna.board.dto.updateBoard.UpdateBoardRes;
 import com.anpetna.coreDto.PageRequestDTO;
 import com.anpetna.coreDto.PageResponseDTO;
+import com.anpetna.board.dto.readAllBoard.ReadAllBoardReq;
+import com.anpetna.board.dto.readAllBoard.ReadAllBoardRes;
 
 public interface BoardService {
 
     // 1. 게시글 등록
     CreateBoardRes createBoard(CreateBoardReq createBoardReq);
 
-    // 2. 게시글 전체 조회 (페이징)
+    // 2. 게시글 전체 조회 (페이징) //★ 수정
     /*ReadAllBoardRes readAllBoard(ReadAllBoardReq readAllBoardReq);*/
-    PageResponseDTO<BoardDTO> readAllBoard(PageRequestDTO pageRequestDTO);
+    // BoardService.java
+    PageResponseDTO<BoardDTO> readAllBoard(PageRequestDTO pageRequestDTO);                       // 기존 것 유지
+    PageResponseDTO<BoardDTO> readAll(BoardType type, String category, PageRequestDTO pr);      // 새로 추가
+
+    // ★ 추가
+    CreateBoardRes create(CreateBoardReq req);
 
     // 3. 게시글 1개 상세 조회 + 조회수 증가
     ReadOneBoardRes readOneBoard(ReadOneBoardReq readOneBoardReq);

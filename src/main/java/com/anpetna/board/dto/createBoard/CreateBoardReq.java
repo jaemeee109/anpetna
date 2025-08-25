@@ -5,6 +5,7 @@ import com.anpetna.coreDto.ImageDTO;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.*;
 
 import java.util.List;
@@ -51,6 +52,8 @@ public class CreateBoardReq {
     @JsonProperty("bLikeCount")
     private Integer bLikeCount = 0;
 
+    @Size(max = 50)
+    private String faqCategory; // ★ 추가
 
 }
 

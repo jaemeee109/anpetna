@@ -1,6 +1,7 @@
 package com.anpetna.board.controller;
 
 import com.anpetna.ApiResult;
+import com.anpetna.board.constant.BoardType; // ★ enum import
 import com.anpetna.board.dto.BoardDTO;
 import com.anpetna.board.dto.createBoard.CreateBoardReq;
 import com.anpetna.board.dto.createBoard.CreateBoardRes;
@@ -32,48 +33,46 @@ public class BoardController {
     @PostMapping(value = "/create", consumes = "application/json", produces = "application/json")
     public ApiResult<CreateBoardRes> createBoard(@Valid @RequestBody CreateBoardReq req) {
         log.info("[POST]/create req={}", req);
-        return new ApiResult<>(boardService.createBoard(req));
+        return new ApiResult<>(boardService.create(req)); // ★ 인터페이스 시그니처에 맞춰 변경
     }
 
     /* 게시글 목록 + 페이징 + 검색 */
-
-    // BoardController.java
     @GetMapping(value = "/readAll", produces = "application/json")
     public ApiResult<PageResponseDTO<BoardDTO>> readAllBoard(
             @RequestParam(value = "page", defaultValue = "1") int page,
             @RequestParam(value = "size", defaultValue = "10") int size,
             @RequestParam(value = "type", required = false) String type,         // t,c,w
             @RequestParam(value = "keyword", required = false) String keyword,
-            @RequestParam(value = "boardType", required = false) String boardType //  추가
+            @RequestParam(value = "boardType", required = false) String boardType, // NOTICE/FREE/QNA/FAQ
+            @RequestParam(value = "category", required = false) String category    // FAQ: 회원계정/주문·배송/…
     ) {
         var pageRequest = new PageRequestDTO();
         pageRequest.setPage(page);
         pageRequest.setSize(size);
         pageRequest.setType(type);
         pageRequest.setKeyword(keyword);
-        pageRequest.setBoardType(boardType);  // 추가
+        pageRequest.setBoardType(boardType); // 필요하면 유지
 
-        log.info("[GET]/readAll page={}, size={}, type={}, keyword={}, boardType={}",
-                page, size, type, keyword, boardType);
+        log.info("[GET]/readAll page={}, size={}, type={}, keyword={}, boardType={}, category={}",
+                page, size, type, keyword, boardType, category); // ★ 로그 포맷 수정
 
-        return new ApiResult<>(boardService.readAllBoard(pageRequest));
+        // ★ boardType 문자열을 enum으로 안전 변환
+        BoardType bt = null;
+        if (boardType != null && !boardType.isBlank()) {
+            try {
+                bt = BoardType.valueOf(boardType.toUpperCase());
+            } catch (IllegalArgumentException ex) {
+                log.warn("Invalid boardType: {}", boardType);
+            }
+        }
+
+        // ★ boardType이 유효하면 카테고리 필터 버전 호출, 아니면 기존 목록 호출
+        if (bt != null) {
+            return new ApiResult<>(boardService.readAll(bt, category, pageRequest));
+        } else {
+            return new ApiResult<>(boardService.readAllBoard(pageRequest));
+        }
     }
-
-    /*@GetMapping(value = "/readAll", produces = "application/json")
-    public ApiResult<PageResponseDTO<BoardDTO>> readAllBoard(
-            @RequestParam(value = "page", defaultValue = "1") int page,
-            @RequestParam(value = "size", defaultValue = "10") int size,
-            @RequestParam(value = "type", required = false) String type,     // t,c,w 등의 조합
-            @RequestParam(value = "keyword", required = false) String keyword
-    ) {
-        var pageRequest = new PageRequestDTO();
-        pageRequest.setPage(page);
-        pageRequest.setSize(size);
-        pageRequest.setType(type);
-        pageRequest.setKeyword(keyword);
-        log.info("[GET]/readAll params page={}, size={}, type={}, keyword={}", page, size, type, keyword);
-        return new ApiResult<>(boardService.readAllBoard(pageRequest));
-    }*/
 
     /* 게시글 상세 + 조회수 증가 + 좋아요 */
     @GetMapping(value = "/readOne/{bno}", produces = "application/json")
