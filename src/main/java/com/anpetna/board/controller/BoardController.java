@@ -36,7 +36,30 @@ public class BoardController {
     }
 
     /* 게시글 목록 + 페이징 + 검색 */
+
+    // BoardController.java
     @GetMapping(value = "/readAll", produces = "application/json")
+    public ApiResult<PageResponseDTO<BoardDTO>> readAllBoard(
+            @RequestParam(value = "page", defaultValue = "1") int page,
+            @RequestParam(value = "size", defaultValue = "10") int size,
+            @RequestParam(value = "type", required = false) String type,         // t,c,w
+            @RequestParam(value = "keyword", required = false) String keyword,
+            @RequestParam(value = "boardType", required = false) String boardType //  추가
+    ) {
+        var pageRequest = new PageRequestDTO();
+        pageRequest.setPage(page);
+        pageRequest.setSize(size);
+        pageRequest.setType(type);
+        pageRequest.setKeyword(keyword);
+        pageRequest.setBoardType(boardType);  // 추가
+
+        log.info("[GET]/readAll page={}, size={}, type={}, keyword={}, boardType={}",
+                page, size, type, keyword, boardType);
+
+        return new ApiResult<>(boardService.readAllBoard(pageRequest));
+    }
+
+    /*@GetMapping(value = "/readAll", produces = "application/json")
     public ApiResult<PageResponseDTO<BoardDTO>> readAllBoard(
             @RequestParam(value = "page", defaultValue = "1") int page,
             @RequestParam(value = "size", defaultValue = "10") int size,
@@ -50,7 +73,7 @@ public class BoardController {
         pageRequest.setKeyword(keyword);
         log.info("[GET]/readAll params page={}, size={}, type={}, keyword={}", page, size, type, keyword);
         return new ApiResult<>(boardService.readAllBoard(pageRequest));
-    }
+    }*/
 
     /* 게시글 상세 + 조회수 증가 + 좋아요 */
     @GetMapping(value = "/readOne/{bno}", produces = "application/json")

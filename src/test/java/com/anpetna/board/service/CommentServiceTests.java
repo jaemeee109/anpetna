@@ -1,6 +1,7 @@
 package com.anpetna.board.service;
 
 import com.anpetna.board.domain.CommentEntity;
+import com.anpetna.board.dto.CommentDTO;
 import com.anpetna.board.dto.createComment.CreateCommReq;
 import com.anpetna.board.dto.createComment.CreateCommRes;
 import com.anpetna.board.dto.deleteComment.DeleteCommReq;
@@ -81,10 +82,10 @@ class CommentServiceTests {
         readCommReq.setSortBy("cno");
 
         ReadCommRes readCommRes = commentService.readComment(readCommReq);
-        PageResponseDTO<ReadCommRes.CommentDTO> page = readCommRes.getPage();
+        PageResponseDTO<CommentDTO> page = readCommRes.getPage();
 
         assertThat(readCommRes.getBno()).isEqualTo(11L);
-        assertThat(page.getDtoList()).extracting(ReadCommRes.CommentDTO::getCno).contains(newCno);
+        assertThat(page.getDtoList()).extracting(CommentDTO::getCno).contains(newCno);
 
         log.info("=============================================================");
         log.info("목록에 있는지 확인 : " + readCommRes);

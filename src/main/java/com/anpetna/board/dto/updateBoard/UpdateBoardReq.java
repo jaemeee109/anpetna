@@ -26,4 +26,10 @@ public class UpdateBoardReq {
 
     @JsonProperty("images")
     private List<ImageDTO> images;
+
+    @JsonProperty("noticeFlag")
+    private Boolean noticeFlag;
+
+    @JsonProperty("isSecret")
+    private Boolean isSecret;
 }

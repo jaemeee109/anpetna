@@ -98,9 +98,10 @@ public class BoardServiceTests {
         ReadOneBoardRes res = boardService.readOneBoard(
                 ReadOneBoardReq.builder().bno(savedBoard.getBno()).build()
         );
-        BoardEntity board = res.getReadOneBoard();
+        BoardEntity board = boardJpaRepository.findById(res.getBno()).orElseThrow();
 
         assertEquals("통합 테스트 게시글", board.getBTitle());
+        assertEquals(savedBoard.getBno(), res.getBno());
         assertEquals(2, board.getImages().size());
         assertEquals("img1.png", board.getImages().get(0).getFileName());
         assertEquals("img2.png", board.getImages().get(1).getFileName());

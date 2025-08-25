@@ -5,6 +5,8 @@ import com.anpetna.board.repository.search.BoardSearch;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface BoardJpaRepository extends JpaRepository<BoardEntity, Long>, BoardSearch {
 
@@ -14,5 +16,15 @@ public interface BoardJpaRepository extends JpaRepository<BoardEntity, Long>, Bo
 
     Page<BoardEntity> findAll(Pageable pageable);
     // 페이징 + 전체 게시글 조회
+    @Query("""
+      select b
+      from BoardEntity b
+      where (:boardType is null or :boardType = '' or upper(b.boardType) = upper(:boardType))
+      order by b.noticeFlag desc, b.createDate desc
+    """)
+    Page<BoardEntity> findByBoardTypeSafe(
+            @Param("boardType") String boardType,
+            Pageable pageable
+    );
 
 }
