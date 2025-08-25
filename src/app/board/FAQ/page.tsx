@@ -118,6 +118,29 @@ export default function FAQPage() {
   // 검색어 상태 바로 아래쯤에 넣어주세요
 const { data, isLoading, error } = useFaqList(page, size, selectedCat);
 
+// 삭제된 글 가려두기용
+const [deletedIds, setDeletedIds] = useState<number[]>([]);
+
+async function handleDelete(bno: number) {
+  if (!confirm('정말 삭제하시겠어요?')) return;
+  try {
+    const base =
+      process.env.NEXT_PUBLIC_API_BASE ||
+      (typeof window !== 'undefined' ? window.location.origin : '');
+    const url = new URL(`/anpetna/board/delete/${bno}`, base);
+    const resp = await fetch(url.toString(), {
+      method: 'POST',
+      credentials: 'include',
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    // 화면에서 즉시 제거
+    setDeletedIds(prev => [...prev, bno]);
+  } catch {
+    alert('삭제 중 오류가 발생했어요.');
+  }
+}
+
+
 
 // ✅ 리스트 안전 매핑 (result.dtoList 우선)
 const list: Row[] = useMemo(() => {
@@ -140,6 +163,10 @@ const list: Row[] = useMemo(() => {
   const filtered = useMemo(() => {
     const kw = q.trim().toLowerCase();
     return list.filter((r) => {
+       const idVal = (r.bno ?? r.id) as number | undefined;
+  if (idVal && deletedIds.includes(idVal)) return false;
+
+
       const catText = pickCategory(r);
       const catNorm = hasAnyCategory ? normalizeToCat(catText) : selectedCat; // ← (3) 보강 포인트
       if (catNorm !== selectedCat) return false;
@@ -215,11 +242,86 @@ const list: Row[] = useMemo(() => {
               const key = r.bno ?? r.id ?? idx;
               return (
                 <details key={key} className="faq-item">
-                  <summary className="faq-q">
-                    <span className="faq-q-label">Q.</span>
-                    <span className="faq-q-text">{title}</span>
-                    <span className="faq-caret" aria-hidden>+</span>
-                  </summary>
+                <summary
+  className="faq-q"
+  style={{
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'nowrap',
+    listStyle: 'none',
+  }}
+>
+  <span className="faq-q-label">Q.</span>
+
+  {/* 제목은 가운데 영역을 꽉 채우도록 */}
+  <span className="faq-q-text" style={{ flex: '1 1 auto', minWidth: 0 }}>
+    {title}
+  </span>
+
+  {/* 오른쪽 액션(수정/삭제) – 검정 글씨 + 작은 폰트 */}
+  {(r.bno ?? r.id) && (
+    <span
+      className="faq-row-actions"
+      style={{
+        marginLeft: 'auto',
+        display: 'inline-flex',
+        gap: 8,
+        whiteSpace: 'nowrap',
+      }}
+    >
+      <Link
+        href={`/board/FAQ/${(r.bno ?? r.id)}/edit`}
+        prefetch={false}
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          textDecoration: 'none',
+          color: '#222',
+          fontFamily: 'inherit',
+          fontSize: '0.875rem',
+          fontWeight: 500,
+          lineHeight: 1.2,
+          display: 'inline-block',
+          WebkitFontSmoothing: 'antialiased',
+          MozOsxFontSmoothing: 'grayscale',
+        }}
+      >
+        수정
+      </Link>
+
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          handleDelete((r.bno ?? r.id) as number);
+        }}
+        style={{
+          background: 'transparent',
+          border: 0,
+          padding: 0,
+          cursor: 'pointer',
+          color: '#222',
+          fontFamily: 'inherit',
+          fontSize: '0.875rem',
+          fontWeight: 500,
+          lineHeight: 1.2,
+          display: 'inline-block',
+          textDecoration: 'none',
+          WebkitFontSmoothing: 'antialiased',
+          MozOsxFontSmoothing: 'grayscale',
+        }}
+      >
+        삭제
+      </button>
+    </span>
+  )}
+
+  {/* + 아이콘은 액션 옆 같은 줄 */}
+  <span className="faq-caret" aria-hidden style={{ marginLeft: 8 }}>+</span>
+</summary>
+
+
+
                   <div className="faq-a">
                     <span className="faq-a-label">A.</span>
                     <div className="faq-a-text">{body}</div>
