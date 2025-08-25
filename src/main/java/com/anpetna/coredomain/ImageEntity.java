@@ -15,7 +15,7 @@ import lombok.Setter;
 @Table(name = "anpetna_image")
 @Getter
 @Setter
-@NoArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ImageEntity {
 
     @Id
@@ -38,7 +38,7 @@ public class ImageEntity {
     private BoardEntity board;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = true)
-    @JoinColumn(name = "member", foreignKey = @ForeignKey(name = "fk_image_member"))
+    @JoinColumn(name = "member_id", foreignKey = @ForeignKey(name = "fk_image_member"))
     private MemberEntity member;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = true)
@@ -46,7 +46,7 @@ public class ImageEntity {
     private ItemEntity item;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = true)
-    @JoinColumn(name = "review",foreignKey = @ForeignKey(name = "fk_image_review"))
+    @JoinColumn(name = "review_id",foreignKey = @ForeignKey(name = "fk_image_review"))
     private ReviewEntity review;
 
 
@@ -81,9 +81,9 @@ public class ImageEntity {
     }
 
     // ====== JPA 생명주기에서 유효성 체크 (서비스 실수 방지) ======
-/*    @PrePersist
+    @PrePersist
     @PreUpdate
-    public void validateExactlyOneParent() {
+    private void validateExactlyOneParent() {
         int cnt = 0;
         if (board  != null) cnt++;
         if (member != null) cnt++;
@@ -92,7 +92,7 @@ public class ImageEntity {
         if (cnt != 1) {
             throw new IllegalStateException("Image must be attached to exactly ONE parent (board|member|item|review).");
         }
-    }*/
+    }
 
     // 정적 팩토리
     public static ImageEntity forBoard(String fileName, String url, BoardEntity b, Integer order) {
@@ -116,7 +116,7 @@ public class ImageEntity {
         img.setFileName(fileName);
         img.setUrl(url);
         img.setSortOrder(order == null ? 0 : order);
-/*        img.attachToItem(i);*/
+        img.attachToItem(i);
         return img;
     }
     public static ImageEntity forReview(String fileName, String url, ReviewEntity r, Integer order) {
