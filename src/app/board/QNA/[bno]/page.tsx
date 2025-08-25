@@ -1,344 +1,407 @@
 'use client';
 
 import { useEffect, useMemo, useState, FormEvent } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
 
-const WRAP = 'mx-auto w-full max-w-[960px] px-4';
+/* ---------- 유틸: 응답 객체에서 문자열 필드를 안전하게 추출 ---------- */
+function pickStr(obj: any, keys: string[], fallback = '') {
+  for (const k of keys) {
+    const v = obj?.[k];
+    if (typeof v === 'string' && v.trim()) return v.trim();
+  }
+  return fallback;
+}
 
-type Detail = {
-  bno: number;
+type Post = {
+  bno?: number;
   bTitle?: string; title?: string; btitle?: string;
   bContent?: string; content?: string; bcontent?: string;
-  // 작성자 ID 후보 키
-  writerId?: string; memberId?: string; memberID?: string; member_id?: string;
-  bWriter?: string; writer?: string; bwriter?: string;
-  createDate?: string; createdAt?: string; regDate?: string;
-  faqCategory?: string; category?: string; type2?: string;
+  bWriter?: string; writer?: string; bwriter?: string; memberId?: string; writerId?: string;
+  createDate?: string; regDate?: string; createdAt?: string;
+  qnaCategory?: string; faqCategory?: string; category?: string;
 };
 
-type CommentRow = {
+type Cmt = {
   cno?: number; id?: number;
-  // 작성자 후보 키
-  writerId?: string; memberId?: string; memberID?: string; member_id?: string;
-  cWriter?: string; writer?: string; username?: string; nickname?: string;
-  // 내용 후보 키
-  cContent?: string; content?: string; comment?: string; ccontent?: string; body?: string; text?: string;
-  createDate?: string; createdAt?: string;
+  cWriter?: string; cwriter?: string; writer?: string; memberId?: string; author?: string; authorId?: string; userId?: string; userName?: string;
+  cContent?: string; ccontent?: string; content?: string; comment?: string; body?: string; text?: string;
+  createDate?: string; regDate?: string; createdAt?: string; created_at?: string; date?: string; datetime?: string;
 };
 
-const pick = (obj: any, keys: string[], fallback = '') =>
-  keys.reduce<string>((acc, k) => (acc !== '' ? acc : (obj?.[k] ?? '')), '').toString() || fallback;
+export default function QnaDetailPage() {
+  const { bno: bnoParam } = useParams<{ bno: string }>();
+  const bno = Number(bnoParam);
 
-const pickWriterId = (d: Detail | null) =>
-  pick(d, ['writerId', 'memberId', 'memberID', 'member_id', 'bWriter', 'writer', 'bwriter'], '');
+  const [post, setPost] = useState<Post | null>(null);
+  const [loadingPost, setLoadingPost] = useState(true);
 
-const formatYMDHM = (s: string) => {
-  if (!s) return '';
-  if (s.includes('T')) return s.replace('T', ' ').slice(0, 16);
-  const d = new Date(s);
-  if (isNaN(d.getTime())) return s;
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-};
+  const [comments, setComments] = useState<Cmt[]>([]);
+  const [loadingCmt, setLoadingCmt] = useState(true);
 
-const baseURL =
-  process.env.NEXT_PUBLIC_API_BASE ||
-  (typeof window !== 'undefined' ? window.location.origin : '');
-
-export default function QNADetailPage() {
-  const router = useRouter();
-  const params = useParams<{ bno: string }>();
-  const bno = Number(params?.bno);
-
-  // 상세
-  const [detail, setDetail] = useState<Detail | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState<string | null>(null);
-
-  // 댓글
-  const [comments, setComments] = useState<CommentRow[]>([]);
+  // 댓글 입력
   const [cWriter, setCWriter] = useState('');
   const [cContent, setCContent] = useState('');
-  const [cSubmitting, setCSubmitting] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  // 상세 불러오기
+  const base =
+    process.env.NEXT_PUBLIC_API_BASE ||
+    (typeof window !== 'undefined' ? window.location.origin : '');
+
+  /* ---------- 글 상세 ---------- */
   useEffect(() => {
-    if (!bno) return;
     let alive = true;
-
     (async () => {
       try {
-        setLoading(true);
-        setErr(null);
-        const resp = await fetch(`${baseURL}/anpetna/board/readOne/${bno}`, { credentials: 'include' });
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        setLoadingPost(true);
+        const resp = await fetch(new URL(`/anpetna/board/readOne/${bno}`, base), {
+          credentials: 'include',
+        });
         const json = await resp.json();
-        const data = json?.result ?? json?.data ?? json;
-        if (alive) setDetail(data);
-      } catch (e: any) {
-        if (alive) setErr(e?.message || '상세 조회 중 오류가 발생했어요.');
+        const raw: any = json?.result ?? json;
+        if (!alive) return;
+        setPost(raw);
       } finally {
-        if (alive) setLoading(false);
+        if (alive) setLoadingPost(false);
       }
     })();
-
     return () => { alive = false; };
-  }, [bno]);
+  }, [bno, base]);
 
-  // 댓글 목록 파서
-  function extractCommentList(json: any): any[] {
-    return (
-      json?.result?.dtoList ??
-      json?.result?.list ??
-      json?.dtoList ??
-      json?.list ??
-      json?.comments ??
-      []
-    );
-  }
+  /* ---------- 댓글 목록 ---------- */
+  async function fetchComments() {
+    setLoadingCmt(true);
+    try {
+      // 백엔드: GET /anpetna/comment/read?bno=...
+      const url = new URL('/anpetna/comment/read', base);
+      url.search = new URLSearchParams({ bno: String(bno) }).toString();
 
-  // 댓글 목록 불러오기 (여러 엔드포인트 순차 시도)
-  async function loadComments() {
-    const tries = [
-      `${baseURL}/anpetna/comment/readAll?bno=${bno}`,
-      `${baseURL}/anpetna/comment/readAll/${bno}`,
-      `${baseURL}/anpetna/comment/list?bno=${bno}`,
-    ];
+      const resp = await fetch(url.toString(), { credentials: 'include' });
+      const json = await resp.json();
 
-    for (const url of tries) {
-      try {
-        const resp = await fetch(url, { credentials: 'include' });
-        if (!resp.ok) continue;
-        const json = await resp.json();
-        const list = extractCommentList(json);
-        if (Array.isArray(list)) {
-          setComments(list);
-          return;
-        }
-      } catch {
-        // 다음 시도
-      }
+      // 현재 응답(result.page.dtoList)에 맞춰 파싱
+      const list =
+        json?.result?.page?.dtoList ??
+        json?.result?.dtoList ??
+        json?.result?.list ??
+        json?.dtoList ??
+        json?.list ??
+        json?.result ??
+        [];
+
+      setComments(Array.isArray(list) ? list : []);
+    } finally {
+      setLoadingCmt(false);
     }
-    // 실패 시 빈 배열
-    setComments([]);
   }
 
   useEffect(() => {
-    if (!bno) return;
-    loadComments();
+    fetchComments();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bno]);
 
-  // 게시글 삭제
+  /* ---------- 안전 매핑(글) ---------- */
+  const title = useMemo(
+    () => pickStr(post, ['bTitle', 'title', 'btitle'], '(제목 없음)'),
+    [post]
+  );
+  const body = useMemo(
+    () => pickStr(post, ['bContent', 'content', 'bcontent'], ''),
+    [post]
+  );
+  // 작성자: DB의 작성자 ID가 우선
+  const authorId = useMemo(
+    () => pickStr(post, ['memberId', 'writerId', 'bWriter', 'bwriter', 'writer'], '작성자정보없음'),
+    [post]
+  );
+  const createdAt = useMemo(
+    () => pickStr(post, ['createDate', 'createdAt', 'regDate'], ''),
+    [post]
+  );
+  const category = useMemo(
+    () => pickStr(post, ['qnaCategory', 'faqCategory', 'category'], 'QNA'),
+    [post]
+  );
+
+  function fmt(ts?: string) {
+    if (!ts) return '';
+    const d = new Date(ts);
+    if (isNaN(+d)) return ts;
+    return d.toLocaleString('ko-KR', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }
+
+  /* ---------- 글 삭제 ---------- */
   async function handleDeletePost() {
-    if (!confirm('정말 삭제하시겠어요?')) return;
-    try {
-      const resp = await fetch(`${baseURL}/anpetna/board/delete/${bno}`, {
-        method: 'POST',
-        credentials: 'include',
-      });
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      router.replace('/board/QNA');
-    } catch {
-      alert('삭제 중 오류가 발생했어요.');
+    if (!post?.bno) return;
+    if (!confirm('이 글을 삭제할까요?')) return;
+    const resp = await fetch(new URL(`/anpetna/board/delete/${post.bno}`, base), {
+      method: 'POST',
+      credentials: 'include',
+    });
+    if (resp.ok) {
+      // ✅ 어떤 구현이어도 ‘나의 문의내역’ 탭으로 가도록 파라미터 여러 개 동시 지정
+      window.location.replace('/board/QNA?view=mine&tab=mine&mode=mine&active=mine');
+    } else {
+      alert('삭제에 실패했습니다.');
     }
   }
 
-  // 댓글 등록 (버튼은 textarea "밖" 오른쪽 하단)
-  async function onSubmitComment(e: FormEvent) {
+  /* ---------- 댓글 등록 ---------- */
+  async function onSubmitCmt(e: FormEvent) {
     e.preventDefault();
-    if (cSubmitting) return;
-    if (!cContent.trim()) return;
+    if (submitting) return;
+    if (!cWriter.trim() || !cContent.trim()) return;
 
-    setCSubmitting(true);
     try {
-      const payload = {
-        bno,
-        cWriter: cWriter,
-        writer: cWriter,
-        cContent: cContent,
-        content: cContent,
-      };
-
-      const resp = await fetch(`${baseURL}/anpetna/comment/create`, {
+      setSubmitting(true);
+      const resp = await fetch(new URL('/anpetna/comment/create', base), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify(payload),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bno,
+          // 서버에서 어떤 키를 기대하든 정규화해서 보냄
+          cWriter,
+          cwriter: cWriter,
+          memberId: cWriter,
+          cContent,
+          ccontent: cContent,
+          content: cContent,
+        }),
       });
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-
+      if (!resp.ok) throw new Error(String(resp.status));
       setCContent('');
-      await loadComments(); // 새로고침 없이 목록 갱신
+      await fetchComments();
     } catch {
-      alert('댓글 등록 중 오류가 발생했어요.');
+      alert('댓글 등록에 실패했습니다.');
     } finally {
-      setCSubmitting(false);
+      setSubmitting(false);
     }
   }
 
-  // 표기 값들
-  const title = useMemo(() => pick(detail, ['bTitle', 'title', 'btitle'], '(제목 없음)'), [detail]);
-  const writerId = useMemo(() => pickWriterId(detail), [detail]);
-  const content = useMemo(() => pick(detail, ['bContent', 'content', 'bcontent'], ''), [detail]);
-  const category = useMemo(() => pick(detail, ['faqCategory', 'category', 'type2'], ''), [detail]);
-  const createdAtRaw = useMemo(() => pick(detail, ['createDate', 'createdAt', 'regDate'], ''), [detail]);
-  const createdAt = useMemo(() => formatYMDHM(createdAtRaw), [createdAtRaw]);
+  /* ---------- 댓글 삭제 ---------- */
+  async function handleDeleteComment(c: Cmt) {
+    const cno = (c.cno ?? c.id) as number | undefined;
+    if (!cno) return;
+    if (!confirm('이 댓글을 삭제할까요?')) return;
 
-  if (loading) return <main className={WRAP}>로딩 중…</main>;
-  if (err || !detail) return <main className={WRAP}>상세를 불러오지 못했어요.</main>;
+    try {
+      const resp = await fetch(new URL(`/anpetna/comment/${cno}/delete`, base), {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (!resp.ok) throw new Error(String(resp.status));
+      await fetchComments();
+    } catch {
+      alert('댓글 삭제에 실패했습니다.');
+    }
+  }
 
   return (
-    <main className={WRAP}>
-      {/* 제목 가운데 */}
-      <section style={{ textAlign: 'center', marginTop: 16 }}>
-        {category ? (
-          <div style={{ marginBottom: 6 }}>
-            <span
-              style={{
-                display: 'inline-block',
-                padding: '4px 10px',
-                borderRadius: 999,
-                background: '#f1f5f9',
-                fontSize: 12,
-                fontWeight: 600,
-                color: '#111827',
-              }}
-            >
-              {category}
-            </span>
-          </div>
-        ) : null}
+    <main className="mx-auto w-full max-w-[700px] px-4">
+      {/* 카테고리 배지 + 제목(가운데 정렬) */}
+      <header style={{ textAlign: 'center', marginTop: 24 }}>
+        <div
+          style={{
+            display: 'inline-block',
+            padding: '4px 10px',
+            borderRadius: 999,
+            background: '#f2f2f2',
+            fontSize: 12,
+            marginBottom: 8,
+          }}
+        >
+          {category}
+        </div>
         <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>{title}</h1>
-      </section>
+      </header>
 
-      {/* 실선 */}
-      <hr className="faq-sep" style={{ marginTop: 12 }} />
+      {/* 구분선 */}
+      <hr className="faq-sep" style={{ margin: '16px 0' }} />
 
-      {/* 작성자ID · 등록일 · 삭제 (오른쪽 정렬) */}
+      {/* 작성자 · 등록일 · 삭제 (오른쪽 정렬) */}
       <div
         style={{
           display: 'flex',
           justifyContent: 'flex-end',
+          gap: 10,
           alignItems: 'center',
-          gap: 8,
           fontSize: 14,
-          color: '#374151',
-          margin: '8px 0 12px',
+          color: '#444',
         }}
       >
-        <span>{writerId || '알수없음'}</span>
-        <span>·</span>
-        <span>{createdAt}</span>
-
-        <button
-          type="button"
-          onClick={handleDeletePost}
-          style={{
-            marginLeft: 12,
-            background: 'transparent',
-            border: '1px solid #e5e7eb',
-            padding: '4px 10px',
-            borderRadius: 8,
-            fontSize: 13,
-            color: '#111',
-            cursor: 'pointer',
-          }}
-        >
-          삭제
-        </button>
+        <span>작성자: <b>{authorId}</b></span>
+        <span>등록일: {fmt(createdAt)}</span>
+        {post?.bno && (
+          <button
+            type="button"
+            onClick={handleDeletePost}
+            style={{
+              background: 'transparent',
+              border: '1px solid #ddd',
+              borderRadius: 8,
+              padding: '6px 10px',
+              cursor: 'pointer',
+              fontSize: 13,
+              color: '#222',
+            }}
+          >
+            삭제
+          </button>
+        )}
       </div>
 
       {/* 본문 */}
-      <div
-        style={{
-          whiteSpace: 'pre-wrap',
-          lineHeight: 1.6,
-          fontSize: 15,
-          color: '#111827',
-          padding: '8px 2px',
-        }}
-      >
-        {content}
-      </div>
+      <article style={{ marginTop: 16, marginBottom: 30, whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
+        {loadingPost ? '불러오는 중…' : body}
+      </article>
 
-      {/* 실선 */}
-      <hr className="faq-sep" style={{ margin: '18px 0' }} />
+      {/* 구분선 */}
+      <hr className="faq-sep" style={{ marginTop: 10, marginBottom: 10 }} />
 
-      {/* 댓글 작성: 입력칸 작게 + 버튼은 밖 오른쪽 */}
-      <form
-        onSubmit={onSubmitComment}
-        style={{ display: 'grid', gridTemplateColumns: '80px 1fr', gap: 10, alignItems: 'start' }}
-      >
-        <label htmlFor="cwriter" style={{ fontWeight: 700, marginTop: 6 }}>
-          작성자
-        </label>
-        <input
-          id="cwriter"
-          value={cWriter}
-          onChange={(e) => setCWriter(e.target.value)}
-          placeholder="작성자명을 입력"
-          style={{
-            height: 32,
-            padding: '0 10px',
-            border: '1px solid #e5e7eb',
-            borderRadius: 8,
-            fontSize: 14,
-          }}
-        />
+      {/* 댓글 리스트 */}
+      <section style={{ maxWidth: 820, marginBottom: 30, textAlign: 'left' }}>
+        {loadingCmt ? (
+          <div>답변 불러오는 중…</div>
+        ) : comments.length === 0 ? (
+          <div style={{ color: '#666' }}>등록된 답변이 없습니다.</div>
+        ) : (
+          comments.map((c, i) => {
+            const name = pickStr(c, [
+              'memberId','writerId','cWriter','cwriter','writer','commentWriter',
+              'nickname','userId','userName','author','authorId'
+            ], '익명');
 
-        <label htmlFor="ccontent" style={{ fontWeight: 700, marginTop: 6 }}>
-          댓글내용
-        </label>
-        <textarea
-          id="ccontent"
-          value={cContent}
-          onChange={(e) => setCContent(e.target.value)}
-          placeholder="댓글을 입력하세요"
-          rows={3}
-          style={{
-            width: '100%',
-            padding: 10,
-            border: '1px solid #e5e7eb',
-            borderRadius: 8,
-            minHeight: 90,
-            fontSize: 14,
-          }}
-        />
+            const text = pickStr(c, [
+              'cContent','ccontent','content','comment','body','text'
+            ], '');
 
-        {/* 빈칸 맞춰주기 */}
-        <div />
-        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            const when = pickStr(c, [
+              'createDate','createdAt','regDate','created_at','created','date','datetime'
+            ], '');
+
+            return (
+              <div key={(c.cno ?? c.id ?? i) as number} style={{ padding: '12px 0' }}>
+                {/* 상단줄: 작성자 · 날짜  +  [삭제] 버튼(오른쪽 정렬, 작게) */}
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <div style={{ fontSize:16, color: '#333' }}>
+                    <b>{name}</b>  <span style={{ color: '#777' }}>{fmt(when)}</span>
+                  </div>
+                  <div style={{ marginLeft: 'auto' }}>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteComment(c)}
+                      style={{
+                        background: 'transparent',
+                        border: '1px solid #ddd',
+                        borderRadius: 8,
+                        padding: '4px 8px',
+                        cursor: 'pointer',
+                        fontSize: 12,
+                        color: '#222',
+                      }}
+                    >
+                      삭제
+                    </button>
+                  </div>
+                </div>
+
+                {/* 내용 */}
+                <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.5, marginTop: 6, fontSize:16 }}>{text}</div>
+                <hr className="faq-sep" style={{ marginTop: 12 }} />
+              </div>
+            );
+          })
+        )}
+      </section>
+
+      {/* 댓글 작성 (왼쪽 정렬 + 기존 버튼 스타일) */}
+      <form onSubmit={onSubmitCmt} style={{ maxWidth: 820, margin: '0 auto', textAlign: 'left' }}>
+        {/* 작성자 */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: '90px 1fr',
+          gap: 10,
+          alignItems: 'center',
+          marginBottom: 10
+        }}>
+          <label htmlFor="cwriter" style={{ fontWeight: 600, textAlign: 'left' }}>작성자</label>
+          <input
+            id="cwriter"
+            value={cWriter}
+            onChange={(e) => setCWriter(e.target.value)}
+            style={{
+              height: 36,
+              padding: '0 10px',
+              border: '1px solid #ddd',
+              borderRadius: 8,
+              maxWidth: 280,
+              textAlign: 'left',
+            }}
+            placeholder="작성자 ID"
+          />
+        </div>
+
+        {/* 댓글 내용 */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: '90px 1fr',
+          gap: 10,
+          alignItems: 'start',
+        }}>
+          <label htmlFor="ccontent" style={{ fontWeight: 500, marginTop: 8, textAlign: 'left' }}>답변</label>
+          <textarea
+            id="ccontent"
+            value={cContent}
+            onChange={(e) => setCContent(e.target.value)}
+            rows={4}
+            style={{
+              padding: 10,
+              border: '1px solid #ddd',
+              borderRadius: 8,
+              minHeight: 120,
+              resize: 'vertical',
+              textAlign: 'left',
+            }}
+            placeholder="댓글 내용을 입력하세요"
+          />
+        </div>
+
+        {/* 버튼 줄 (오른쪽 정렬) */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
           <button
             type="submit"
-            disabled={cSubmitting}
+            disabled={submitting}
             className="btn-3d btn-primary"
-            style={{ padding: '6px 12px', fontSize: 12 }}
+            style={{ textDecoration: 'none' }}
           >
-            {cSubmitting ? '등록 중…' : '등록'}
+            {submitting ? '등록 중…' : '등록'}
           </button>
         </div>
       </form>
 
       {/* 여백 */}
-      <div style={{ height: 14 }} />
+      <div style={{ height: 10 }} />
 
-      {/* 댓글 목록 */}
-      {comments.map((c, i) => {
-        const w = pick(c, ['writerId', 'memberId', 'memberID', 'member_id', 'cWriter', 'writer', 'username', 'nickname'], '익명');
-        const body = pick(c, ['cContent', 'content', 'comment', 'ccontent', 'body', 'text'], '');
-        return (
-          <div key={(c.cno ?? c.id ?? i) as number} style={{ marginBottom: 12 }}>
-            <div style={{ fontWeight: 600, marginBottom: 6 }}>{w}</div>
-            <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>{body}</div>
-            <hr className="faq-sep" style={{ margin: '10px 0' }} />
-          </div>
-        );
-      })}
-
-      {/* 목록으로 */}
-      <div style={{ display: 'flex', justifyContent: 'center', marginTop: 18, marginBottom: 24 }}>
-        <Link href="/board/QNA" className="btn-3d btn-white" prefetch={false} style={{ textDecoration: 'none' }}>
+      {/* 목록으로 (가운데 정렬) – 반드시 ‘나의 문의내역’ 탭으로 */}
+      <div style={{ textAlign: 'center', marginTop: 16, marginBottom: 50 }}>
+        <Link
+          href="/board/QNA?view=mine"
+          prefetch={false}
+          className="btn-3d btn-white"
+          style={{ textDecoration: 'none' }}
+          onClick={(e) => {
+            // ✅ 어떤 구현이든 확실히 mine 탭으로 이동시키기
+            e.preventDefault();
+            window.location.assign('/board/QNA?view=mine&tab=mine&mode=mine&active=mine');
+          }}
+        >
           목록으로
         </Link>
       </div>
