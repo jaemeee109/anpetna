@@ -25,6 +25,7 @@ export type CreateBoardReq = {
   boardType: BoardType;
   noticeFlag?: boolean;
   isSecret?: boolean;
+  faqCategory?: string; // ★ 서버 DTO에 추가한 필드와 동일
   imageUrls?: string[];
 };
 export type UpdateBoardReq = Partial<CreateBoardReq> & { bno: number };

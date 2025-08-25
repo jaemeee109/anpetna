@@ -19,38 +19,43 @@ function NavLink({ href, children }: { href: string; children: React.ReactNode }
   );
 }
 
-/** 클라이언트 저장소/쿠키에서 로그인 여부 판단 (이름은 프로젝트에 맞게 변경) */
 function getCookie(name: string) {
   if (typeof document === 'undefined') return null;
-  const m = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/([.$?*|{}()[\]\\/+^])/g, '\\$1') + '=([^;]*)'));
+  const safe = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const m = document.cookie.match(new RegExp('(?:^|; )' + safe + '=([^;]*)'));
   return m ? decodeURIComponent(m[1]) : null;
 }
 
 export default function Header() {
   const router = useRouter();
+  const pathname = usePathname();
   const [authed, setAuthed] = useState(false);
 
   useEffect(() => {
-    /* 프로젝트에 맞게 토큰/세션 이름만 바꿔주면 됨 */
     const token =
       typeof window !== 'undefined' &&
-      (localStorage.getItem('accessToken')  /* 키이름 */
-      || getCookie('accessToken') /* 쿠키 이름 */
-      || getCookie('JSESSIONID'));/* 세션 쿠키 이름 */
+      (localStorage.getItem('accessToken') ||
+        getCookie('accessToken') ||
+        getCookie('JSESSIONID'));
     setAuthed(!!token);
   }, []);
 
   const handleLogout = async () => {
-    // 필요하면 서버 로그아웃 호출
-    // await fetch('/anpetna/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
     if (typeof window !== 'undefined') {
       localStorage.removeItem('accessToken');
       document.cookie = 'accessToken=; Max-Age=0; path=/';
       document.cookie = 'JSESSIONID=; Max-Age=0; path=/';
     }
     setAuthed(false);
-    router.replace('/'); // 홈으로
+    router.replace('/');
   };
+
+  const helpActive =
+    pathname === '/board/FAQ' ||
+    pathname === '/board/QNA' ||
+    pathname === '/board/Help' ||
+    pathname?.startsWith('/board/FAQ/') ||
+    pathname?.startsWith('/board/QNA/');
 
   return (
     <header className="apn-header">
@@ -88,8 +93,31 @@ export default function Header() {
       <nav className="container apn-nav">
         <NavLink href="/board/NOTICE">NOTICE</NavLink>
         <NavLink href="/items">STORE</NavLink>
-        <NavLink href="/board/Free">BOARD</NavLink>
-        <NavLink href="/board/QNA">HELP</NavLink>
+        <NavLink href="/board/FREE">BOARD</NavLink>
+
+        {/* HELP + 드롭다운 */}
+        <div className="dropdown group">
+          <button
+            type="button"
+            className={`pill ${helpActive ? 'pill--active' : ''}`}
+            aria-haspopup="true"
+            aria-expanded={helpActive ? 'true' : 'false'}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+          >
+            HELP
+          </button>
+          <div className="dropdown-menu" role="menu" aria-label="Help submenu">
+            <Link href="/board/FAQ" className="dropdown-item" role="menuitem">
+              FAQ
+            </Link>
+            <Link href="/board/QNA" className="dropdown-item" role="menuitem">
+              Q&A
+            </Link>
+          </div>
+        </div>
       </nav>
 
       {/* 얇은 가로선 */}
@@ -97,4 +125,3 @@ export default function Header() {
     </header>
   );
 }
-/* 토큰 이름 바꾸기:백엔드에서 쓰는 이름이 다르면 accessToken/JSESSIONID 부분을 프로젝트에 맞게 바꾸기. */
