@@ -10,5 +10,8 @@ import lombok.*;
 @NoArgsConstructor
 public class DeleteBoardRes {
 
-    private BoardEntity deleteBoard;
+    /*private BoardEntity deleteBoard;*/
+
+    private Long bno;
+    private boolean deleted; // true/false
 }

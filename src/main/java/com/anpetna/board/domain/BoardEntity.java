@@ -54,8 +54,7 @@ public class BoardEntity extends BaseEntity {
     @Enumerated(EnumType.STRING)
     private BoardType boardType;    // 게시물 종류
 
-    @Builder.Default
-    @Column(nullable = false)
+    @Column(nullable = false) @Builder.Default
     private Boolean noticeFlag = false;        // 상단 고정 여부
 
     @Column(nullable = false)
