@@ -1,14 +1,9 @@
 package com.anpetna.item.dto.registerItem;
 
-<<<<<<< HEAD
-public class RegisterItemRes {
-
-=======
 import com.anpetna.coreDto.ImageListDTO;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
-
 
 @ToString
 @Setter
@@ -29,5 +24,4 @@ public class RegisterItemRes extends ImageListDTO {
     }
     //  UI(관리자페이지)
     //  "~~~" 상품이 등록되었습니다. → [상세 보기]...
->>>>>>> 7e346ca (member빼고 cart넣고)
 }
