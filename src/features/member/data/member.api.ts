@@ -110,16 +110,23 @@ interface LoginRes {
 
 // ----- 환경값 & 유틸 -----
 const BASE =
-  process.env.NEXT_PUBLIC_API_BASE ||
-  (typeof window !== 'undefined' ? window.location.origin : '');
+  (process.env.NEXT_PUBLIC_API_BASE as string | undefined) ||
+  (typeof window !== 'undefined'
+    ? `${window.location.protocol}//${window.location.hostname}${
+        window.location.port
+          ? `:${window.location.port === '3000' ? '8000' : window.location.port}`
+          : ''
+      }`.replace(/:$/, '')
+    : '');
 
 // 보드/FAQ에서 사용 중인 프리픽스와 동일하게 기본값 '/anpetna'
 const API_PREFIX = process.env.NEXT_PUBLIC_API_PREFIX || '/anpetna';
 
+
 const LOGIN_PATH_CANDIDATES = [
-  process.env.NEXT_PUBLIC_LOGIN_PATH || '/jwt/login',
-  '/auth/login',
-  '/member/login',
+  process.env.NEXT_PUBLIC_LOGIN_PATH || '/jwt/login', 
+  '/member/login',                                   
+  '/auth/login',                                      
 ];
 
 function apiURL(path: string) {

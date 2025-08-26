@@ -47,9 +47,11 @@ export default function LoginPage() {
       //   (클래스 @RequestMapping("/member") + @PostMapping("/login"))
       //   컨텍스트(/anpetna) 유무 모두 시도
       const candidates = [
-        apiURL('/member/login'),
-        new URL('/member/login', BASE).toString(),
-      ];
+  apiURL('/jwt/login'),              // ✅ JwtController 매핑
+  apiURL('/member/login'),           // 구버전/대체 경로 대비
+  new URL('/jwt/login', BASE).toString(),
+  new URL('/member/login', BASE).toString(),
+];
 
       let ok = false;
       let lastText = '';
