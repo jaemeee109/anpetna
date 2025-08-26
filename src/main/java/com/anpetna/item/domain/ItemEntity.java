@@ -14,6 +14,7 @@ import java.util.List;
 
 @Entity
 @Table(name="anpetna_item")
+@Setter
 @Getter
 @Builder
 @AllArgsConstructor
