@@ -2,6 +2,7 @@ package com.anpetna.order.repository;
 
 import com.anpetna.item.domain.ItemEntity;
 import com.anpetna.order.domain.OrderEntity;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -14,7 +15,10 @@ public interface OrderRepository extends JpaRepository<OrderEntity, Long> {
     // 첫번째 제네렉 : 엔티티 , 두 번째 : 엔티티의 PK 타입
     // JPA : 기본 CRUD(save, findById, findAll, deleteById 등 제공)
 
-
+    @EntityGraph(attributePaths = {
+            "itemEntity",
+            "itemEntity.images"
+    })
 
     // 특정 주문서 ID에 속한 모든 주문 품목을 조회
     List<OrderEntity> findByOrders_OrdersId(Long ordersId);
