@@ -21,7 +21,7 @@ public class OrdersServiceImpl implements OrdersService {
 
 
     @Override
-    public OrdersDTO getDetail(Long ordersId) { // 주문 한 건을 찾아서 응답 DTO로 바꿔주는 메서드
+    public OrdersDTO getDetail(Long ordersId) { // 주문 한건 상세 조회
 
         if (ordersId == null) throw new IllegalArgumentException("ordersId는 비워둘 수 없습니다.");
         // 방어코드 : 파라미터가 null 이면 예외
@@ -33,34 +33,6 @@ public class OrdersServiceImpl implements OrdersService {
 
         return toSummaryDTO(e); // 엔티티를 응답에 맞는 DTO로 반환해서 변환
     }
-
-
-
-
-    @Override
-    public OrdersDTO getSummary(Long ordersId) { // 주문 한 건의 요약 정보만 뽑아서 OrderDTO로 돌려주는 메서드
-
-        if (ordersId == null) throw new IllegalArgumentException("ordersId는 비워둘 수 없습니다.");
-        // getDetail과 흐름은 동일하지만 "요약" 관점의 에러 메시지를 사용
-
-        OrdersEntity e = ordersRepository.findByOrdersId(ordersId)
-                // e = ordersRepository 안에 있는 findByOrdersId(ordersId)을 실행.
-                // findByOrdersId(ordersId)는 DB 조회를 실행하고 Optional<OrdersEntity>를 돌려줌
-                // Optional<OrdersEntity> : 제네릭 안 값이 있을지 없을지 모르는 상황에서 값 부재를 드러내는 것
-                .orElseThrow(() -> new IllegalArgumentException("주문 요약을 찾을 수 없습니다: " + ordersId));
-                // 값이 없으면 IllegalArgumentException의 값을 던짐
-
-        return toSummaryDTO(e);
-        // 현재 구현은 getDetail과 사실상 동일 동작.
-        // 컨트롤러/클라이언트에서 목적(상세 vs 요약)에 따라 이 메서드를 구분 호출하도록 한 구조.
-    }
-
-
-    // 현재 getDetail와 getSummary의 기능이 같기 때문에
-    // getDetail에 새로운 DTO를 만들어서 상세 보기와 요약 보기를 제대로 분리해야 한다.
-
-
-
 
 
 

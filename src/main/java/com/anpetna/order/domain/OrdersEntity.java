@@ -9,13 +9,13 @@ import java.util.List;
 
  // "주문서(헤더)"를 담는 엔티티
  // 한 건의 주문(영수증 상단 정보) = OrdersEntity 1행
-@Entity // JPA에게 이 클래스가 테이블과 매핑되는 "엔티티"임을 알림
-@Table(name = "anpetna_orders") // 실제 매핑될 DB 테이블명
-@Data // Lombok: getter/setter/toString/equals/hashCode 자동 생성 (엔티티에서 equals/hashCode는 팀 컨벤션 고려)
+@Entity
+@Table(name = "anpetna_orders")
+@Data
+@Getter
 @NoArgsConstructor // 기본 생성자
 @AllArgsConstructor // 모든 필드 받는 생성자
-@Builder // 빌더 패턴 지원
-
+@Builder
 public class OrdersEntity {
 
     @Id // PK(기본키)
@@ -32,7 +32,14 @@ public class OrdersEntity {
     @Column(name = "orders_totalAmount", nullable = false) // 주문 총 금액(헤더 수준 합계)
     private int totalAmount;
 
-    @Builder.Default // 빌더 사용 시에도 빈 리스트로 기본값 세팅 (null 방지)
+    @Column(name = "orders_itemImageUrl", nullable = false)
+    private String itemImageUrl;    // 대표이미지 URL
+
+     @Column(name = "order_itemImageName", nullable = false)
+     private String itemImageName;   // 파일명
+
+
+     @Builder.Default // 빌더 사용 시에도 빈 리스트로 기본값 세팅 (null 방지)
     @ToString.Exclude // Lombok toString()에서 제외 → 순환참조/과도한 출력 방지
     @OneToMany(
             mappedBy = "orders",              // 반대편(OrderEntity)에서 이 엔티티를 가리키는 필드명

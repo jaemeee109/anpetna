@@ -35,12 +35,6 @@ public class OrderController {
         return ordersService.getDetail(ordersId);
     }
 
-    // 주문 요약 조회
-    @GetMapping("/{ordersId}/summary")
-    public OrdersDTO getSummary(@PathVariable @Min(1) Long ordersId) {
-        return ordersService.getSummary(ordersId);
-    }
-
     // 회원별 주문 요약 페이징 조회
     @GetMapping
     public Page<OrdersDTO> getSummariesByMember(

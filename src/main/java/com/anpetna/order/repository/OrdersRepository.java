@@ -16,7 +16,7 @@ public interface OrdersRepository extends JpaRepository<OrdersEntity, Long> {
 
 
 
-    // 주문 헤더 + 품목 + 아이템까지 한번에 로딩 (쿼리문 X, fetch 전략만 지정)
+    // 주문 헤더 + 품목 + 아이템까지 한번에 로딩
     @EntityGraph(attributePaths = { "orderItems", "orderItems.itemEntity" })
     // @EntityGraph: 연관된 컬렉션/엔티티를 즉시 함께 가져오도록 지시(N+1 문제 완화).
     // attributePaths 경로 문법:

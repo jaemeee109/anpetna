@@ -6,11 +6,8 @@ import org.springframework.data.domain.Pageable;
 
 public interface OrdersService {
 
-    // 주문 상세
+    // 주문 단건 상세
     OrdersDTO getDetail(Long ordersId);
-
-    // 주문 요약(주문 1건의 총액/총수량)
-    OrdersDTO getSummary(Long ordersId);
 
     // 회원별 주문 요약 페이지(해당 회원의 모든 주문)
     Page<OrdersDTO> getSummariesByMember(String memberId, Pageable pageable);
