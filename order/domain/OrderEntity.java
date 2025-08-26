@@ -1,6 +1,7 @@
 package com.anpetna.order.domain;
 
 import com.anpetna.item.domain.ItemEntity;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -10,6 +11,7 @@ import lombok.*;
 @Entity                                // JPA에게 "이 클래스를 테이블과 매핑해!" 라고 알려줌
 @Table(name = "anpetna_order_item")    // 실제 DB 테이블 이름 지정
 @Data                                  // Lombok: getter/setter/toString/equals/hashCode 자동 생성
+@Setter
 @NoArgsConstructor                     // 기본 생성자 자동 생성 (JPA가 프록시 만들 때 필요)
 @AllArgsConstructor                     // 모든 필드를 받는 생성자 자동 생성
 @Builder
@@ -36,6 +38,9 @@ public class OrderEntity {
     @Column(name="order_quantity", nullable = false)
     private int quantity; // 수량
 
+    @Transient
+    private String thumbnailUrl; // 썸네일용
+
 
      // 이 품목이 "어느 주문서(헤더)에 소속인지"를 나타내는 필드
      // 하나의 주문서(OrdersEntity)에 여러 개의 품목(OrderEntity)이 달립니다. => N:1
@@ -47,12 +52,6 @@ public class OrderEntity {
     // Lombok이 만드는 toString()에서 이 필드는 제외
     // (양방향 연관관계일 때 무한 순환(toString 호출이 계속됨) 또는 불필요한 로딩 방지를 위해)
     private OrdersEntity orders;
-
-
-
-
-
-
 
 
 }
