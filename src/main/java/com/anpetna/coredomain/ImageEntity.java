@@ -19,7 +19,7 @@ import lombok.Setter;
 public class ImageEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "image_uuid")
     private Long  uuid;
 
