@@ -64,9 +64,9 @@ export default function Header() {
         <nav className="apn-auth">
           {!authed ? (
             <>
-              <Link href="/join">JOIN</Link>
+             <Link href="/member/signup">JOIN</Link>
               <span className="sep">|</span>
-              <Link href="/login">LOGIN</Link>
+              <Link href="/member/login">LOGIN</Link>
             </>
           ) : (
             <>

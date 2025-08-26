@@ -1,45 +1,93 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { memberApi } from "../data/member.api";
-import type { LoginReq, UpdateMeReq, SignupReq } from "../data/member.types";
+// features/member/hooks/useMember.ts
+'use client';
 
-export const useMe = () =>
-  useQuery({
-    queryKey: ["member","me"],
-    queryFn: () => memberApi.me(),
-  });
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import type {
+  Member, ModifyMemberReq, ReadMemberAllRes, ReadMemberOneRes,
+  JoinMemberReq, JoinMemberRes, LoginReq, LoginRes,
+} from '../data/member.types';
+import {
+  listMembers, readMemberOne, modifyMember,
+  signup as apiSignup, login as apiLogin, removeMember, AuthStore,
+} from '../data/member.api';
 
-export const useLogin = () =>
-  useMutation({
-    mutationFn: (body: LoginReq) => memberApi.login(body),
-    onSuccess: (res) => {
-      if (typeof window !== "undefined" && res?.accessToken) {
-        localStorage.setItem("AT", res.accessToken);
+export function useMemberList() {
+  const [data, setData] = useState<ReadMemberAllRes>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setErr] = useState<Error | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        setLoading(true);
+        setErr(null);
+        const res = await listMembers();
+        if (alive) setData(res);
+      } catch (e) {
+        if (alive) setErr(e as Error);
+      } finally {
+        if (alive) setLoading(false);
       }
-    },
-  });
+    })();
+    return () => { alive = false; };
+  }, []);
 
-export const useLogout = () =>
-  useMutation({
-    mutationFn: () => memberApi.logout(),
-    onSuccess: () => {
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("AT");
-        window.location.href = "/member/login";
+  return { data, loading, error };
+}
+
+export function useMyProfile(initialId?: string) {
+  const [member, setMember] = useState<ReadMemberOneRes | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setErr] = useState<Error | null>(null);
+
+  const memberId = useMemo(
+    () => initialId || AuthStore.memberId() || '',
+    [initialId]
+  );
+
+  useEffect(() => {
+    if (!memberId) return;
+    let alive = true;
+    (async () => {
+      try {
+        setLoading(true);
+        setErr(null);
+        const res = await readMemberOne(memberId);
+        if (alive) setMember(res);
+      } catch (e) {
+        if (alive) setErr(e as Error);
+      } finally {
+        if (alive) setLoading(false);
       }
-    },
-  });
+    })();
+    return () => { alive = false; };
+  }, [memberId]);
 
-export const useSignup = () =>
-  useMutation({
-    mutationFn: (body: SignupReq) => memberApi.signup(body),
-  });
+  const update = useCallback(async (patch: ModifyMemberReq) => {
+    const res = await modifyMember(patch);
+    setMember(res);
+    return res;
+  }, []);
 
-export const useUpdateMe = () => {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (body: UpdateMeReq) => memberApi.updateMe(body),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["member","me"] });
-    },
-  });
-};
+  const remove = useCallback(async () => {
+    const res = await removeMember();
+    AuthStore.clear();
+    return res;
+  }, []);
+
+  return { member, loading, error, update, remove, memberId };
+}
+
+export function useMemberActions() {
+  const signup = useCallback((body: JoinMemberReq): Promise<JoinMemberRes> => {
+    return apiSignup(body);
+  }, []);
+
+  const login = useCallback(async (body: LoginReq): Promise<LoginRes> => {
+    const data = await apiLogin(body);
+    return data;
+  }, []);
+
+  return { signup, login };
+}
