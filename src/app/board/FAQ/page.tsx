@@ -214,7 +214,7 @@ const list: Row[] = useMemo(() => {
           <input
             value={kwInput}
             onChange={(e) => setKwInput(e.target.value)}
-            placeholder="키워드로 검색 (예: 배송, 환불)"
+            placeholder="검색 내용을 입력해주세요 ^ㅅ^ "
             className="faq-search"
             aria-label="FAQ 검색"
           />
@@ -230,7 +230,7 @@ const list: Row[] = useMemo(() => {
 
       {/* 선택 카테고리의 글 목록 */}
       <section aria-live="polite" className="faq-listwrap">
-        <h2 className="faq-listtitle">{selectedCat} 카테고리 글 목록</h2>
+      {/*  <h2 className="faq-listtitle">{selectedCat} </h2>*/}
 
         {filtered.length === 0 ? (
           <div className="faq-empty">검색 결과가 없습니다.</div>
