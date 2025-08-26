@@ -1,18 +1,121 @@
 // features/member/data/member.api.ts
-import type {
-  JoinMemberReq, JoinMemberRes,
-  ModifyMemberReq, ModifyMemberRes,
-  ReadMemberAllRes, ReadMemberOneRes,
-  LoginReq, LoginRes,
-  DeleteMemberRes,
-} from './member.types';
+
+// ======== (추가) 로컬 타입 선언: import 없이 동작하도록 최소 정의 ========
+type MemberRole =
+  | 'USER' | 'ADMIN'
+  | 'ROLE_USER' | 'ROLE_ADMIN'
+  | (string & {});
+
+interface MemberImage {
+  uuid?: number | string;
+  fileName?: string;
+  url?: string;
+  sortOrder?: number;
+}
+
+interface Member {
+  memberId: string;
+  memberPw?: string;
+  memberName: string;
+
+  memberBirthY: string;
+  memberBirthM: string;
+  memberBirthD: string;
+  memberBirthGM: string;
+
+  memberGender: string;
+  memberHasPet: string;
+
+  memberPhone: string;
+  smsStsYn: string;
+
+  memberEmail: string;
+  emailStsYn: string;
+
+  memberRoadAddress: string;
+  memberZipCode: string;
+  memberDetailAddress: string;
+
+  memberRole: MemberRole;
+  memberSocial?: boolean;
+  memberEtc?: string;
+
+  images?: MemberImage[];
+  memberFileImage?: Array<string | MemberImage>;
+
+  createDate?: string;
+  latestDate?: string;
+
+  social?: boolean;
+  etc?: string;
+
+  status?: string;
+  memberDTO?: Member;
+}
+
+type ReadMemberAllRes = Member[];
+interface ReadMemberOneRes extends Member {}
+
+interface JoinMemberReq {
+  memberId: string;
+  memberPw: string;
+  memberName: string;
+
+  memberBirthY: string;
+  memberBirthM: string;
+  memberBirthD: string;
+  memberBirthGM: string;
+
+  memberGender: string;
+  memberHasPet: string;
+
+  memberPhone: string;
+  smsStsYn: string;
+
+  memberEmail: string;
+  emailStsYn: string;
+
+  memberRoadAddress: string;
+  memberZipCode: string;
+  memberDetailAddress: string;
+
+  memberRole: MemberRole;
+
+  memberSocial?: boolean;
+  memberEtc?: string;
+
+  social?: boolean;
+  etc?: string;
+}
+type JoinMemberRes = { memberId: string };
+
+type ModifyMemberReq = Partial<Omit<Member, 'memberId'>> & { memberId: string };
+type ModifyMemberRes = Member;
+
+interface LoginReq {
+  memberId: string;
+  memberPw: string;
+}
+interface LoginRes {
+  accessToken?: string;
+  refreshToken?: string;
+  expiresIn?: number;
+  tokenType?: string;
+  token?: string;
+  jwt?: string;
+  memberId?: string;
+}
+// ======================================================================
+
 
 // ----- 환경값 & 유틸 -----
 const BASE =
   process.env.NEXT_PUBLIC_API_BASE ||
   (typeof window !== 'undefined' ? window.location.origin : '');
 
-const API_PREFIX = process.env.NEXT_PUBLIC_API_PREFIX || ''; // 예: '/anpetna'
+// 보드/FAQ에서 사용 중인 프리픽스와 동일하게 기본값 '/anpetna'
+const API_PREFIX = process.env.NEXT_PUBLIC_API_PREFIX || '/anpetna';
+
 const LOGIN_PATH_CANDIDATES = [
   process.env.NEXT_PUBLIC_LOGIN_PATH || '/jwt/login',
   '/auth/login',
@@ -20,7 +123,6 @@ const LOGIN_PATH_CANDIDATES = [
 ];
 
 function apiURL(path: string) {
-  // path 앞에 '/'가 없으면 보정
   const normalized = path.startsWith('/') ? path : `/${path}`;
   return new URL(`${API_PREFIX}${normalized}`, BASE).toString();
 }
@@ -100,27 +202,25 @@ async function post<T>(path: string, body: unknown, init?: RequestInit): Promise
 
 // ----- 엔드포인트 매핑 -----
 export const ENDPOINTS = {
-  signup: '/member/join',                        // POST
-  list: '/member/readAll',                       // GET
+  signup: '/member/join',                                    // POST
+  list: '/member/readAll',                                   // GET
   readOne: (memberId: string) => `/member/my_page/${encodeURIComponent(memberId)}`, // GET
-  modify: '/member/modify',                      // POST
-  remove: '/member/delete',                      // GET (인증 필요)
+  modify: '/member/modify',                                  // POST
+  remove: '/member/delete',                                  // GET (인증 필요)
 };
 
 // ----- API 함수들 -----
 export async function signup(body: JoinMemberReq): Promise<JoinMemberRes> {
-  // DTO 호환: social/etc가 들어오면 memberSocial/memberEtc로 보정
+  // DTO 호환: (혹시 페이지에서 social/etc 이름으로 보낼 경우 대비)
   const normalized = {
     ...body,
-    memberSocial: body.memberSocial ?? body.social,
-    memberEtc: body.memberEtc ?? body.etc,
+    memberSocial: (body as any).memberSocial ?? (body as any).social,
+    memberEtc: (body as any).memberEtc ?? (body as any).etc,
   };
-  const res = await post<JoinMemberRes>(ENDPOINTS.signup, normalized);
-  return res;
+  return await post<JoinMemberRes>(ENDPOINTS.signup, normalized);
 }
 
 export async function login(body: LoginReq): Promise<LoginRes> {
-  // 여러 후보 경로를 시도
   let lastErr: unknown = null;
   for (const p of LOGIN_PATH_CANDIDATES) {
     try {
@@ -131,6 +231,7 @@ export async function login(body: LoginReq): Promise<LoginRes> {
         body: JSON.stringify(body),
       });
       if (!resp.ok) continue;
+
       const data = await parseJson(resp) as any;
 
       const token: string | undefined =
@@ -139,12 +240,14 @@ export async function login(body: LoginReq): Promise<LoginRes> {
         data?.memberId ?? body.memberId;
 
       if (token) AuthStore.set(token, mid);
+
       const out: LoginRes = {
         accessToken: data?.accessToken ?? token,
         refreshToken: data?.refreshToken,
         expiresIn: data?.expiresIn,
         tokenType: data?.tokenType ?? (token ? 'Bearer' : undefined),
-        memberId: mid,
+        // 필요 시 로그인 응답에 memberId도 넘겨둠(타입 확장 가능)
+        ...(mid ? { memberId: mid } as any : {}),
       };
       return out;
     } catch (e) {
@@ -156,9 +259,7 @@ export async function login(body: LoginReq): Promise<LoginRes> {
 
 export async function listMembers(): Promise<ReadMemberAllRes> {
   const data = await get<any>(ENDPOINTS.list);
-  // 서버가 리스트를 바로 주거나 result에 담아줄 수 있음
-  const arr =
-    data?.dtoList ?? data?.list ?? data?.members ?? data ?? [];
+  const arr = data?.dtoList ?? data?.list ?? data?.members ?? data ?? [];
   return Array.isArray(arr) ? (arr as ReadMemberAllRes) : [];
 }
 
@@ -168,15 +269,21 @@ export async function readMemberOne(memberId: string): Promise<ReadMemberOneRes>
 }
 
 export async function modifyMember(body: ModifyMemberReq): Promise<ModifyMemberRes> {
-  // DTO 호환 보정
   const normalized = {
     ...body,
-    memberSocial: body.memberSocial ?? (body as any).social,
-    memberEtc: body.memberEtc ?? (body as any).etc,
+    memberSocial: (body as any).memberSocial ?? (body as any).social,
+    memberEtc: (body as any).memberEtc ?? (body as any).etc,
   };
   const data = await post<any>(ENDPOINTS.modify, normalized);
   return (data as ModifyMemberRes);
 }
+
+// ✅ 로컬 타입: DeleteMemberRes (member.types.ts에 없을 때를 대비)
+type DeleteMemberRes = {
+  memberId?: string;
+  success?: boolean;
+  message?: string;
+};
 
 export async function removeMember(): Promise<DeleteMemberRes> {
   const data = await get<any>(ENDPOINTS.remove);

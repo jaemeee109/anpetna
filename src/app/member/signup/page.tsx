@@ -58,6 +58,23 @@ export default function SignupPage() {
   const set = <K extends keyof Form,>(k: K, v: Form[K]) => setForm((f) => ({ ...f, [k]: v }));
   const toggleGM = (v: GM) => set('memberBirthGM', v);
 
+  
+  const BASE =
+    (process.env.NEXT_PUBLIC_API_BASE as string | undefined) ||
+    (typeof window !== 'undefined'
+      ? `${window.location.protocol}//${window.location.hostname}${
+          window.location.port
+            ? `:${window.location.port === '3000' ? '8000' : window.location.port}`
+            : ''
+        }`.replace(/:$/, '')
+      : '');
+
+  const API_PREFIX = (process.env.NEXT_PUBLIC_API_PREFIX as string | undefined) ?? '/anpetna';
+  function apiURL(path: string) {
+    const normalized = path.startsWith('/') ? path : `/${path}`;
+    return new URL(`${API_PREFIX}${normalized}`, BASE).toString();
+  }
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (submitting) return;
@@ -91,16 +108,34 @@ export default function SignupPage() {
         memberHasPet: form.memberHasPet,
       };
 
-      const resp = await fetch('/member/join', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+      // ✅ 우선순위: 1) BASE+API_PREFIX+'/member/join'  2) BASE+'/member/join' (백엔드 prefix가 없는 경우)
+      const candidates = [
+        apiURL('/member/join'),
+        new URL('/member/join', BASE).toString(),
+      ];
 
-      if (!resp.ok) {
-        const t = await resp.text().catch(() => '');
-        throw new Error(`회원가입 실패 (HTTP ${resp.status})\n${t.slice(0, 200)}`);
+      let ok = false;
+      let lastText = '';
+      for (const url of candidates) {
+        try {
+          const resp = await fetch(url, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          if (resp.ok) {
+            ok = true;
+            break;
+          }
+          lastText = `HTTP ${resp.status} ${await resp.text().catch(() => '')}`;
+        } catch (e: any) {
+          lastText = String(e?.message || e);
+        }
+      }
+
+      if (!ok) {
+        throw new Error(`회원가입 실패\n${lastText}`.trim());
       }
 
       alert('회원가입이 완료되었습니다. 로그인 페이지로 이동합니다.');

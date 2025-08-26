@@ -1,11 +1,14 @@
 // features/member/data/member.types.ts
 
-// 백엔드 enum이 무엇이든 받아주기 위해 관대한 타입으로 선언
+// --- 백엔드 enum(com.anpetna.member.constant.MemberRole) 대응 ---
+// 기본적으로 USER/ADMIN 이지만, 서버에서 ROLE_* 혹은 다른 문자열을 줄 수도 있어
+// 안전하게 string fallback 허용
 export type MemberRole =
   | 'USER' | 'ADMIN'
   | 'ROLE_USER' | 'ROLE_ADMIN'
-  | (string & {}); // 서버가 다른 문자열을 줄 경우도 통과
+  | (string & {});
 
+// --- 이미지(프로필) ---
 export interface MemberImage {
   uuid?: number | string;
   fileName?: string;
@@ -13,74 +16,103 @@ export interface MemberImage {
   sortOrder?: number;
 }
 
+// --- 회원 기본 모델 (백엔드 MemberDTO 필드 반영, 관대 모양) ---
 export interface Member {
+  // 식별 / 인증
   memberId: string;
   memberPw?: string;
+
+  // 기본 정보
   memberName: string;
+
+  // 생년월일(YYYY/MM/DD + 양/음력)
   memberBirthY: string;
   memberBirthM: string;
   memberBirthD: string;
-  memberBirthGM: string;     // 양/음력
-  memberGender: string;
-  memberHasPet: string;
+  memberBirthGM: string; // '양력' | '음력'
+
+  // 기타 특성
+  memberGender: string;   // 'M' | 'F' | 'U' 등
+  memberHasPet: string;   // 'Y' | 'N'
+
+  // 연락
   memberPhone: string;
-  smsStsYn: string;          // 문자수신 여부
+  smsStsYn: string;       // 'Y' | 'N'
   memberEmail: string;
-  emailStsYn: string;        // 이메일 수신 여부
+  emailStsYn: string;     // 'Y' | 'N'
+
+  // 주소
   memberRoadAddress: string;
   memberZipCode: string;
   memberDetailAddress: string;
+
+  // 권한/소셜/비고
   memberRole: MemberRole;
-  memberSocial?: boolean;    // 엔티티는 boolean, DTO는 social 이름일 수도 있어 optional
+  memberSocial?: boolean;
   memberEtc?: string;
 
-  images?: MemberImage[];    // 프로필 이미지들
+  // 프로필 이미지 (백엔드: List memberFileImage)
+  images?: MemberImage[];
+  memberFileImage?: Array<string | MemberImage>;
 
-  // BaseEntity
+  // 생성/수정 시간 (BaseEntity)
   createDate?: string;
   latestDate?: string;
 
-  // DTO 호환(서버가 다른 이름을 줄 수 있어 보조 필드)
+  // 서버가 다른 키로 줄 수도 있어 보조 키들
   social?: boolean;
   etc?: string;
-  memberFileImage?: Array<string | MemberImage>;
+
+  // 백엔드 MemberDTO에 보일 수 있는 보조 필드들(관대 처리)
+  status?: string;
+  memberDTO?: Member;
 }
 
+// ---- 목록/단건 ----
 export type ReadMemberAllRes = Member[];
 export interface ReadMemberOneRes extends Member {}
 
+// ---- 가입 ----
 export interface JoinMemberReq {
   memberId: string;
   memberPw: string;
   memberName: string;
+
   memberBirthY: string;
   memberBirthM: string;
   memberBirthD: string;
   memberBirthGM: string;
+
   memberGender: string;
   memberHasPet: string;
+
   memberPhone: string;
   smsStsYn: string;
+
   memberEmail: string;
   emailStsYn: string;
+
   memberRoadAddress: string;
   memberZipCode: string;
   memberDetailAddress: string;
+
   memberRole: MemberRole;
+
+  // 선택
   memberSocial?: boolean;
   memberEtc?: string;
-  // DTO 호환
+
+  // 호환 키
   social?: boolean;
   etc?: string;
 }
+export type JoinMemberRes = { memberId: string };
 
-export type JoinMemberRes = {
-  memberId: string;
-};
-
+// ---- 수정 ----
 export type ModifyMemberReq = Partial<Omit<Member, 'memberId'>> & { memberId: string };
 export type ModifyMemberRes = Member;
 
+// ---- 로그인 ----
 export interface LoginReq {
   memberId: string;
   memberPw: string;
@@ -89,15 +121,18 @@ export interface LoginRes {
   accessToken?: string;
   refreshToken?: string;
   expiresIn?: number;
-  tokenType?: string; // Bearer 등
-  // 서버가 다른 키로 줄 수도 있어 보조 키들
+  tokenType?: string; // e.g. 'Bearer'
+  // 서버가 다른 키로 줄 수도 있어 대비
   token?: string;
   jwt?: string;
   memberId?: string;
 }
 
+// ---- 삭제 ----
+// 컨트롤러(import: com.anpetna.member.dto.deleteMember.DeleteMemberRes)에 맞춰 export
 export interface DeleteMemberRes {
   memberId?: string;
   success?: boolean;
   message?: string;
+  status?: string; // ApiResult 형태일 때를 대비해 관대 처리
 }
