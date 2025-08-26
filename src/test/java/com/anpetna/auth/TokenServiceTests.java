@@ -131,7 +131,7 @@ public class TokenServiceTests {
 
         when(tokenRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        TokenResponse response = sut.refresh(oldRT, loginMemberReq);
+        TokenResponse response = sut.refresh(oldRT);
 
         assertThat(response.getAccessToken()).isEqualTo("Access.Token.12345");
         assertThat(response.getRefreshToken()).isEqualTo(newRT);
@@ -161,7 +161,7 @@ public class TokenServiceTests {
         when(tokenHash.sha256(eq(rawRefresh))).thenReturn(storedHash);
 
         // when
-        sut.logout(rawRefresh, accessToken, te);
+        sut.logout(rawRefresh, accessToken);
 
         // then
         verify(tokenRepository).revokeByMemberId(eq(memberId));//revoke가 호출되는지를 검증

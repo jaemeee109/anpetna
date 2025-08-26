@@ -1,15 +1,17 @@
 package com.anpetna.coreDto;
 
 import com.anpetna.coreDomain.ImageEntity;
-import lombok.*;
+import jakarta.persistence.Column;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 @Getter
 @Builder
-@Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class ImageDTO {
-
     private Long uuid;
     private String fileName;
     private String url;
@@ -22,3 +24,4 @@ public class ImageDTO {
         this.sortOrder = imageEntity.getSortOrder();
     }
 }
+

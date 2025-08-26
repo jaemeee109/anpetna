@@ -36,6 +36,7 @@ public class PageRequestDTO {
     // list?page=3&type=w&keyword=kkw
 
     private String boardType;
+
     public String getLink(){
 
         if(link == null){
