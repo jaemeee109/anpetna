@@ -40,8 +40,8 @@ import java.util.stream.Collectors;
 @Transactional
 public class BoardServiceImpl implements BoardService {
 
-
-    private final BoardJpaRepository boardJpaRepository; // 의존성 주입
+    // 의존성 주입
+    private final BoardJpaRepository boardJpaRepository;
 
     // 멤버 확인용
     private final MemberRepository memberRepository;
@@ -93,7 +93,6 @@ public class BoardServiceImpl implements BoardService {
     }
 
 
-
     //=================================================================================
     @Transactional
     @Override
@@ -123,17 +122,38 @@ public class BoardServiceImpl implements BoardService {
                 Integer order = imageDTO.getSortOrder() != null ? imageDTO.getSortOrder() : idx++;
                 //              DTO 에 sortOrder 가 있으면 그대로 사용.
                 //                                       없으면(null) 현재 idx 값을 사용하고, 그 다음에 idx 를 1 증가(후위 증가 idx++)
-
-                ImageEntity imageEntity = ImageEntity.forBoard(imageDTO.getFileName(), imageDTO.getUrl(), board, order);
+                ImageEntity.forBoard(imageDTO.getFileName(), imageDTO.getUrl(), board, order);
                 // 연관관계 편의 메서드 이용
             }
         }
-        var saved = boardJpaRepository.save(board);
-        return CreateBoardRes.builder().createBoard(saved).build();
+
+        BoardEntity saved = boardJpaRepository.save(board); //
+
+        // ★ 실제 저장된 이미지 엔티티 기준으로 응답 DTO 용 리스트 생성(정렬 포함)
+        List<ImageDTO> imagesRes = Optional.ofNullable(saved.getImages()).orElse(List.of())
+                .stream()
+                .sorted(Comparator.comparing(img -> Optional.ofNullable(img.getSortOrder()).orElse(0)))
+                .map(img -> ImageDTO.builder()
+                        .fileName(img.getFileName())
+                        .url(img.getUrl())
+                        .sortOrder(img.getSortOrder())
+                        .build())
+                .toList();
+
+        // ★ saved 기준으로 빌더 채우기
+        return CreateBoardRes.builder()
+                .bno(saved.getBno())
+                .bTitle(saved.getBTitle())
+                .bWriter(saved.getBWriter())
+                .bContent(saved.getBContent())
+                .bLikeCount(saved.getBLikeCount())
+                .images(imagesRes)
+                .createDate(saved.getCreateDate())   // BaseEntity에 있다면
+                .latestDate(saved.getLatestDate())   // BaseEntity에 있다면
+                .build();
     }
 
-    //★ 추가
-    //================================================================================= 
+    // ★ 추가 ==========================================================================
     @Override
     @Transactional
     public CreateBoardRes create(CreateBoardReq req) {
@@ -144,7 +164,6 @@ public class BoardServiceImpl implements BoardService {
     @Override
     @Transactional(readOnly = true)
     public PageResponseDTO<BoardDTO> readAllBoard(PageRequestDTO pageRequestDTO) {
-
         //비회원 허용 (여기서는 강제 검증 안 함) 필요시 로깅·맞춤기능에만 사용
         resolveLoginIdIfAny();
 
@@ -267,11 +286,27 @@ public class BoardServiceImpl implements BoardService {
             }
         }
 
+        // DB에 즉시 반영
         boardJpaRepository.flush();
+
+        List<ImageDTO> imagesUpdate = Optional.ofNullable(boardEntity.getImages()).orElse(List.of()).stream()
+                .sorted(Comparator.comparing(img -> Optional.ofNullable(img.getSortOrder()).orElse(0)))
+                .map(img -> ImageDTO.builder()
+                        .fileName(img.getFileName())
+                        .url(img.getUrl())
+                        .sortOrder(img.getSortOrder())
+                        .build())
+                .toList();
 
         // JPA dirty checking
         return UpdateBoardRes.builder()
-                .updateBoard(boardEntity)
+                .bno(boardEntity.getBno())
+                .bTitle(boardEntity.getBTitle())
+                .bContent(boardEntity.getBContent())
+                .bLikeCount(boardEntity.getBLikeCount())
+                .images(imagesUpdate)
+                .createDate(boardEntity.getCreateDate())   // BaseEntity에 있다면
+                .latestDate(boardEntity.getLatestDate())   // BaseEntity에 있다면
                 .build();
     }
 
@@ -290,8 +325,10 @@ public class BoardServiceImpl implements BoardService {
 
         boardJpaRepository.delete(board);
 
-        return DeleteBoardRes.builder().deleteBoard(board).build();
-
+        return DeleteBoardRes.builder()
+                .bno(board.getBno())
+                .deleted(true)
+                .build();
     }
 
     //=================================================================================
@@ -313,7 +350,8 @@ public class BoardServiceImpl implements BoardService {
 
         // 4. 결과 반환
         return UpdateBoardRes.builder()
-                .updateBoard(boardEntity)
+                .bno(boardEntity.getBno())
+                .bLikeCount(boardEntity.getBLikeCount())
                 .build();
     }
 }

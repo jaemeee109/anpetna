@@ -3,13 +3,19 @@ package com.anpetna.board.dto;
 import com.anpetna.board.domain.BoardEntity;
 import com.anpetna.board.constant.BoardType;
 import com.anpetna.coreDomain.ImageEntity;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
 @Data
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
 public class BoardDTO {
 
     private Long bno;
@@ -41,7 +47,7 @@ public class BoardDTO {
         this.boardType = entity.getBoardType();
         this.noticeFlag = entity.getNoticeFlag();
         this.isSecret = entity.getIsSecret();
-        this.faqCategory=entity.getFaqCategory(); // ★ 추가
+        this.faqCategory = entity.getFaqCategory(); // ★ 추가
         this.createDate = entity.getCreateDate();
         this.latestDate = entity.getLatestDate();
 
@@ -50,5 +56,18 @@ public class BoardDTO {
                 .stream()
                 .map(ImageEntity::getUrl)
                 .collect(Collectors.toList());
+    }
+
+    // ✅ 변환 메서드
+    public static BoardDTO from(BoardEntity e) {
+        return BoardDTO.builder()
+                .bno(e.getBno())
+                .bTitle(e.getBTitle())
+                .bWriter(e.getBWriter())
+                .bLikeCount(e.getBLikeCount() == null ? 0 : e.getBLikeCount())
+                .createDate(e.getCreateDate())
+                .latestDate(e.getLatestDate())
+                .noticeFlag(Boolean.TRUE.equals(e.getNoticeFlag()))
+                .build();
     }
 }

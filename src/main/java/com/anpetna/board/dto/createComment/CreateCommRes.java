@@ -1,6 +1,5 @@
 package com.anpetna.board.dto.createComment;
 
-import com.anpetna.board.domain.CommentEntity;
 import com.anpetna.board.dto.CommentDTO;
 import lombok.*;
 

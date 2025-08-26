@@ -1,5 +1,6 @@
 package com.anpetna.board.dto.deleteBoard;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.*;
 
 @Getter

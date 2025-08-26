@@ -1,6 +1,7 @@
 package com.anpetna.board.dto.readAllBoard;
 
 import com.anpetna.board.domain.BoardEntity;
+import com.anpetna.board.dto.BoardDTO;
 import lombok.*;
 
 import java.util.List;
@@ -12,7 +13,8 @@ import java.util.List;
 @NoArgsConstructor
 public class ReadAllBoardRes {
 
-    private List<BoardEntity> readAllBoard;
+    private List<BoardDTO> readAllBoard;
+
     private int totalPages;
     private long totalElements;
     private int currentPage;

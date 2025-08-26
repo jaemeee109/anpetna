@@ -11,7 +11,7 @@ import lombok.*;
 @Builder
 @AllArgsConstructor // 모든 필드값으로 생성자 만듬
 @NoArgsConstructor // 기본생성자
-@ToString
+@ToString(exclude = "board")
 public class CommentEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
