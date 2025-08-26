@@ -1,12 +1,8 @@
-package com.anpetna.member.refreshToken.controller;
+package com.anpetna.auth.controller;
 
-import com.anpetna.config.JwtProvider;
-import com.anpetna.member.domain.MemberEntity;
-import com.anpetna.member.dto.loginMember.LoginMemberReq;
-import com.anpetna.member.refreshToken.dto.LoginRequest;
-import com.anpetna.member.refreshToken.dto.TokenResponse;
-import com.anpetna.member.refreshToken.entity.TokenEntity;
-import com.anpetna.member.refreshToken.service.JwtService;
+import com.anpetna.auth.dto.LoginMemberReq;
+import com.anpetna.auth.dto.TokenResponse;
+import com.anpetna.auth.service.JwtService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

@@ -1,10 +1,10 @@
-package com.anpetna.service;
+package com.anpetna.auth;
 
 import com.anpetna.config.JwtProvider;
-import com.anpetna.member.refreshToken.entity.BlackListedEntity;
-import com.anpetna.member.refreshToken.repository.BlacklistedRepository;
-import com.anpetna.member.refreshToken.service.BlacklistServiceImpl;
-import com.anpetna.member.refreshToken.util.TokenHash;
+import com.anpetna.auth.domain.BlackListedEntity;
+import com.anpetna.auth.repository.BlacklistedRepository;
+import com.anpetna.auth.service.BlacklistServiceImpl;
+import com.anpetna.auth.util.TokenHash;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import org.junit.jupiter.api.Test;

@@ -1,4 +1,4 @@
-package com.anpetna.member.dto.loginMember;
+package com.anpetna.auth.dto;
 
 import lombok.*;
 

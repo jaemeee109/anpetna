@@ -116,7 +116,7 @@ public class CommentServiceImpl implements CommentService {
                 .map(CommentDTO::fromEntity)   // 공용 DTO 매핑
                 .toList();
 
-        var pageDTO = PageResponseDTO.<CommentDTO>withAll()
+        PageResponseDTO<CommentDTO> pageDTO = PageResponseDTO.<CommentDTO>withAll()
                 .pageRequestDTO(readCommReq)
                 .dtoList(dtoList)
                 .total((int) page.getTotalElements())

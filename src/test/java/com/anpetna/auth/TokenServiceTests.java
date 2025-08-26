@@ -1,14 +1,14 @@
-package com.anpetna.service;
+package com.anpetna.auth;
 
 import com.anpetna.config.JwtProvider;
 import com.anpetna.member.domain.MemberEntity;
-import com.anpetna.member.dto.loginMember.LoginMemberReq;
-import com.anpetna.member.refreshToken.dto.TokenResponse;
-import com.anpetna.member.refreshToken.entity.TokenEntity;
-import com.anpetna.member.refreshToken.repository.TokenRepository;
-import com.anpetna.member.refreshToken.service.BlacklistServiceImpl;
-import com.anpetna.member.refreshToken.service.JwtServiceImpl;
-import com.anpetna.member.refreshToken.util.TokenHash;
+import com.anpetna.auth.dto.LoginMemberReq;
+import com.anpetna.auth.dto.TokenResponse;
+import com.anpetna.auth.domain.TokenEntity;
+import com.anpetna.auth.repository.TokenRepository;
+import com.anpetna.auth.service.BlacklistServiceImpl;
+import com.anpetna.auth.service.JwtServiceImpl;
+import com.anpetna.auth.util.TokenHash;
 import com.anpetna.member.repository.MemberRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,7 +20,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
-import java.lang.reflect.Member;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;

@@ -1,4 +1,4 @@
-package com.anpetna.member.refreshToken.util;
+package com.anpetna.auth.util;
 
 import org.springframework.stereotype.Component;
 

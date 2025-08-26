@@ -1,4 +1,4 @@
-package com.anpetna.member.refreshToken.entity;
+package com.anpetna.auth.domain;
 
 import jakarta.persistence.*;
 import lombok.Getter;

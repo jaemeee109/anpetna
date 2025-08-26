@@ -1,9 +1,10 @@
 package com.anpetna.config;
-import com.anpetna.member.refreshToken.service.BlacklistServiceImpl;
+import com.anpetna.auth.service.BlacklistServiceImpl;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -12,13 +13,13 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+
+@RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
+
     private final JwtProvider jwtProvider;
     private final BlacklistServiceImpl blacklistService;
-    public JwtAuthenticationFilter(JwtProvider jwtProvider, BlacklistServiceImpl blacklistService) {
-        this.jwtProvider = jwtProvider;
-        this.blacklistService = blacklistService;
-    }
+
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,

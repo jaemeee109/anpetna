@@ -1,5 +1,5 @@
 package com.anpetna.config;
-import com.anpetna.member.refreshToken.service.BlacklistServiceImpl;
+import com.anpetna.auth.service.BlacklistServiceImpl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

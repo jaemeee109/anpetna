@@ -1,4 +1,4 @@
-package com.anpetna.member.refreshToken.service;
+package com.anpetna.auth.service;
 
 public interface BlacklistService {
 

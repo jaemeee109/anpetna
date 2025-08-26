@@ -1,5 +1,6 @@
 package com.anpetna.board.dto.readComment;
 
+import com.anpetna.board.dto.CommentDTO;
 import com.anpetna.coreDto.PageResponseDTO;
 import lombok.*;
 
@@ -13,18 +14,5 @@ public class ReadCommRes {
 
     private Long bno;
     private PageResponseDTO<CommentDTO> page;
-
-
-    @Getter
-    @Setter
-    @AllArgsConstructor
-    @NoArgsConstructor
-    @ToString
-    public static class CommentDTO {
-        private Long cno;
-        private String cContent;
-        private String cWriter;
-        private Integer cLikeCount;
-    }
 
 }

@@ -1,6 +1,6 @@
-package com.anpetna.member.refreshToken.repository;
+package com.anpetna.auth.repository;
 
-import com.anpetna.member.refreshToken.entity.TokenEntity;
+import com.anpetna.auth.domain.TokenEntity;
 import jakarta.transaction.Transactional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 import java.util.Optional;
 
 public interface TokenRepository extends JpaRepository<TokenEntity, Long> {
+
     @Query("select t from TokenEntity t where t.memberId = :memberId")
     Optional<TokenEntity> findByTokenMemberId(@Param("memberId") String id);
 

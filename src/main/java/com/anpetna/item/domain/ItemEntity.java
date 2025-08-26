@@ -53,7 +53,7 @@ public class ItemEntity extends BaseEntity {
 
 /*    @Column(name="item_ThumbsId", nullable=false)
     private String itemThumbsId;*/
-
+    @Builder.Default
     @OneToMany(mappedBy = "item", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ImageEntity> images = new ArrayList<>();
 

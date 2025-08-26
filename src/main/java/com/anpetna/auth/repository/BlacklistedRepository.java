@@ -1,6 +1,6 @@
-package com.anpetna.member.refreshToken.repository;
+package com.anpetna.auth.repository;
 
-import com.anpetna.member.refreshToken.entity.BlackListedEntity;
+import com.anpetna.auth.domain.BlackListedEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.time.Instant;

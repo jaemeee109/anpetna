@@ -1,9 +1,9 @@
-package com.anpetna.member.refreshToken.service;
+package com.anpetna.auth.service;
 
 import com.anpetna.config.JwtProvider;
-import com.anpetna.member.refreshToken.entity.BlackListedEntity;
-import com.anpetna.member.refreshToken.repository.BlacklistedRepository;
-import com.anpetna.member.refreshToken.util.TokenHash;
+import com.anpetna.auth.domain.BlackListedEntity;
+import com.anpetna.auth.repository.BlacklistedRepository;
+import com.anpetna.auth.util.TokenHash;
 import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
