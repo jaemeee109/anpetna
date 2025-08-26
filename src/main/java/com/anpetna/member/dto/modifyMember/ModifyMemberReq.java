@@ -15,6 +15,7 @@ import java.util.List;
 @NoArgsConstructor
 public class ModifyMemberReq {
 
+    private String memberName;//이름
     private String memberId;//아이디
     private String memberPw;//비밀번호
     private String memberEmail;//이메일

@@ -1,4 +1,5 @@
 package com.anpetna.config;
+import com.anpetna.member.refreshToken.dto.TokenRequest;
 import com.anpetna.member.refreshToken.service.BlacklistServiceImpl;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -30,8 +31,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
         String token = header.substring(7);
+        TokenRequest tokenRequest = TokenRequest.builder()
+                .accessToken(token)
+                .build();
         // 2) [중요] 블랙리스트 먼저 확인 → 로그아웃/폐기 토큰 즉시 차단
-        if (blacklistService.isBlacklisted(token)) {
+        if (blacklistService.isBlacklisted(tokenRequest)) {
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Token is revoked");
             return;
         }

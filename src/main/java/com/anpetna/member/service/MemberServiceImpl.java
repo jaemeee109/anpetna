@@ -117,6 +117,7 @@ public class MemberServiceImpl implements MemberService {
         if (member == null) {
             throw new UsernameNotFoundException(memberId);
         }
+//        ResponseStatusException(HttpStatus.)
 
         member.setMemberPw(passwordEncoder.encode(modifyMemberReq.getMemberPw()));
         member.setMemberPhone(modifyMemberReq.getMemberPhone());
@@ -144,6 +145,8 @@ public class MemberServiceImpl implements MemberService {
         return null;
 
     }
+
+
 
 
 }

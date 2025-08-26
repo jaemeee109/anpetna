@@ -3,7 +3,7 @@ package com.anpetna.member.refreshToken.controller;
 import com.anpetna.config.JwtProvider;
 import com.anpetna.member.domain.MemberEntity;
 import com.anpetna.member.dto.loginMember.LoginMemberReq;
-import com.anpetna.member.refreshToken.dto.LoginRequest;
+import com.anpetna.member.refreshToken.dto.TokenRequest;
 import com.anpetna.member.refreshToken.dto.TokenResponse;
 import com.anpetna.member.refreshToken.entity.TokenEntity;
 import com.anpetna.member.refreshToken.service.JwtService;
@@ -24,8 +24,8 @@ public class JwtController {
     }
 
     @PostMapping("/refresh")
-    public ResponseEntity<TokenResponse> refresh(@RequestBody TokenResponse tokenResponse) {
-        return ResponseEntity.ok(jwtService.refresh(tokenResponse.getRefreshToken()));
+    public ResponseEntity<TokenResponse> refresh(@RequestBody TokenRequest tokenRequest) {
+        return ResponseEntity.ok(jwtService.refresh(tokenRequest));
     }
 
     @PostMapping("/logout")
@@ -34,7 +34,12 @@ public class JwtController {
         String access = clean(authorization);          // 위 clean() 재사용
         String refresh = clean(tokenResponse.getRefreshToken());
 
-        jwtService.logout(refresh, access);
+        TokenRequest tokenRequest = TokenRequest.builder()
+                .accessToken(access)
+                .refreshToken(refresh)
+                .build();
+
+        jwtService.logout(tokenRequest);
         return ResponseEntity.noContent().build(); //
     }
 

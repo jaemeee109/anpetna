@@ -3,6 +3,7 @@ package com.anpetna.service;
 import com.anpetna.config.JwtProvider;
 import com.anpetna.member.domain.MemberEntity;
 import com.anpetna.member.dto.loginMember.LoginMemberReq;
+import com.anpetna.member.refreshToken.dto.TokenRequest;
 import com.anpetna.member.refreshToken.dto.TokenResponse;
 import com.anpetna.member.refreshToken.entity.TokenEntity;
 import com.anpetna.member.refreshToken.repository.TokenRepository;
@@ -115,6 +116,10 @@ public class TokenServiceTests {
         String oldRT = "Refresh.Token.456";
         String newRT = "Refresh.Token.45678";
 
+        TokenRequest tokenRequest = TokenRequest.builder()
+                .refreshToken(oldRT)
+                .build();
+
         when(jwtProvider.validateToken(eq(oldRT))).thenReturn(true);
         when(jwtProvider.getUsername(eq(oldRT))).thenReturn(te.getMemberId());
 
@@ -132,7 +137,7 @@ public class TokenServiceTests {
 
         when(tokenRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        TokenResponse response = sut.refresh(oldRT, loginMemberReq);
+        TokenResponse response = sut.refresh(tokenRequest);
 
         assertThat(response.getAccessToken()).isEqualTo("Access.Token.12345");
         assertThat(response.getRefreshToken()).isEqualTo(newRT);
@@ -155,6 +160,11 @@ public class TokenServiceTests {
         te.setMemberId(memberId);
         te.setRefreshToken(storedHash);                  //DB엔 해시가 저장되어 있어야 함
 
+        TokenRequest tokenRequest = TokenRequest.builder()
+                .refreshToken(rawRefresh)
+                .accessToken(accessToken)
+                .build();
+
         //refresh 토큰 유효성은 통과
         when(jwtProvider.validateToken(eq(rawRefresh))).thenReturn(true);
 
@@ -162,13 +172,13 @@ public class TokenServiceTests {
         when(tokenHash.sha256(eq(rawRefresh))).thenReturn(storedHash);
 
         // when
-        sut.logout(rawRefresh, accessToken, te);
+        sut.logout(tokenRequest);
 
         // then
         verify(tokenRepository).revokeByMemberId(eq(memberId));//revoke가 호출되는지를 검증
 
         // 블랙리스트 등록 호출 검증
-        verify(blacklistService).addToBlacklist(eq(accessToken));
+        verify(blacklistService).addToBlacklist(eq(tokenRequest));
 
         // 불필요 상호작용 없는지
         verifyNoMoreInteractions(tokenRepository, blacklistService, jwtProvider, tokenHash);
