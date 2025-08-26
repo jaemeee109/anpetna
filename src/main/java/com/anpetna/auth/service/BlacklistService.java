@@ -1,6 +1,6 @@
 package com.anpetna.auth.service;
 
-import com.anpetna.member.refreshToken.dto.TokenRequest;
+import com.anpetna.auth.dto.TokenRequest;
 
 public interface BlacklistService {
 

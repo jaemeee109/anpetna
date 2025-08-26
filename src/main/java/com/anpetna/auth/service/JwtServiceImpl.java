@@ -1,14 +1,13 @@
 package com.anpetna.auth.service;
 
+import com.anpetna.auth.domain.TokenEntity;
+import com.anpetna.auth.dto.LoginMemberReq;
+import com.anpetna.auth.dto.TokenRequest;
+import com.anpetna.auth.dto.TokenResponse;
+import com.anpetna.auth.repository.TokenRepository;
+import com.anpetna.auth.util.TokenHash;
 import com.anpetna.config.JwtProvider;
 import com.anpetna.member.domain.MemberEntity;
-import com.anpetna.member.dto.loginMember.LoginMemberReq;
-import com.anpetna.member.refreshToken.dto.LoginRequest;
-import com.anpetna.member.refreshToken.dto.TokenRequest;
-import com.anpetna.member.refreshToken.dto.TokenResponse;
-import com.anpetna.member.refreshToken.entity.TokenEntity;
-import com.anpetna.member.refreshToken.repository.TokenRepository;
-import com.anpetna.member.refreshToken.util.TokenHash;
 import com.anpetna.member.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -17,7 +16,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
-import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor

@@ -1,10 +1,10 @@
 package com.anpetna.auth.service;
 
+import com.anpetna.auth.dto.TokenRequest;
+import com.anpetna.auth.repository.BlacklistedRepository;
+import com.anpetna.auth.util.TokenHash;
 import com.anpetna.config.JwtProvider;
-import com.anpetna.member.refreshToken.dto.TokenRequest;
-import com.anpetna.member.refreshToken.entity.BlackListedEntity;
-import com.anpetna.member.refreshToken.repository.BlacklistedRepository;
-import com.anpetna.member.refreshToken.util.TokenHash;
+import com.anpetna.auth.domain.BlackListedEntity;
 import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;

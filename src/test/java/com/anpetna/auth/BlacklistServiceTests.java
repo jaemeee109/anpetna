@@ -1,5 +1,6 @@
 package com.anpetna.auth;
 
+import com.anpetna.auth.dto.TokenRequest;
 import com.anpetna.config.JwtProvider;
 import com.anpetna.auth.domain.BlackListedEntity;
 import com.anpetna.auth.repository.BlacklistedRepository;
@@ -37,6 +38,10 @@ public class BlacklistServiceTests {
     private static final String AT = "eyJhbGciOiJIaccess";      // 가짜 토큰
     private static final String HASH = "abcdef012345";          // 가짜 해시
 
+    TokenRequest tokenRequest = TokenRequest.builder()
+            .accessToken(AT)
+            .build();
+
 //    @BeforeEach
 //    void setup() {
 //        // 공통 스텁: 해시 유틸은 항상 같은 해시를 반환하게
@@ -57,7 +62,7 @@ public class BlacklistServiceTests {
                 .thenReturn(false);
 
         // when
-        sut.addToBlacklist(AT);
+        sut.addToBlacklist(tokenRequest);
 
         // then: save 1회, 저장되는 값 검증
         ArgumentCaptor<BlackListedEntity> cap = ArgumentCaptor.forClass(BlackListedEntity.class);
@@ -83,7 +88,7 @@ public class BlacklistServiceTests {
                 .thenReturn(true);
 
         // when
-        sut.addToBlacklist(AT);
+        sut.addToBlacklist(tokenRequest);
 
         // then: 저장이 되기전에 끝나야 하므로, save가 한번도 동작을 하지 않았는지 검증
         verify(repo, never()).save(any());
@@ -99,7 +104,7 @@ public class BlacklistServiceTests {
         when(jwtProvider.parseClaims(AT)).thenReturn(claims);
 
         // when
-        sut.addToBlacklist(AT);
+        sut.addToBlacklist(tokenRequest);
 
         // then
         verify(repo, never()).existsByAccessTokenHashAndExpiresAtAfter(anyString(), any());
@@ -113,7 +118,7 @@ public class BlacklistServiceTests {
         when(jwtProvider.parseClaims(AT)).thenThrow(new JwtException("언마로ㅜㅇ;노미ㅜ챠뱆어ㅏ밍;"));
 
         // when
-        sut.addToBlacklist(AT);
+        sut.addToBlacklist(tokenRequest);
 
         // then
         verify(repo, never()).save(any());
@@ -140,8 +145,8 @@ public class BlacklistServiceTests {
                 .thenReturn(false);
 
         // when & then
-        assertThat(sut.isBlacklisted(AT)).isTrue();
-        assertThat(sut.isBlacklisted(AT)).isFalse();
+        assertThat(sut.isBlacklisted(tokenRequest)).isTrue();
+        assertThat(sut.isBlacklisted(tokenRequest)).isFalse();
         verify(tokenHash, times(2)).sha256(eq(AT));
     }
 

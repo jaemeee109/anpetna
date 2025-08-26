@@ -1,12 +1,9 @@
 package com.anpetna.auth.controller;
 
-import com.anpetna.config.JwtProvider;
-import com.anpetna.member.domain.MemberEntity;
-import com.anpetna.member.dto.loginMember.LoginMemberReq;
-import com.anpetna.member.refreshToken.dto.TokenRequest;
-import com.anpetna.member.refreshToken.dto.TokenResponse;
-import com.anpetna.member.refreshToken.entity.TokenEntity;
-import com.anpetna.member.refreshToken.service.JwtService;
+import com.anpetna.auth.dto.LoginMemberReq;
+import com.anpetna.auth.dto.TokenRequest;
+import com.anpetna.auth.dto.TokenResponse;
+import com.anpetna.auth.service.JwtService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -29,18 +26,20 @@ public class JwtController {
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout(@RequestHeader(value="Authorization", required=false) String authorization,
-                                       @RequestBody TokenResponse tokenResponse) {
-        String access = clean(authorization);          // 위 clean() 재사용
-        String refresh = clean(tokenResponse.getRefreshToken());
+    public ResponseEntity<Void> logout(
+            @RequestHeader(value="Authorization", required=false) String authorization,
+            @RequestBody TokenRequest tokenRequest) {
 
-        TokenRequest tokenRequest = TokenRequest.builder()
+        String access = clean(authorization);
+        String refresh = clean(tokenRequest.getRefreshToken());
+
+        TokenRequest req = TokenRequest.builder()
                 .accessToken(access)
                 .refreshToken(refresh)
                 .build();
 
-        jwtService.logout(tokenRequest);
-        return ResponseEntity.noContent().build(); //
+        jwtService.logout(req);
+        return ResponseEntity.noContent().build();
     }
 
     private String clean(String token) {

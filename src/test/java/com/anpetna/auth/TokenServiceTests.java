@@ -2,7 +2,6 @@ package com.anpetna.auth;
 
 import com.anpetna.config.JwtProvider;
 import com.anpetna.member.domain.MemberEntity;
-<<<<<<<< HEAD:src/test/java/com/anpetna/auth/TokenServiceTests.java
 import com.anpetna.auth.dto.LoginMemberReq;
 import com.anpetna.auth.dto.TokenResponse;
 import com.anpetna.auth.domain.TokenEntity;
@@ -10,16 +9,7 @@ import com.anpetna.auth.repository.TokenRepository;
 import com.anpetna.auth.service.BlacklistServiceImpl;
 import com.anpetna.auth.service.JwtServiceImpl;
 import com.anpetna.auth.util.TokenHash;
-========
-import com.anpetna.member.dto.loginMember.LoginMemberReq;
-import com.anpetna.member.refreshToken.dto.TokenRequest;
-import com.anpetna.member.refreshToken.dto.TokenResponse;
-import com.anpetna.member.refreshToken.entity.TokenEntity;
-import com.anpetna.member.refreshToken.repository.TokenRepository;
-import com.anpetna.member.refreshToken.service.BlacklistServiceImpl;
-import com.anpetna.member.refreshToken.service.JwtServiceImpl;
-import com.anpetna.member.refreshToken.util.TokenHash;
->>>>>>>> origin/Feature/Member:src/test/java/com/anpetna/service/TokenServiceTests.java
+import com.anpetna.auth.dto.TokenRequest;
 import com.anpetna.member.repository.MemberRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.BeforeEach;

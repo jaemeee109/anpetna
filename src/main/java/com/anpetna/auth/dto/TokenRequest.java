@@ -1,5 +1,4 @@
-package com.anpetna.member.refreshToken.dto;
-
+package com.anpetna.auth.dto;
 import lombok.*;
 
 @Getter

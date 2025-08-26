@@ -1,6 +1,6 @@
 package com.anpetna.config;
-import com.anpetna.member.refreshToken.dto.TokenRequest;
-import com.anpetna.member.refreshToken.service.BlacklistServiceImpl;
+import com.anpetna.auth.service.BlacklistServiceImpl;
+import com.anpetna.auth.dto.TokenRequest;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
