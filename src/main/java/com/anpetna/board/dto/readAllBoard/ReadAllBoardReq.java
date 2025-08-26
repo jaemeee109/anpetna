@@ -14,7 +14,7 @@ public class ReadAllBoardReq {
     private Integer size;
     private String boardType;
 
-// 정렬 조건 (예: "createDate,desc")
+    // 정렬 조건 (예: "createDate,desc")
     private String sortBy;
 
     /**

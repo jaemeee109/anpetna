@@ -1,7 +1,10 @@
 package com.anpetna.board.dto.readOneBoard;
 
 import com.anpetna.board.domain.BoardEntity;
+import com.anpetna.coreDto.ImageDTO;
 import lombok.*;
+
+import java.util.List;
 
 @Getter
 @Setter
@@ -22,4 +25,6 @@ public class ReadOneBoardRes {
 
     private Boolean noticeFlag;
     private Boolean isSecret;
+
+    private List<ImageDTO> images;
 }
