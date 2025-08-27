@@ -161,13 +161,13 @@ public class integrationTest {
 
         log.info("board_create_success_when_member 메서드 실행 : " + req.toString());
 
-        var res = boardService.createBoard(req);
+        var res = boardService.createBoard(req, null);
 
         log.info("board_create_success_when_member 메서드 실행 : " + res.toString());
 
         assertThat(res).isNotNull();
-        assertThat(res.getCreateBoard().getBno()).isNotNull();
-        assertThat(res.getCreateBoard().getBWriter()).isEqualTo("user02");
+        assertThat(res.getBno()).isNotNull();          // ← 평탄화
+        assertThat(res.getBWriter()).isEqualTo("user02");
 
         logout();
     }
@@ -186,7 +186,7 @@ public class integrationTest {
                 .isSecret(Boolean.FALSE)
                 .build();
 
-        var result = assertThatThrownBy(() -> boardService.createBoard(req)).isInstanceOf(AccessDeniedException.class);
+        var result = assertThatThrownBy(() -> boardService.createBoard(req, null)).isInstanceOf(AccessDeniedException.class);
         log.info(req.getBWriter());
         log.info(result.getWritableAssertionInfo().toString());
 
@@ -286,12 +286,12 @@ public class integrationTest {
                 .build();
 
         // when
-        var upRes = boardService.updateBoard(upReq);
+        var upRes = boardService.updateBoard(upReq, null, null, null);
 
         // then
         assertThat(upRes).isNotNull();
-        assertThat(upRes.getUpdateBoard().getBno()).isEqualTo(bno);
-        assertThat(upRes.getUpdateBoard().getBTitle()).contains("수정 후");
+        assertThat(upRes.getBno()).isEqualTo(bno);     // ← 평탄화
+        assertThat(upRes.getBTitle()).contains("수정 후");
 
         logout();
     }
@@ -317,7 +317,7 @@ public class integrationTest {
                 .build();
 
         // when & then
-        assertThatThrownBy(() -> boardService.updateBoard(upReq))
+        assertThatThrownBy(() -> boardService.updateBoard(upReq, null, null, null))
                 .isInstanceOf(AccessDeniedException.class)
                 .hasMessageContaining("본인 글만 수정할 수 있습니다.");
 
@@ -341,7 +341,7 @@ public class integrationTest {
         var delRes = boardService.deleteBoard(DeleteBoardReq.builder().bno(bno).build());
 
         assertThat(delRes).isNotNull();
-        assertThat(delRes.getDeleteBoard().getBno()).isEqualTo(bno);
+        assertThat(delRes.getBno()).isEqualTo(bno);
 
         logout();
     }
