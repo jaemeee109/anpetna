@@ -1,6 +1,7 @@
 package com.anpetna.item.dto.registerReview;
 
 import com.anpetna.coreDto.ImageListDTO;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.ToString;
 
@@ -8,6 +9,7 @@ import java.time.LocalDateTime;
 
 @ToString
 @Getter
+@Builder
 public class RegisterReviewReq extends ImageListDTO {
 
     private String content;
@@ -16,6 +18,6 @@ public class RegisterReviewReq extends ImageListDTO {
 
     private LocalDateTime regDate;
 
-    private String itemId;
+    private Long itemId;
 
 }

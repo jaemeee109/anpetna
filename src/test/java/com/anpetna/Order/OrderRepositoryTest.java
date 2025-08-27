@@ -1,4 +1,4 @@
-package com.anpetna.Order;
+package com.anpetna.order;
 
 
 import com.anpetna.order.domain.OrdersEntity;

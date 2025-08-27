@@ -1,4 +1,4 @@
-package com.anpetna.Order;
+package com.anpetna.order;
 
 import com.anpetna.item.domain.ItemEntity;
 import com.anpetna.order.domain.OrderEntity;

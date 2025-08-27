@@ -4,13 +4,11 @@ import com.anpetna.coreDto.ImageListDTO;
 import com.anpetna.item.constant.ItemCategory;
 import com.anpetna.item.constant.ItemSaleStatus;
 import com.anpetna.item.constant.ItemSellStatus;
-import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 
 @Getter
-
 @ToString
 @NoArgsConstructor
 public class ItemDTO extends ImageListDTO {

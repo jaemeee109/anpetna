@@ -1,9 +1,7 @@
 package com.anpetna.auth;
 
 import com.anpetna.cart.repository.CartRepository;
-import com.anpetna.item.repository.ItemRepository;
 import com.anpetna.item.repository.ReviewRepository;
-import com.anpetna.member.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 

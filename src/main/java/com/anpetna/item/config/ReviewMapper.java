@@ -3,14 +3,21 @@ package com.anpetna.item.config;
 import com.anpetna.coreDomain.ImageEntity;
 import com.anpetna.coreDto.ImageDTO;
 import com.anpetna.coreDto.ImageListDTO;
+import com.anpetna.item.domain.ItemEntity;
 import com.anpetna.item.domain.ReviewEntity;
 import com.anpetna.item.dto.ReviewDTO;
 import com.anpetna.item.dto.modifyReview.ModifyReviewReq;
 import com.anpetna.item.dto.registerReview.RegisterReviewReq;
 import com.anpetna.item.dto.searchOneReview.SearchOneReviewRes;
+import jakarta.annotation.PostConstruct;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.log4j.Log4j2;
+import org.modelmapper.Converter;
 import org.modelmapper.ModelMapper;
 import org.modelmapper.TypeMap;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Bean;
 import org.springframework.stereotype.Component;
 
 @Component

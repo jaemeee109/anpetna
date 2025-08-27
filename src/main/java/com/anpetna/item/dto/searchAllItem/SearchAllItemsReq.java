@@ -1,7 +1,6 @@
 package com.anpetna.item.dto.searchAllItem;
 
 import com.anpetna.item.constant.ItemCategory;
-import com.anpetna.item.constant.ItemPrice;
 import com.anpetna.item.constant.ItemSellStatus;
 import lombok.Getter;
 import lombok.Setter;

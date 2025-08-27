@@ -1,4 +1,4 @@
-package com.anpetna.memberboardcomment;
+package com.anpetna.board;
 
 import com.anpetna.board.constant.BoardType;
 import com.anpetna.board.dto.BoardDTO;
@@ -31,7 +31,6 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.junit.jupiter.api.DisplayName;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.stream.IntStream;
