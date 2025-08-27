@@ -1,8 +1,6 @@
-package com.anpetna.board;
+package com.anpetna.board.repository;
 
 import com.anpetna.board.domain.CommentEntity;
-import com.anpetna.board.repository.BoardJpaRepository;
-import com.anpetna.board.repository.CommentJpaRepository;
 import lombok.extern.log4j.Log4j2;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

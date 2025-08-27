@@ -13,8 +13,10 @@ import com.anpetna.member.dto.readMemberOne.ReadMemberOneReq;
 import com.anpetna.member.dto.readMemberOne.ReadMemberOneRes;
 import com.anpetna.member.service.MemberService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
@@ -76,18 +78,23 @@ public class MemberController {
     //==============================================
 
 
-    //상세 조회
+    // 상세 조회: 관리자 또는 로그인한 본인만 접근
     @GetMapping({"/readOne", "/my_page/{memberId}"})
     @ResponseBody
-    @Transactional
-    public ApiResult<ReadMemberOneRes> readOne(@PathVariable String memberId) {
+    @Transactional(readOnly = true)
+    public ApiResult<ReadMemberOneRes> readOne(
+            @PathVariable(value = "memberId", required = false) String memberId,
+            @AuthenticationPrincipal String me // 👈 문자열 principal 그대로 주입
+    ) {
+        String target = (memberId == null || memberId.isBlank()) ? me : memberId;
 
         ReadMemberOneReq req = new ReadMemberOneReq();
-        req.setMemberId(memberId);
+        req.setMemberId(target);
 
-        var readOne = memberService.readOne(req);
+        var readOne = memberService.readOne(req); // Service에서 @PreAuthorize
         return new ApiResult<>(readOne);
     }
+
 
 //===========================================
 //(관리자가 볼 때는 프론트에 있는 전체보기에서 모든 계정들 중 한 계정을 눌렀을 때 정보가 보여야 함)(사용자가 볼 때는 내 정보들을 (마이페이지처럼) 가입했을 때 입력한 정보들이 보여야 함/수정페이지는 따로)
@@ -102,8 +109,7 @@ public class MemberController {
     //================================================
 
 
-
-    //조회
+    // 조회(전체): 관리자만 접근
     @GetMapping("/readAll")
     @ResponseBody
     public ApiResult<List<ReadMemberAllRes>> memberReadAll() {

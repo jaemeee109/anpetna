@@ -1,4 +1,4 @@
-package com.anpetna.board;
+package com.anpetna.board.service;
 
 import com.anpetna.board.domain.CommentEntity;
 import com.anpetna.board.dto.CommentDTO;
@@ -11,7 +11,6 @@ import com.anpetna.board.dto.readComment.ReadCommRes;
 import com.anpetna.board.dto.updateComment.UpdateCommReq;
 import com.anpetna.board.dto.updateComment.UpdateCommRes;
 import com.anpetna.board.repository.CommentJpaRepository;
-import com.anpetna.board.service.CommentService;
 import com.anpetna.coreDto.PageResponseDTO;
 import lombok.extern.log4j.Log4j2;
 import org.junit.jupiter.api.Test;

@@ -12,13 +12,13 @@ import com.anpetna.member.repository.MemberRepository;
 import io.jsonwebtoken.Claims;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
-import org.hibernate.annotations.AttributeAccessor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -147,31 +147,48 @@ public class JwtServiceImpl implements JwtService {
     }
 
     @Override
-    public void logout(TokenRequest tokenRequest){
-        //클라이언트가 보낸 refreshToken의 유효성 검사
-        if(!jwtProvider.validateToken(tokenRequest.getRefreshToken())){
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "무효한 토큰입니다");
+    @Transactional
+    public void logout(TokenRequest tokenRequest) {
+        // 0) 입력 검증
+        String refreshPlain = Optional.ofNullable(tokenRequest.getRefreshToken())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "refresh 토큰이 필요합니다."));
+
+        // 1) 리프레시 토큰 "전용" 검증 (Access 검증 금지)
+        if (!jwtProvider.validateRefreshToken(refreshPlain)) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "무효한 리프레시 토큰입니다.");
         }
 
-        String id = jwtProvider.getUsername(tokenRequest.getRefreshToken());
+        Instant now = Instant.now();
 
-        TokenEntity tokenEntity = tokenRepository.findByTokenMemberId(id)
-                .orElseThrow(()-> new ResponseStatusException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
+        // 2) 해시로 활성 리프레시 토큰 레코드 조회 (미회수 + 미만료)
+        String refreshHash = tokenHash.sha256(refreshPlain);
+        TokenEntity tok = tokenRepository
+                .findFirstByRefreshTokenAndRevokedAtIsNullAndExpiresAtAfter(refreshHash, now)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "이미 만료되었거나 회수된 토큰입니다."));
 
-        String reqRefreshToken = tokenHash.sha256(tokenRequest.getRefreshToken()); //요청받은 refresh토큰을 hash로 변환
-
-        //DB에 저장된 해시값과 비교 (불일치 시 위조/재사용/오류로 간주)
-        if (!reqRefreshToken.equals(tokenEntity.getRefreshToken())){
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "토큰이 맞지 않습니다");
+        // 3) subject 교차검증(보안 강화) — 토큰의 sub와 DB의 memberId가 같아야 함
+        String subject = jwtProvider.getUsernameFlexible(refreshPlain); // 만료여도 Claims 가능
+        if (!subject.equals(tok.getMemberId())) {
+            // 의심스러운 상황: 해당 리프레시를 즉시 회수
+            tok.setRevokedAt(now);
+            tokenRepository.save(tok);
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "토큰 소유자 불일치");
         }
 
-        //Refresh Token 무효화 (삭제 or revoke)
-        tokenRepository.revokeByMemberId(tokenEntity.getMemberId());
+        // 4) 리프레시 토큰 회수(로그아웃)
+        tok.setRevokedAt(now);
+        tokenRepository.save(tok);
 
-        //Access Token 즉시 차단 → 블랙리스트 서비스에 “그대로” 전달
-        //당신의 BlacklistServiceImpl은 토큰 원문을 받아 내부에서 parse + exp 확인 + 해시 저장을 처리합니다.
-        blacklistService.addToBlacklist(tokenRequest);
+        // (선택) 동일 사용자 활성 리프레시 전부 회수하고 싶으면 정책에 따라:
+        // tokenRepository.revokeAllActiveByMemberId(subject, now);
 
-        // 3) 멱등성: 이미 무효화/블랙리스트여도 예외 없이 통과
+        // 5) 액세스 토큰 블랙리스트(있으면) — 즉시 차단
+        String accessPlain = tokenRequest.getAccessToken();
+        if (accessPlain != null && !accessPlain.isBlank()) {
+            // addToBlacklist(TokenRequest)는 내부에서 access 토큰을 파싱/만료시각 추출/해시 저장한다고 가정
+            blacklistService.addToBlacklist(tokenRequest);
+        }
+
+        // 멱등성: 이미 회수/블랙리스트여도 예외 없이 위 흐름을 통과하도록 설계하는 게 보통 안전합니다.
     }
 }
