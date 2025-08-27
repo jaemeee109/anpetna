@@ -1,80 +1,110 @@
 package com.anpetna.config;
-import com.anpetna.auth.service.BlacklistServiceImpl;
-import lombok.RequiredArgsConstructor;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
-import jakarta.servlet.http.HttpServletResponse; // ★추가
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
-import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.List;
+
+// ⭐ 추가: PasswordEncoder import
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+
 @Configuration
 @EnableWebSecurity
-//Spring Security가 AOP Proxy를 만들어서 해당 메서드를 감쌉니다.
-@RequiredArgsConstructor
-@EnableMethodSecurity(prePostEnabled = true)
 public class SecurityConfig {
+
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http, JwtProvider jwtProvider, BlacklistServiceImpl blacklistService, CorsConfigurationSource corsConfigurationSource) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                .cors(c -> c.configurationSource(corsConfigurationSource()))
+                // CORS + CSRF
+                .cors(Customizer.withDefaults())
                 .csrf(csrf -> csrf.disable())
 
-                //기본 Spring Security 로그인 폼, HTTP Basic 인증 비활성화
-                //JWT 기반 로그인/인증만 사용하기 위해 끔
-                .formLogin(f -> f.disable())
-                .httpBasic(b -> b.disable())
+                // 세션(무상태, JWT 기준)
+                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
-                //JWT는 stateless 인증 → 서버 세션 불필요
-                //따라서 STATELESS 설정 → Spring Security가 세션 생성하지 않음
-                .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-
-                //특정 경로는 모두 허용 (permitAll()) : 로그인, 회원가입, 공용 API 등
-                //그 외 요청은 인증 필요 (authenticated()) : JWT 토큰이 유효해야 접근 가능
+                // 권한 규칙
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()           // ★추가: CORS preflight 허용
-                        .requestMatchers("/jwt/**").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/member/login").permitAll()
-                        .requestMatchers("/member/join").permitAll()
-                        .requestMatchers("/", "/signup", "/api/v1/**", "/member/readOne", "/member/readAll", "/member/my_page/*").permitAll()
-                        .anyRequest().authenticated()
+                                // ⭐ 수정됨: preflight 허용
+                                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+
+                                // ⭐ 수정됨: 로그인/리프레시/정적/에러 등 완전 허용
+                                .requestMatchers(
+                                        "/jwt/login",
+                                        "/jwt/refresh",
+                                        "/actuator/**",
+                                        "/error",
+                                        "/favicon.ico",
+                                        "/static/**", "/css/**", "/js/**", "/images/**"
+                                ).permitAll()
+
+                                // ⭐ 수정됨: board / comment 읽기는 모두 허용
+                                .requestMatchers(HttpMethod.GET, "/anpetna/board/**").permitAll()
+                                .requestMatchers(HttpMethod.GET, "/anpetna/comment/**").permitAll()
+
+                                // ⭐ 수정됨: 쓰기/수정/삭제는 인증 필요
+                                .requestMatchers(HttpMethod.POST,   "/anpetna/board/**").authenticated()
+                                .requestMatchers(HttpMethod.PUT,    "/anpetna/board/**").authenticated()
+                                .requestMatchers(HttpMethod.DELETE, "/anpetna/board/**").authenticated()
+                                .requestMatchers(HttpMethod.POST,   "/anpetna/comment/**").authenticated()
+                                .requestMatchers(HttpMethod.DELETE, "/anpetna/comment/**").authenticated()
+
+                                // ⭐ 수정됨: 회원가입 허용(필요 시 추가)
+                                .requestMatchers("/member/join").permitAll()
+
+                                // 나머지는 인증
+                                .anyRequest().authenticated()
+
+                        // ===== 기존 =====
+                        // .anyRequest().permitAll()
                 )
-                .exceptionHandling(e -> e                                             // ★추가: 에러 응답 분리
-                        .authenticationEntryPoint((req, res, ex) ->
-                                res.sendError(HttpServletResponse.SC_UNAUTHORIZED))   // 401
-                        .accessDeniedHandler((req, res, ex) ->
-                                res.sendError(HttpServletResponse.SC_FORBIDDEN))      // 403
+
+                // 로그아웃
+                .logout(logout -> logout
+                        // ⭐ 수정됨: /jwt/logout 허용
+                        .logoutUrl("/jwt/logout").permitAll()
                 )
-                .addFilterBefore(new JwtAuthenticationFilter(jwtProvider,blacklistService), UsernamePasswordAuthenticationFilter.class);
+
+                // ⭐ 수정됨: 기본 인증/폼 로그인 비활성
+                .httpBasic(httpBasic -> httpBasic.disable())
+                .formLogin(form -> form.disable());
+
+        // JWT 필터가 있다면 여기에 추가
+        // http.addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+
         return http.build();
     }
-    @Bean
-    public AuthenticationManager authenticationManager(
-            AuthenticationConfiguration authenticationConfiguration) throws Exception {
-        return authenticationConfiguration.getAuthenticationManager();
-    }
+
+    // ⭐ 추가: JwtServiceImpl 등에서 주입받는 PasswordEncoder 빈
     @Bean
     public PasswordEncoder passwordEncoder() {
+        // BCrypt 사용 (강도 기본값 10). 필요하면 new BCryptPasswordEncoder(12)로 조정
         return new BCryptPasswordEncoder();
     }
-    /** Security가 참조할 CORS 설정(Origin/Headers/Methods). MVC WebConfig와 동일하게 맞춰줌 */
-    // 프론트 연결 코드 추가
+
+    // ⭐ 수정됨: CORS 허용 설정 추가
     @Bean
-    public org.springframework.web.cors.CorsConfigurationSource corsConfigurationSource() {
-        var cfg = new org.springframework.web.cors.CorsConfiguration();
-        cfg.setAllowedOrigins(java.util.List.of("http://192.168.0.160:3000")); // 정확한 Origin (와일드카드 X)
-        cfg.setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
-        cfg.setAllowedHeaders(java.util.List.of("*")); // Authorization 포함
-        cfg.setAllowCredentials(true); // withCredentials/Authorization 사용할 때 필수
-        var source = new org.springframework.web.cors.UrlBasedCorsConfigurationSource();
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration cfg = new CorsConfiguration();
+        cfg.setAllowedOrigins(List.of(
+                "http://192.168.0.168:3000",
+                "http://localhost:3000"
+        ));
+        cfg.setAllowedMethods(List.of("GET","POST","PUT","DELETE","PATCH","OPTIONS"));
+        cfg.setAllowedHeaders(List.of("*"));
+        cfg.setAllowCredentials(true);
+        cfg.setExposedHeaders(List.of("Authorization", "Set-Cookie"));
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", cfg);
         return source;
     }
