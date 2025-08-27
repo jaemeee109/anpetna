@@ -16,8 +16,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.java.Log;
 import org.modelmapper.ModelMapper;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.parameters.P;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -74,20 +76,26 @@ public class MemberServiceImpl implements MemberService {
     }
 
     @Override
+    @PreAuthorize("hasRole('ADMIN') or (#p0 != null and #p0.memberId == authentication.name)")
+    @Transactional(readOnly = true)
     public ReadMemberOneRes readOne(ReadMemberOneReq readMemberOneReq) {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated()
-                || authentication instanceof org.springframework.security.authentication.AnonymousAuthenticationToken) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "인증이 필요합니다.");
-        }
 
-        String memberId = authentication.getName();
-        MemberEntity member = memberRepository.findById(memberId)
+        // ▼ 요청 대상 ID를 우선 사용 (컨트롤러에서 이미 me/경로변수로 채워서 옴)
+        String targetId = (readMemberOneReq != null && readMemberOneReq.getMemberId() != null
+                && !readMemberOneReq.getMemberId().isBlank())
+                ? readMemberOneReq.getMemberId()
+                : SecurityContextHolder.getContext().getAuthentication().getName();
+
+        MemberEntity member = memberRepository.findById(targetId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "회원을 찾을 수 없습니다."));
+
         return ReadMemberOneRes.from(member);
     }
 
+
     @Override
+    @PreAuthorize("hasRole('ADMIN')")
+    @Transactional(readOnly = true)
      public List<ReadMemberAllRes> memberReadAll() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()
