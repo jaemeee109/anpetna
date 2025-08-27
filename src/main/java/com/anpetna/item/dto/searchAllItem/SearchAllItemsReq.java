@@ -3,11 +3,13 @@ package com.anpetna.item.dto.searchAllItem;
 import com.anpetna.item.constant.ItemCategory;
 import com.anpetna.item.constant.ItemSellStatus;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.query.SortDirection;
 
 @Setter
 @Getter
+@NoArgsConstructor
 public class SearchAllItemsReq {
 
     private ItemSellStatus sortBySale; // 상품 판매상태

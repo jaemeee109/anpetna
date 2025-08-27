@@ -25,7 +25,7 @@ public class TokenEntity {
     @Column(name = "member_id", nullable = false)
     private String memberId;
 
-    @Column(name = "token_refresh_token")
+    @Column(name = "token_refresh_token", nullable = false)
     private String refreshToken;
 
     @Column(name = "token_expiresAt")
