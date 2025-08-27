@@ -151,7 +151,7 @@ export default function DeleteAccountPage() {
       <p className="text-sm text-gray-600 leading-6">
         <b>안내사항</b><br />
         <br></br>
-        · 회원 탈퇴는 <b>영구적</b>이며, 즉시 삭제되므로 되돌릴 수 없습니다.<br />
+        · 회원 탈퇴는 영구적이며 되돌릴 수 없습니다.<br />
         · 고객 정보 및 개인형 서비스 이용 기록은 개인정보처리방침 기준에 따라 삭제됩니다.
       </p>
  <div className="row">

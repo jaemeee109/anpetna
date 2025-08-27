@@ -2,14 +2,8 @@
 // 클라이언트 전용 유틸이지만, 'use client'는 필요 없습니다.
 // (window 접근 전 안전 가드만 해주면 됨)
 
-type TokenPair = {
-  accessToken?: string | null;
-  refreshToken?: string | null;
-};
-
-function hasWindow() {
-  return typeof window !== 'undefined';
-}
+type TokenPair = { accessToken?: string | null; refreshToken?: string | null; };
+function hasWindow() { return typeof window !== 'undefined'; }
 
 const KEY_ACCESS = 'accessToken';
 const KEY_REFRESH = 'refreshToken';
@@ -72,3 +66,39 @@ export const AuthStore = {
     } catch {}
   },
 };
+// 백엔드 베이스 URL (개발시 3000 → 8000 포트 전환 로직 포함)
+function buildBase(): string {
+  const env = process.env.NEXT_PUBLIC_API_BASE as string | undefined;
+  if (env) return env.replace(/\/+$/, '');
+  if (!hasWindow()) return '';
+  const { protocol, hostname, port } = window.location;
+  const usePort = port ? (port === '3000' ? '8000' : port) : '';
+  return `${protocol}//${hostname}${usePort ? `:${usePort}` : ''}`;
+}
+
+const API_PREFIX = (process.env.NEXT_PUBLIC_API_PREFIX as string | undefined) ?? '/anpetna';
+function apiURL(path: string) {
+  const p = path.startsWith('/') ? path : `/${path}`;
+  return `${buildBase()}${API_PREFIX}${p}`;
+}
+
+/** 서버에 로그아웃 통보 (가능한 엔드포인트 후보 모두 시도) */
+export async function serverLogout(): Promise<void> {
+  const candidates = [apiURL('/jwt/logout'), apiURL('/member/logout')];
+  for (const url of candidates) {
+    try {
+      const res = await fetch(url, { method: 'POST', credentials: 'include' });
+      if (res.ok) break; // 하나 성공하면 종료
+    } catch {
+      /* 다음 후보로 */
+    }
+  }
+}
+
+/** 로컬 토큰/쿠키 완전 제거 (Header에서 쓰는 이름 그대로 export) */
+export function purgeAuthArtifacts() {
+  AuthStore.clear();
+}
+
+// (원하면 이 줄도 추가해서 default로 AuthStore를 함께 제공)
+// export default AuthStore;

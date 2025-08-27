@@ -78,13 +78,13 @@ export default function Header() {
     setAuthed(hasToken());
   }, [pathname]);
 
-const handleLogout = async () => {
-  await serverLogout();       // 1) 서버에 로그아웃 통보 (블랙리스트 등)
-  purgeAuthArtifacts();       // 2) 로컬 토큰/쿠키 완전 제거
-  window.dispatchEvent(new Event('auth-changed')); // 헤더 즉시 갱신
-  setMyOpen(false);
-  router.replace('/');
-};
+ const handleLogout = async () => {
+   await serverLogout();
+   purgeAuthArtifacts();
+    window.dispatchEvent(new Event('auth-changed'));
+    setMyOpen(false);
+    router.replace('/');
+  };
 
   const helpActive =
     pathname === '/board/FAQ' ||

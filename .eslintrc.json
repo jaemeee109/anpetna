@@ -1,5 +1,16 @@
 {
   "extends": ["next", "prettier"],
+  "settings": {
+    "import/parsers": {
+      "@typescript-eslint/parser": [".ts", ".tsx"]
+    },
+    "import/resolver": {
+      "typescript": {
+        "project": "./tsconfig.json",
+        "alwaysTryTypes": true
+      }
+    }
+  },
   "rules": {
     "react/no-unescaped-entities": "off",
     "@next/next/no-page-custom-font": "off"

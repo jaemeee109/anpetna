@@ -104,46 +104,33 @@ export default function ItemsPage() {
   return (
     <main className={WRAP}>
       {/* === FAQ와 동일한 헤더 구조/클래스 === */}
-      <section className="faq-head text-center">
+      <section className="faq-head text-center mt-0">
         {/* 발바닥은 FAQ처럼 CSS가 붙는 제목 마크업만 사용 (동일 코드) */}
-       <h1 className="faq-title inline-flex items-center gap-2 justify-center">
-  ONLINE STORE &nbsp;<PawIcon />
-</h1>
-       
+      <h1 className="faq-title inline-flex items-center gap-1 justify-center !mb-0" style={{ marginBottom: 0 }}></h1>
 
         {/* 카테고리 탭: FAQ와 동일 클래스 구조 */}
-        <div className="faq-catbar flex flex-col items-center gap-5 mt-4" role="tablist" aria-label="Store categories">
+        <div className="faq-catbar flex flex-col items-center gap-5 " style={{ marginTop: 0 }} role="tablist" aria-label="Store categories">
           <div className="flex flex-wrap justify-center gap-4">
-            {(['FEED','SNACKS','CLOTHING'] as ViewCat[]).map((c) => (
+            {(['FEED','SNACKS','CLOTHING','BATH','BEUTY','TOY','OTHERS'] as ViewCat[]).map((c) => (
               <button
                 key={c}
                 type="button"
+                style={{
+                marginLeft: 10,
+                width: 110,
+                height:50,
+                fontSize: 15
+                }}
                 className={`faq-cat ${c === cat ? 'is-active' : ''}`}
                 aria-pressed={c === cat}
                 onClick={() => { setCat(c); setPage(1); }}
+                
               >
                 {c}
               </button>
             ))}
           </div>
-          <div className="flex flex-wrap justify-center gap-2">
-            {(['BATH','BEUTY','TOY','OTHERS'] as ViewCat[]).map((c) => (
-              <button
-                key={c}
-                type="button"
-                className={`faq-cat ${c === cat ? 'is-active' : ''}`}
-                aria-pressed={c === cat}
-                onClick={() => { setCat(c); setPage(1); }}
-              >
-                {c}
-              </button>
-            ))}
-            
-          </div>
-        </div>
-        
-
-        {/* 검색: FAQ 검색 폼과 동일한 클래스/레이아웃 (상단 실선 '위', 우측 정렬, 작은 사이즈) */}
+            {/* 검색: FAQ 검색 폼과 동일한 클래스/레이아웃 (상단 실선 '위', 우측 정렬, 작은 사이즈) */}
         <form
           className="faq-actions flex items-center gap-1 justify-end mt-3 "
           onSubmit={(e) => { e.preventDefault(); setQ(qInput.trim()); setPage(1); }}
@@ -152,7 +139,7 @@ export default function ItemsPage() {
   value={qInput}
   onChange={(e) => setQInput(e.target.value)}
   placeholder="검색으로 원하는 상품을 찾아보세요"
-  className="faq-search text-xs text-center !w-[270px] sm:!w-[180px] md:!w-[180px]"
+  className="faq-search text-xs text-center !w-[250px] sm:!w-[180px] md:!w-[180px]"
   aria-label="상품 검색"
 />
           {/* 흰 배경 + 진한 회색선 돋보기 아이콘 버튼 */}
@@ -180,6 +167,10 @@ export default function ItemsPage() {
 </button>
 
         </form>
+        </div>
+        
+
+      
          
       </section>
 
