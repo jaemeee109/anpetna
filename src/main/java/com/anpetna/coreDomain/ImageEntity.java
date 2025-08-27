@@ -38,15 +38,15 @@ public class ImageEntity {
     private BoardEntity board;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = true)
-    @JoinColumn(name = "member_id", foreignKey = @ForeignKey(name = "fk_image_member"))
+    @JoinColumn(name = "member", foreignKey = @ForeignKey(name = "fk_image_member"))
     private MemberEntity member;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = true)
-    @JoinColumn(name = "item_id", foreignKey = @ForeignKey(name = "fk_image_item"))
+    @JoinColumn(name = "item", foreignKey = @ForeignKey(name = "fk_image_item"))
     private ItemEntity item;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = true)
-    @JoinColumn(name = "review_id",foreignKey = @ForeignKey(name = "fk_image_review"))
+    @JoinColumn(name = "review",foreignKey = @ForeignKey(name = "fk_image_review"))
     private ReviewEntity review;
 
 

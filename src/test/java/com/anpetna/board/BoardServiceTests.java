@@ -1,4 +1,4 @@
-package com.anpetna.board.service;
+package com.anpetna.board;
 
 import com.anpetna.board.domain.BoardEntity;
 import com.anpetna.board.constant.BoardType;
@@ -11,7 +11,7 @@ import com.anpetna.board.dto.readOneBoard.ReadOneBoardRes;
 import com.anpetna.board.dto.updateBoard.UpdateBoardReq;
 import com.anpetna.board.dto.updateBoard.UpdateBoardRes;
 import com.anpetna.board.repository.BoardJpaRepository;
-import com.anpetna.coreDomain.ImageEntity;
+import com.anpetna.board.service.BoardService;
 import com.anpetna.coreDto.ImageDTO;
 import com.anpetna.coreDto.PageRequestDTO;
 import com.anpetna.coreDto.PageResponseDTO;

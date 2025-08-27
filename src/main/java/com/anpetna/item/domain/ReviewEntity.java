@@ -1,6 +1,7 @@
 package com.anpetna.item.domain;
 
 import com.anpetna.coreDomain.ImageEntity;
+import com.anpetna.member.domain.MemberEntity;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.Check;
@@ -32,13 +33,19 @@ public class ReviewEntity {
     @Column(name = "review_regDate", nullable = false)
     private LocalDateTime regDate;
 
-    @ManyToOne
-    @JoinColumn(name = "item_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "item_id", nullable = false, referencedColumnName = "item_id")
     private ItemEntity itemId;
+
+    // member FK 추가
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "member_id", nullable = false, referencedColumnName = "member_id")
+    private MemberEntity memberId;
 
     @Builder.Default
     @OneToMany(mappedBy = "review", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ImageEntity> images = new ArrayList<>();
+    //  최대 5장
 
     public void addImage(ImageEntity image) {
         images.add(image);
@@ -48,4 +55,5 @@ public class ReviewEntity {
         images.remove(image);
         image.setReview(null);
     }
+
 }
