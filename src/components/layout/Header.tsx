@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { serverLogout, purgeAuthArtifacts } from '@/features/member/data/session';
 
 /** 현재 URL과 비교해 pill 활성화 */
 function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
@@ -26,29 +27,64 @@ function getCookie(name: string) {
   return m ? decodeURIComponent(m[1]) : null;
 }
 
+function hasToken(): boolean {
+  if (typeof window === 'undefined') return false;
+  const ls = localStorage.getItem('accessToken');
+  const ck = getCookie('accessToken') || getCookie('JSESSIONID');
+  return !!(ls || ck);
+}
+
 export default function Header() {
   const router = useRouter();
   const pathname = usePathname();
-  const [authed, setAuthed] = useState(false);
+  const [authed, setAuthed] = useState<boolean>(false);
 
+  // ▼ MYPAGE 드롭박스 상태/외부클릭 닫기
+  const [myOpen, setMyOpen] = useState(false);
+  const myRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
-    const token =
-      typeof window !== 'undefined' &&
-      (localStorage.getItem('accessToken') ||
-        getCookie('accessToken') ||
-        getCookie('JSESSIONID'));
-    setAuthed(!!token);
+    const onDocClick = (e: MouseEvent) => {
+      if (!myRef.current) return;
+      if (!myRef.current.contains(e.target as Node)) setMyOpen(false);
+    };
+    document.addEventListener('click', onDocClick);
+    return () => document.removeEventListener('click', onDocClick);
   }, []);
 
-  const handleLogout = async () => {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('accessToken');
-      document.cookie = 'accessToken=; Max-Age=0; path=/';
-      document.cookie = 'JSESSIONID=; Max-Age=0; path=/';
-    }
-    setAuthed(false);
-    router.replace('/');
-  };
+  // 초기 렌더에서 로그인 여부 계산
+  useEffect(() => {
+    setAuthed(hasToken());
+  }, []);
+
+  // ❗같은 탭에서 로그인/로그아웃 시 갱신을 위해 커스텀 이벤트 수신
+  useEffect(() => {
+    const onAuthChanged = () => setAuthed(hasToken());
+    window.addEventListener('auth-changed', onAuthChanged);
+
+    // 다른 탭에서 토큰이 바뀌면 storage 이벤트로 갱신
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'accessToken') setAuthed(hasToken());
+    };
+    window.addEventListener('storage', onStorage);
+
+    return () => {
+      window.removeEventListener('auth-changed', onAuthChanged);
+      window.removeEventListener('storage', onStorage);
+    };
+  }, []);
+
+  // 라우트 이동 시에도 한 번 더 동기화(새로고침 없이 상태 변할 수 있으니)
+  useEffect(() => {
+    setAuthed(hasToken());
+  }, [pathname]);
+
+const handleLogout = async () => {
+  await serverLogout();       // 1) 서버에 로그아웃 통보 (블랙리스트 등)
+  purgeAuthArtifacts();       // 2) 로컬 토큰/쿠키 완전 제거
+  window.dispatchEvent(new Event('auth-changed')); // 헤더 즉시 갱신
+  setMyOpen(false);
+  router.replace('/');
+};
 
   const helpActive =
     pathname === '/board/FAQ' ||
@@ -64,13 +100,45 @@ export default function Header() {
         <nav className="apn-auth">
           {!authed ? (
             <>
-             <Link href="/member/signup">JOIN</Link>
+              <Link href="/member/signup">JOIN</Link>
               <span className="sep">|</span>
               <Link href="/member/login">LOGIN</Link>
             </>
           ) : (
             <>
-              <Link href="/mypage">MYPAGE</Link>
+              {/* ▼ MYPAGE 드롭박스 (페이지 이동 없음) */}
+              <div
+                className="dropdown"
+                ref={myRef}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setMyOpen((v) => !v);
+                }}
+              >
+                <button
+                  type="button"
+                  className="btn-link"
+                  aria-haspopup="true"
+                  aria-expanded={myOpen ? 'true' : 'false'}
+                >
+                  MYPAGE
+                </button>
+                {myOpen && (
+                  <div className="dropdown-menu" role="menu" aria-label="MyPage submenu">
+                    <Link href="/member/info" className="dropdown-item" role="menuitem" onClick={() => setMyOpen(false)}>
+                      INFO
+                    </Link>
+                    <Link href="/member/orders" className="dropdown-item" role="menuitem" onClick={() => setMyOpen(false)}>
+                      ORDER
+                    </Link>
+                    <Link href="/member/delete" className="dropdown-item" role="menuitem" onClick={() => setMyOpen(false)}>
+                      DEL
+                    </Link>
+                  </div>
+                )}
+              </div>
+
               <span className="sep">|</span>
               <Link href="/cart">CART</Link>
               <span className="sep">|</span>

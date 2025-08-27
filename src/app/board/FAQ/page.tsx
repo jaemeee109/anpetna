@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
-const WRAP = 'mx-auto w-full max-w-[960px] px-4';
+const WRAP = 'mx-auto w-full max-w-[700px] px-4';
 
 // FAQ 카테고리 버튼 목록 (표시 라벨)
 const CATS = ['회원계정', '주문/배송', '교환/반품', '이용안내'] as const;
@@ -22,10 +22,38 @@ type Row = {
   category?: string; bCategory?: string; faqCategory?: string; cat?: string; group?: string; section?: string; type2?: string;
 };
 
+/** 응답이 비어 있어도 안전하게 JSON으로 파싱 */
+async function parseJsonSafe(resp: Response): Promise<any> {
+  const text = await resp.text();
+  if (!text) return {};
+  try { return JSON.parse(text); } catch { return {}; }
+}
+
+/** 개발 중엔 3000 → 8000 자동 스왑하여 백엔드로 보냄 */
+function buildBase(): string {
+  const env = process.env.NEXT_PUBLIC_API_BASE as string | undefined;
+  if (env) return env.replace(/\/+$/, '');
+  if (typeof window === 'undefined') return '';
+  const { protocol, hostname, port } = window.location;
+  const usePort = port ? (port === '3000' ? '8000' : port) : '';
+  return `${protocol}//${hostname}${usePort ? `:${usePort}` : ''}`;
+}
+
+/** Authorization 헤더(있으면) + 기타 헤더 병합 */
+function authHeaders(extra?: HeadersInit, json = false): Headers {
+  const h = new Headers(extra);
+  if (json) h.set('Content-Type', 'application/json');
+  try {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+    if (token) h.set('Authorization', `Bearer ${token}`);
+  } catch {}
+  return h;
+}
+
 /** 서버에서 FAQ 목록을 가져옵니다.
  *  ✅ boardType & category를 서버에 전달해 서버 측에서 먼저 필터링
  */
-function useFaqList(page: number, size: number, selectedCat: Cat) { // ← (1) 선택 카테고리 인자로 받기
+function useFaqList(page: number, size: number, selectedCat: Cat) {
   const [data, setData] = useState<any>(null);
   const [isLoading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
@@ -38,12 +66,8 @@ function useFaqList(page: number, size: number, selectedCat: Cat) { // ← (1) �
         setLoading(true);
         setError(null);
 
-        const base =
-          process.env.NEXT_PUBLIC_API_BASE ||
-          (typeof window !== 'undefined' ? window.location.origin : '');
-
+        const base = buildBase();
         const url = new URL('/anpetna/board/readAll', base);
-        // ✅ 핵심: boardType & category 전달 (기존 type=FAQ 제거)
         url.search = new URLSearchParams({
           page: String(page),
           size: String(size),
@@ -53,11 +77,12 @@ function useFaqList(page: number, size: number, selectedCat: Cat) { // ← (1) �
 
         const resp: Response = await fetch(url.toString(), {
           credentials: 'include',
+          headers: authHeaders(), // ← Authorization 헤더 자동 부착
           signal: ac.signal,
         });
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
 
-        const json: any = await resp.json();
+        const json: any = await parseJsonSafe(resp);
         setData(json);
       } catch (e: unknown) {
         if ((e as any)?.name === 'AbortError') return;
@@ -68,7 +93,7 @@ function useFaqList(page: number, size: number, selectedCat: Cat) { // ← (1) �
     })();
 
     return () => ac.abort();
-  }, [page, size, selectedCat]); // ← (2) 선택 카테고리 바뀌면 다시 로드
+  }, [page, size, selectedCat]);
 
   return { data, isLoading, error };
 }
@@ -115,60 +140,54 @@ export default function FAQPage() {
   const [kwInput, setKwInput] = useState('');
   const [q, setQ] = useState('');
 
-  // 검색어 상태 바로 아래쯤에 넣어주세요
-const { data, isLoading, error } = useFaqList(page, size, selectedCat);
+  const { data, isLoading, error } = useFaqList(page, size, selectedCat);
 
-// 삭제된 글 가려두기용
-const [deletedIds, setDeletedIds] = useState<number[]>([]);
+  // 삭제된 글 가려두기용
+  const [deletedIds, setDeletedIds] = useState<number[]>([]);
 
-async function handleDelete(bno: number) {
-  if (!confirm('정말 삭제하시겠어요?')) return;
-  try {
-    const base =
-      process.env.NEXT_PUBLIC_API_BASE ||
-      (typeof window !== 'undefined' ? window.location.origin : '');
-    const url = new URL(`/anpetna/board/delete/${bno}`, base);
-    const resp = await fetch(url.toString(), {
-      method: 'POST',
-      credentials: 'include',
-    });
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    // 화면에서 즉시 제거
-    setDeletedIds(prev => [...prev, bno]);
-  } catch {
-    alert('삭제 중 오류가 발생했어요.');
+  async function handleDelete(bno: number) {
+    if (!confirm('정말 삭제하시겠어요?')) return;
+    try {
+      const base = buildBase();
+      const url = new URL(`/anpetna/board/delete/${bno}`, base);
+      const resp = await fetch(url.toString(), {
+        method: 'POST',
+        credentials: 'include',
+        headers: authHeaders(), // 인증 포함
+      });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      // 화면에서 즉시 제거
+      setDeletedIds(prev => [...prev, bno]);
+    } catch {
+      alert('삭제 중 오류가 발생했어요.');
+    }
   }
-}
 
+  // ✅ 리스트 안전 매핑 (result.dtoList 우선)
+  const list: Row[] = useMemo(() => {
+    const d = data as any; 
+    const raw =
+      d?.result?.dtoList ??
+      d?.result?.page?.dtoList ??
+      d?.page?.dtoList ??
+      d?.dtoList ??
+      d?.list ??
+      [];
+    return Array.isArray(raw) ? raw : [];
+  }, [data]);
 
-
-// ✅ 리스트 안전 매핑 (result.dtoList 우선)
-const list: Row[] = useMemo(() => {
-  const d = data as any; 
-  const raw =
-    d?.result?.dtoList ??        // ← 여기 추가!
-    d?.result?.page?.dtoList ??
-    d?.page?.dtoList ??
-    d?.dtoList ??
-    d?.list ??
-    [];
-  return Array.isArray(raw) ? raw : [];
-}, [data]);
-  // ✅ 서버가 이미 카테고리로 필터링했더라도,
-  //    DTO에 카테고리 필드가 없는 경우가 있어 클라 필터가 전부 버려지는 문제 대응:
-  //    레코드 전체에 카테고리 값이 하나도 없으면 '선택 카테고리'로 간주.
+  // DTO에 카테고리 값이 전혀 없을 때를 대비해, 선택 카테고리로 간주
   const hasAnyCategory = useMemo(() => list.some(r => pickCategory(r) !== ''), [list]);
 
   // 카테고리 + 키워드 필터
   const filtered = useMemo(() => {
     const kw = q.trim().toLowerCase();
     return list.filter((r) => {
-       const idVal = (r.bno ?? r.id) as number | undefined;
-  if (idVal && deletedIds.includes(idVal)) return false;
-
+      const idVal = (r.bno ?? r.id) as number | undefined;
+      if (idVal && deletedIds.includes(idVal)) return false;
 
       const catText = pickCategory(r);
-      const catNorm = hasAnyCategory ? normalizeToCat(catText) : selectedCat; // ← (3) 보강 포인트
+      const catNorm = hasAnyCategory ? normalizeToCat(catText) : selectedCat;
       if (catNorm !== selectedCat) return false;
 
       if (!kw) return true;
@@ -176,7 +195,7 @@ const list: Row[] = useMemo(() => {
       const body = (r.bContent ?? r.content ?? r.bcontent ?? '').toString().toLowerCase();
       return title.includes(kw) || body.includes(kw);
     });
-  }, [list, selectedCat, q, hasAnyCategory]);
+  }, [list, selectedCat, q, hasAnyCategory, deletedIds]);
 
   if (isLoading) return <div className={WRAP}>FAQ 불러오는 중…</div>;
   if (error) return <div className={WRAP}>FAQ 로딩 오류가 발생했어요</div>;
@@ -230,7 +249,7 @@ const list: Row[] = useMemo(() => {
 
       {/* 선택 카테고리의 글 목록 */}
       <section aria-live="polite" className="faq-listwrap">
-      {/*  <h2 className="faq-listtitle">{selectedCat} </h2>*/}
+        {/*  <h2 className="faq-listtitle">{selectedCat} </h2>*/}
 
         {filtered.length === 0 ? (
           <div className="faq-empty">검색 결과가 없습니다.</div>
@@ -242,85 +261,83 @@ const list: Row[] = useMemo(() => {
               const key = r.bno ?? r.id ?? idx;
               return (
                 <details key={key} className="faq-item">
-                <summary
-  className="faq-q"
-  style={{
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-    flexWrap: 'nowrap',
-    listStyle: 'none',
-  }}
->
-  <span className="faq-q-label">Q.</span>
+                  <summary
+                    className="faq-q"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      flexWrap: 'nowrap',
+                      listStyle: 'none',
+                    }}
+                  >
+                    <span className="faq-q-label">Q.</span>
 
-  {/* 제목은 가운데 영역을 꽉 채우도록 */}
-  <span className="faq-q-text" style={{ flex: '1 1 auto', minWidth: 0 }}>
-    {title}
-  </span>
+                    {/* 제목은 가운데 영역을 꽉 채우도록 */}
+                    <span className="faq-q-text" style={{ flex: '1 1 auto', minWidth: 0 }}>
+                      {title}
+                    </span>
 
-  {/* 오른쪽 액션(수정/삭제) – 검정 글씨 + 작은 폰트 */}
-  {(r.bno ?? r.id) && (
-    <span
-      className="faq-row-actions"
-      style={{
-        marginLeft: 'auto',
-        display: 'inline-flex',
-        gap: 8,
-        whiteSpace: 'nowrap',
-      }}
-    >
-      <Link
-        href={`/board/FAQ/${(r.bno ?? r.id)}/edit`}
-        prefetch={false}
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          textDecoration: 'none',
-          color: '#222',
-          fontFamily: 'inherit',
-          fontSize: '0.875rem',
-          fontWeight: 500,
-          lineHeight: 1.2,
-          display: 'inline-block',
-          WebkitFontSmoothing: 'antialiased',
-          MozOsxFontSmoothing: 'grayscale',
-        }}
-      >
-        수정
-      </Link>
+                    {/* 오른쪽 액션(수정/삭제) – 검정 글씨 + 작은 폰트 */}
+                    {(r.bno ?? r.id) && (
+                      <span
+                        className="faq-row-actions"
+                        style={{
+                          marginLeft: 'auto',
+                          display: 'inline-flex',
+                          gap: 8,
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        <Link
+                          href={`/board/FAQ/${(r.bno ?? r.id)}/edit`}
+                          prefetch={false}
+                          onClick={(e) => e.stopPropagation()}
+                          style={{
+                            textDecoration: 'none',
+                            color: '#222',
+                            fontFamily: 'inherit',
+                            fontSize: '0.875rem',
+                            fontWeight: 500,
+                            lineHeight: 1.2,
+                            display: 'inline-block',
+                            WebkitFontSmoothing: 'antialiased',
+                            MozOsxFontSmoothing: 'grayscale',
+                          }}
+                        >
+                          수정
+                        </Link>
 
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          handleDelete((r.bno ?? r.id) as number);
-        }}
-        style={{
-          background: 'transparent',
-          border: 0,
-          padding: 0,
-          cursor: 'pointer',
-          color: '#222',
-          fontFamily: 'inherit',
-          fontSize: '0.875rem',
-          fontWeight: 500,
-          lineHeight: 1.2,
-          display: 'inline-block',
-          textDecoration: 'none',
-          WebkitFontSmoothing: 'antialiased',
-          MozOsxFontSmoothing: 'grayscale',
-        }}
-      >
-        삭제
-      </button>
-    </span>
-  )}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete((r.bno ?? r.id) as number);
+                          }}
+                          style={{
+                            background: 'transparent',
+                            border: 0,
+                            padding: 0,
+                            cursor: 'pointer',
+                            color: '#222',
+                            fontFamily: 'inherit',
+                            fontSize: '0.875rem',
+                            fontWeight: 500,
+                            lineHeight: 1.2,
+                            display: 'inline-block',
+                            textDecoration: 'none',
+                            WebkitFontSmoothing: 'antialiased',
+                            MozOsxFontSmoothing: 'grayscale',
+                          }}
+                        >
+                          삭제
+                        </button>
+                      </span>
+                    )}
 
-  {/* + 아이콘은 액션 옆 같은 줄 */}
-  <span className="faq-caret" aria-hidden style={{ marginLeft: 8 }}>+</span>
-</summary>
-
-
+                    {/* + 아이콘은 액션 옆 같은 줄 */}
+                    <span className="faq-caret" aria-hidden style={{ marginLeft: 8 }}>+</span>
+                  </summary>
 
                   <div className="faq-a">
                     <span className="faq-a-label">A.</span>

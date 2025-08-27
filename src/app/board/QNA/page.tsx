@@ -20,6 +20,34 @@ type Row = {
   commentsCount?: number; commentCount?: number; replyCount?: number;
 };
 
+/** 응답이 비어 있어도 안전하게 JSON으로 파싱 */
+async function parseJsonSafe(resp: Response): Promise<any> {
+  const text = await resp.text();
+  if (!text) return {};
+  try { return JSON.parse(text); } catch { return {}; }
+}
+
+/** 개발중엔 3000 → 8000 자동 스왑하여 백엔드로 보냄 */
+function buildBase(): string {
+  const env = process.env.NEXT_PUBLIC_API_BASE as string | undefined;
+  if (env) return env.replace(/\/+$/, '');
+  if (typeof window === 'undefined') return '';
+  const { protocol, hostname, port } = window.location;
+  const usePort = port ? (port === '3000' ? '8000' : port) : '';
+  return `${protocol}//${hostname}${usePort ? `:${usePort}` : ''}`;
+}
+
+/** Authorization 헤더(있으면) + 기타 헤더 병합 */
+function authHeaders(extra?: HeadersInit, json = false): Headers {
+  const h = new Headers(extra);
+  if (json) h.set('Content-Type', 'application/json');
+  try {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+    if (token) h.set('Authorization', `Bearer ${token}`);
+  } catch {}
+  return h;
+}
+
 export default function QnaPage() {
   const router = useRouter();
   const sp = useSearchParams();
@@ -47,13 +75,25 @@ export default function QnaPage() {
   const [loadingList, setLoadingList] = useState(false);
   const [counts, setCounts] = useState<Record<number, number>>({});
 
-  const base =
-    process.env.NEXT_PUBLIC_API_BASE ||
-    (typeof window !== 'undefined' ? window.location.origin : '');
+  const base = buildBase();
+
+  // 현재 로그인 토큰 (없으면 보호 API를 호출하지 않음)
+  const token =
+    typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
 
   // 목록 로드 (나의 문의내역)
   useEffect(() => {
     if (view !== 'mine') return;
+
+    // ✅ 토큰 없으면 보호 API 호출하지 않고 메시지만
+    if (!token) {
+      setList([]);
+      setErr('로그인이 필요합니다.');
+      return;
+    } else {
+      setErr(null);
+    }
+
     let alive = true;
     (async () => {
       setLoadingList(true);
@@ -64,27 +104,42 @@ export default function QnaPage() {
           size: '100',
           boardType: 'QNA',
         }).toString();
-        const resp = await fetch(url.toString(), { credentials: 'include' });
-        const json = await resp.json();
+
+        const resp = await fetch(url.toString(), {
+          credentials: 'include',
+          headers: authHeaders(), // ← Authorization 헤더 포함
+        });
+
+        if (!resp.ok) {
+          const text = await resp.text().catch(() => '');
+          throw new Error(`목록 호출 실패 (HTTP ${resp.status})${text ? `\n${text}` : ''}`);
+        }
+        const json = await parseJsonSafe(resp);
+
         const raw =
           json?.result?.dtoList ??
           json?.result?.page?.dtoList ??
           json?.dtoList ??
           json?.list ??
           [];
+
         if (!alive) return;
         setList(Array.isArray(raw) ? raw : []);
+      } catch (e) {
+        console.error(e);
+        if (alive) setList([]);
+        if (alive) setErr(e instanceof Error ? e.message : '목록 호출 실패');
       } finally {
         if (alive) setLoadingList(false);
       }
     })();
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view]);
+  }, [view, token]);
 
   // 각 글의 댓글 카운트
   useEffect(() => {
-    if (view !== 'mine' || list.length === 0) return;
+    if (view !== 'mine' || list.length === 0 || !token) return;
     let alive = true;
     (async () => {
       const out: Record<number, number> = {};
@@ -94,8 +149,18 @@ export default function QnaPage() {
           try {
             const url = new URL('/anpetna/comment/read', base);
             url.search = new URLSearchParams({ bno: String(id) }).toString();
-            const resp = await fetch(url.toString(), { credentials: 'include' });
-            const json = await resp.json();
+
+            const resp = await fetch(url.toString(), {
+              credentials: 'include',
+              headers: authHeaders(),
+            });
+
+            if (!resp.ok) {
+              const text = await resp.text().catch(() => '');
+              throw new Error(`댓글수 호출 실패 (HTTP ${resp.status})${text ? `\n${text}` : ''}`);
+            }
+            const json = await parseJsonSafe(resp);
+
             const total =
               json?.result?.page?.total ??
               json?.result?.total ??
@@ -110,7 +175,7 @@ export default function QnaPage() {
       if (alive) setCounts(out);
     })();
     return () => { alive = false; };
-  }, [view, list, base]);
+  }, [view, list, base, token]);
 
   // 등록
   async function onSubmit(e: FormEvent) {
@@ -120,13 +185,17 @@ export default function QnaPage() {
       setErr('제목과 내용을 입력해 주세요.');
       return;
     }
+    if (!token) {
+      setErr('로그인이 필요합니다.');
+      return;
+    }
     setErr(null);
     try {
       setSubmitting(true);
       const resp = await fetch(new URL('/anpetna/board/create', base), {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(undefined, true), // JSON + Authorization
         body: JSON.stringify({
           bTitle: title,
           bContent: content,
@@ -153,9 +222,7 @@ export default function QnaPage() {
   function normalizeCat(label: string): Cat {
     const s = String(label ?? '').trim();
     if (!s) return '기타';
-    // 완전 일치 우선
     if (CATS.includes(s as Cat)) return s as Cat;
-    // 느슨 매칭(혹시 모를 공백/특수문자/영문)
     const low = s.toLowerCase().replace(/\s+/g, '');
     if (low.includes('회원') || low.includes('계정') || low.includes('account')) return '회원계정';
     if (low.includes('주문') || low.includes('배송') || low.includes('order') || low.includes('shipping')) return '주문/배송';
@@ -180,18 +247,12 @@ export default function QnaPage() {
   }
 
   function catChipStyle(cat: Cat): React.CSSProperties {
-    // 밝은 톤 배경 + 가독성 있는 글자색
     switch (cat) {
-      case '회원계정': // 밝은 주황
-        return { background: '#FFE8CC', color: '#B45309' };
-      case '주문/배송': // 밝은 핑크
-        return { background: '#FFE4EC', color: '#BE185D' };
-      case '교환/반품': // 밝은 노랑
-        return { background: '#FFF7CC', color: '#A16207' };
-      case '이용안내': // 밝은 초록
-        return { background: '#DCFCE7', color: '#166534' };
-      default: // 기타: 밝은 하늘색
-        return { background: '#E8F4FF', color: '#0369a1' };
+      case '회원계정': return { background: '#FFE8CC', color: '#B45309' };
+      case '주문/배송': return { background: '#FFE4EC', color: '#BE185D' };
+      case '교환/반품': return { background: '#FFF7CC', color: '#A16207' };
+      case '이용안내': return { background: '#DCFCE7', color: '#166534' };
+      default: return { background: '#E8F4FF', color: '#0369a1' };
     }
   }
   // -----------------------------------------------
@@ -307,7 +368,7 @@ export default function QnaPage() {
           {loadingList ? (
             <div>목록 불러오는 중…</div>
           ) : list.length === 0 ? (
-            <div style={{ color: '#666' }}>작성한 문의가 없습니다.</div>
+            <div style={{ color: '#666' }}>{err ?? '작성한 문의가 없습니다.'}</div>
           ) : (
             <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
               {list.map((r, idx) => {
@@ -329,14 +390,13 @@ export default function QnaPage() {
                         minHeight: 36,
                       }}
                     >
-                      {/* ▶ 카테고리 칩: 색상/사이즈만 변경 */}
                       <span
                         style={{
                           ...catChipStyle(catText as Cat),
                           display: 'inline-block',
-                          padding: '4px 10px',  // ← 사이즈 키우기(여기)
+                          padding: '4px 10px',
                           borderRadius: 999,
-                          fontSize: 13,         // ← 글자 크기(여기)
+                          fontSize: 13,
                           whiteSpace: 'nowrap',
                           flex: '0 0 auto',
                         }}
@@ -344,7 +404,6 @@ export default function QnaPage() {
                         {catText}
                       </span>
 
-                      {/* 제목 + [댓글수] — 제목 바로 옆 */}
                       <Link
                         href={`/board/QNA/${bno}`}
                         prefetch={false}
@@ -365,7 +424,6 @@ export default function QnaPage() {
                       </Link>
                     </div>
 
-                    {/* 구분선(간격 유지) */}
                     <hr className="faq-sep" style={{ margin: '12px 0 0' }} />
                   </li>
                 );

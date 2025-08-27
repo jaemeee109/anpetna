@@ -6,6 +6,22 @@ import { useRouter } from 'next/navigation';
 
 type LoginBody = { memberId: string; memberPw: string };
 
+// ====== (컴포넌트 바깥) 공용 유틸: 안전 JSON 파서 & 토큰 추출 ======
+async function parseJsonSafe(resp: Response): Promise<any> {
+  const text = await resp.text().catch(() => '');
+  if (!text) return {};
+  try { return JSON.parse(text); } catch { return { raw: text }; }
+}
+function pickToken(data: any): string | undefined {
+  return (
+    data?.accessToken ||
+    data?.token ||
+    data?.jwt ||
+    data?.result?.accessToken ||
+    data?.result?.token
+  );
+}
+
 export default function LoginPage() {
   const router = useRouter();
 
@@ -33,6 +49,46 @@ export default function LoginPage() {
     return new URL(`${API_PREFIX}${normalized}`, BASE).toString();
   }
 
+  // 후보 URL 하나에 대해: 1) credentials:'omit' → 2) 'include' 재시도
+  async function tryLoginOnce(url: string, payload: LoginBody) {
+    // 1) omit
+    try {
+      const r1 = await fetch(url, {
+        method: 'POST',
+        credentials: 'omit',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (r1.ok) {
+        const data = await parseJsonSafe(r1);
+        return { ok: true, data, status: r1.status, usedUrl: url };
+      }
+      // 2) include
+      const r2 = await fetch(url, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (r2.ok) {
+        const data = await parseJsonSafe(r2);
+        return { ok: true, data, status: r2.status, usedUrl: url };
+      }
+      const body2 = await parseJsonSafe(r2);
+      return {
+        ok: false,
+        status: r2.status,
+        usedUrl: url,
+        errorText:
+          typeof body2?.raw === 'string'
+            ? `HTTP ${r2.status} ${body2.raw.slice(0, 300)}`
+            : `HTTP ${r2.status} ${JSON.stringify(body2).slice(0, 300)}`,
+      };
+    } catch (e: any) {
+      return { ok: false, status: 0, usedUrl: url, errorText: String(e?.message || e) };
+    }
+  }
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (submitting) return;
@@ -43,43 +99,38 @@ export default function LoginPage() {
 
       const payload: LoginBody = { memberId, memberPw };
 
-      // ★ 백엔드 확인 결과: MemberController에 POST "/member/login" 존재
-      //   (클래스 @RequestMapping("/member") + @PostMapping("/login"))
-      //   컨텍스트(/anpetna) 유무 모두 시도
+      // ✅ JwtController 및 구버전 경로 모두 후보로 시도 (프리픽스 유무 포함)
       const candidates = [
-  apiURL('/jwt/login'),              // ✅ JwtController 매핑
-  apiURL('/member/login'),           // 구버전/대체 경로 대비
-  new URL('/jwt/login', BASE).toString(),
-  new URL('/member/login', BASE).toString(),
-];
+        apiURL('/jwt/login'),
+        apiURL('/member/login'),
+        new URL('/jwt/login', BASE).toString(),
+        new URL('/member/login', BASE).toString(),
+      ];
 
-      let ok = false;
-      let lastText = '';
+      let success = false;
+      let lastErr = '';
       for (const url of candidates) {
-        try {
-          const resp = await fetch(url, {
-            method: 'POST',
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-          });
-          if (resp.ok) {
-            const data = await resp.json().catch(() => ({} as any));
-            const token = data?.accessToken ?? data?.token ?? data?.jwt ?? data?.result?.token;
-            if (token && typeof window !== 'undefined') {
-              localStorage.setItem('accessToken', token);
-              localStorage.setItem('memberId', memberId);
-            }
-            ok = true;
-            break;
+        const r = await tryLoginOnce(url, payload);
+        if (r.ok) {
+          const token = pickToken((r as any).data);
+          if (token && typeof window !== 'undefined') {
+            localStorage.setItem('accessToken', token);
+            localStorage.setItem('memberId', memberId);
           }
-          lastText = `HTTP ${resp.status} ${await resp.text().catch(() => '')}`;
-        } catch (e: any) {
-          lastText = String(e?.message || e);
+          success = true;
+          break;
+        } else {
+          lastErr = `${r.usedUrl}\n${r.errorText || ''}`.trim();
         }
       }
 
-      if (!ok) throw new Error(`로그인 실패 (/member/login)\n${lastText}`.trim());
+      if (!success) {
+        // 네트워크/서버 다운 메시지 보정
+        if (/Failed to fetch|NetworkError|ERR_CONNECTION/i.test(lastErr)) {
+          throw new Error('서버에 연결할 수 없습니다. 백엔드가 실행 중인지와 포트를 확인해주세요.');
+        }
+        throw new Error(`로그인 실패\n${lastErr || '(원인 미상)'}`);
+      }
 
       alert('로그인 되었습니다.');
       router.replace('/');
@@ -139,15 +190,12 @@ export default function LoginPage() {
         <p className="text-center text-sm text-gray-400 select-none">
           아이디 찾기 / 비밀번호 찾기
         </p>
-<br></br>
-<br></br>
+        <br></br>
+        <br></br>
         {err && <p className="text-red-600 text-sm text-center mt-2 whitespace-pre-line">{err}</p>}
       </form>
 
-      {/* 여백은 여기서 조절:
-          - 전체 페이지: <main>의 py-8
-          - 블록 사이 간격: <div className="h-2/h-4" />
-          - 줄 간격: .row margin 값 */}
+      {/* 여백/디자인 기존 그대로 유지 */}
       <style jsx global>{`
         .row {
           display: flex;

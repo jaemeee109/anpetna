@@ -1,4 +1,3 @@
-// app/member/signup/page.tsx
 'use client';
 
 import { useMemo, useState, FormEvent } from 'react';
@@ -21,7 +20,7 @@ interface Form {
   memberRoadAddress: string;
   memberZipCode: string;
   memberDetailAddress: string;
-  memberHasPet: YesNo; // ✅ 추가: 반려동물 여부
+  memberHasPet: YesNo;
 }
 
 export default function SignupPage() {
@@ -49,7 +48,7 @@ export default function SignupPage() {
     memberRoadAddress: '',
     memberZipCode: '',
     memberDetailAddress: '',
-    memberHasPet: 'N', // ✅ 기본값: 없음
+    memberHasPet: 'N',
   });
 
   const [submitting, setSubmitting] = useState(false);
@@ -58,7 +57,7 @@ export default function SignupPage() {
   const set = <K extends keyof Form,>(k: K, v: Form[K]) => setForm((f) => ({ ...f, [k]: v }));
   const toggleGM = (v: GM) => set('memberBirthGM', v);
 
-  
+  // === 백엔드 베이스 ===
   const BASE =
     (process.env.NEXT_PUBLIC_API_BASE as string | undefined) ||
     (typeof window !== 'undefined'
@@ -69,12 +68,34 @@ export default function SignupPage() {
         }`.replace(/:$/, '')
       : '');
 
-  const API_PREFIX = (process.env.NEXT_PUBLIC_API_PREFIX as string | undefined) ?? '/anpetna';
-  function apiURL(path: string) {
+  // 접두어 포함 URL 생성
+  function apiWithPrefix(path: string) {
+    const prefix = (process.env.NEXT_PUBLIC_API_PREFIX as string | undefined) ?? '/anpetna';
     const normalized = path.startsWith('/') ? path : `/${path}`;
-    return new URL(`${API_PREFIX}${normalized}`, BASE).toString();
+    return new URL(`${prefix}${normalized}`, BASE).toString();
+  }
+  // 접두어 없이 URL 생성
+  function apiNoPrefix(path: string) {
+    const normalized = path.startsWith('/') ? path : `/${path}`;
+    return new URL(normalized, BASE).toString();
   }
 
+  // 안전 트림 + 기본값
+  const nz = (v: string, dflt = '-') => (String(v ?? '').trim() || dflt);
+  async function readBody(resp: Response) {
+    const text = await resp.text().catch(() => '');
+    try {
+      const j = text ? JSON.parse(text) : null;
+      if (j && typeof j === 'object') {
+        const msg =
+          j.message || j.error || j.detail || j.msg || j.status || j.reason || JSON.stringify(j, null, 2);
+        return typeof msg === 'string' ? msg : JSON.stringify(msg, null, 2);
+      }
+    } catch {}
+    return text;
+  }
+
+  // === 가입 제출 ===
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (submitting) return;
@@ -96,46 +117,78 @@ export default function SignupPage() {
       setSubmitting(true);
       setErr(null);
 
-      // 서버에서 필요하지만 UI에 노출하지 않는 필드는 기본값으로 처리
-      const payload = {
-        ...form,
+      // 보수적으로 값 보정
+      const flat = {
+        memberId: nz(form.memberId),
+        memberPw: nz(form.memberPw),
+        memberName: nz(form.memberName),
+
+        memberBirthY: nz(form.memberBirthY),
+        memberBirthM: nz(form.memberBirthM.padStart(2, '0')),
+        memberBirthD: nz(form.memberBirthD.padStart(2, '0')),
+        memberBirthGM: (form.memberBirthGM || '양력') as GM,
+
         memberGender: 'U',
-        emailStsYn: 'N',
-        memberRole: 'USER',
+        memberHasPet: (form.memberHasPet || 'N') as YesNo,
+
+        memberPhone: nz(form.memberPhone, '00000000000'),
+        smsStsYn: (form.smsStsYn || 'N') as YesNo,
+
+        memberEmail: nz(form.memberEmail, 'user@example.com'),
+        emailStsYn: 'N' as YesNo,
+
+        memberRoadAddress: nz(form.memberRoadAddress, '-'),
+        memberZipCode: nz(form.memberZipCode, '00000'),
+        memberDetailAddress: nz(form.memberDetailAddress, '-'),
+
+        memberRole: 'USER' as any,
         memberSocial: false,
         memberEtc: '',
-        // ✅ 반려동물 여부는 이제 사용자가 선택한 값 전송
-        memberHasPet: form.memberHasPet,
+        social: false,
+        etc: '',
       };
 
-      // ✅ 우선순위: 1) BASE+API_PREFIX+'/member/join'  2) BASE+'/member/join' (백엔드 prefix가 없는 경우)
-      const candidates = [
-        apiURL('/member/join'),
-        new URL('/member/join', BASE).toString(),
-      ];
+      // 래핑 DTO 동시 제공(모르는 키는 서버가 무시)
+      const bodyJSON = JSON.stringify({ ...flat, memberDTO: { ...flat } });
 
-      let ok = false;
-      let lastText = '';
-      for (const url of candidates) {
-        try {
-          const resp = await fetch(url, {
-            method: 'POST',
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-          });
-          if (resp.ok) {
-            ok = true;
-            break;
-          }
-          lastText = `HTTP ${resp.status} ${await resp.text().catch(() => '')}`;
-        } catch (e: any) {
-          lastText = String(e?.message || e);
-        }
+      // ▶ 1순위: 접두어 포함 (/anpetna/member/join)
+      const url1 = apiWithPrefix('/member/join');
+      let resp = await fetch(url1, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          Accept: 'application/json, text/plain, */*',
+        },
+        body: bodyJSON,
+      });
+
+      // ▶ 404면 접두어 없는 경로로 폴백 (/member/join)
+      if (resp.status === 404) {
+        const url2 = apiNoPrefix('/member/join');
+        resp = await fetch(url2, {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json; charset=utf-8',
+            Accept: 'application/json, text/plain, */*',
+          },
+          body: bodyJSON,
+        });
       }
 
-      if (!ok) {
-        throw new Error(`회원가입 실패\n${lastText}`.trim());
+      if (!resp.ok) {
+        const body = await readBody(resp);
+        if (/duplicate|unique|exists|duplicated|already/i.test(body)) {
+          throw new Error('이미 사용 중인 아이디입니다. 다른 아이디로 시도해주세요.');
+        }
+        if (/password|encoder|bcrypt|illegal/i.test(body)) {
+          throw new Error('비밀번호 처리 중 서버 오류가 발생했습니다. 너무 짧거나 허용되지 않는 문자가 포함됐을 수 있어요.');
+        }
+        if (/null|nullable|not\s*null|constraint/i.test(body)) {
+          throw new Error(`필수 항목 누락으로 가입이 거절되었습니다.\n서버 메시지: ${body}`);
+        }
+        throw new Error(`회원가입 실패 (HTTP ${resp.status})\n${body || '(본문 없음)'}`);
       }
 
       alert('회원가입이 완료되었습니다. 로그인 페이지로 이동합니다.');
@@ -149,7 +202,6 @@ export default function SignupPage() {
 
   return (
     <main className="mx-auto max-w-[720px] px-4 py-8 text-center">
-      {/* 타이틀 + 너가 붙인 SVG (크기는 글자 크기에 맞춰 1em) */}
       <br></br>
       <h1 className="text-2xl font-semibold mb-4 flex items-center justify-center gap-2 ">
         Join Us &nbsp;
@@ -166,11 +218,10 @@ export default function SignupPage() {
         </svg>
       </h1>
 
-      {/* 밝은 회색 실선 (유지) */}
       <hr className="border-gray-200 mb-6" />
-<br></br>
+      <br></br>
+
       <form onSubmit={onSubmit}>
-        {/* 라벨 + 입력칸 한 줄, 전체 가운데 정렬 (유지) */}
         <Row label="ID">
           <input className="input" value={form.memberId} onChange={e => set('memberId', e.target.value)} />
         </Row>
@@ -225,10 +276,9 @@ export default function SignupPage() {
         <Row label="PhoneNumber">
           <div className="inline-flex items-center gap-3">
             <input className="input" value={form.memberPhone} onChange={e => set('memberPhone', e.target.value)} />
-            {/* SMS 라벨만 연한 회색(유지) */}
             <label className="inline-flex items-center gap-1 text-sm text-gray-400">
-           &nbsp;  SMS&nbsp;
-             <input
+              &nbsp;  SMS&nbsp;
+              <input
                 type="checkbox"
                 className="checkbox"
                 checked={form.smsStsYn === 'Y'}
@@ -269,7 +319,6 @@ export default function SignupPage() {
           />
         </Row>
 
-        {/* ✅ 새로 추가: DetailAddress 바로 아래 — Have a Pet? YES / NO (체크박스) */}
         <Row label="Have a Pet?">
           <div className="inline-flex items-center gap-4">
             <label className="inline-flex items-center gap-1 text-sm">
@@ -292,14 +341,13 @@ export default function SignupPage() {
             </label>
           </div>
         </Row>
-<br></br>
-        {/* 여백 + 밝은 회색 실선 (유지) */}
+
+        <br></br>
         <div className="h-2" />
         <hr className="border-gray-200" />
         <div className="h-4" />
         <br></br>
 
-        {/* 버튼: 가운데 정렬 / 가입하기=흰 바탕 검정 글씨 (유지) */}
         <div className="flex justify-center gap-3">
           <button type="submit" className="btn-3d btn-white text-black" disabled={submitting}>
             {submitting ? '처리 중…' : '가입하기'}
@@ -308,36 +356,33 @@ export default function SignupPage() {
             취소
           </button>
         </div>
-<br></br>
-<br></br>
-<br></br>
-<br></br>
-<br></br>
-        {err && <p className="text-red-600 text-sm text-center mt-2">{err}</p>}
+
+        <br></br><br></br><br></br><br></br><br></br>
+
+        {err && (
+          <pre className="text-red-600 text-xs text-left mt-2 whitespace-pre-wrap break-words max-w-[720px] mx-auto">
+{err}
+          </pre>
+        )}
       </form>
 
-      {/* 스타일 (기존 유지) */}
       <style jsx global>{`
-        /* 라벨 + 입력칸 한 줄, 가운데 정렬 */
         .row {
           display: flex;
           align-items: center;
-          justify-content: center; /* 가운데 정렬 */
+          justify-content: center;
           gap: 12px;
-          margin: 14px 0; /* 줄 간격 */
+          margin: 14px 0;
           text-align: center;
         }
-
-        /* 라벨 폰트 크기 (유지: 굵게 X) */
         .label {
           color: #111;
           font-size: 1.15rem;
           font-weight: 400;
         }
-
         .input {
           display: inline-block;
-          border: 1px solid #e5e7eb; /* 밝은 회색 테두리 */
+          border: 1px solid #e5e7eb;
           border-radius: 6px;
           height: 26px;
           padding: 3px 8px;
@@ -349,9 +394,7 @@ export default function SignupPage() {
         .input--xs { width: 100px; }
         .input--smw { width: 120px; }
         .input--lgw { width: 260px; }
-
         .checkbox { width: 12px; height: 12px; }
-
         .btn-3d {
           padding: 8px 14px;
           border-radius: 10px;

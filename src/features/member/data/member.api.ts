@@ -1,62 +1,83 @@
 // features/member/data/member.api.ts
 
-// ======== (추가) 로컬 타입 선언: import 없이 동작하도록 최소 정의 ========
-type MemberRole =
-  | 'USER' | 'ADMIN'
-  | 'ROLE_USER' | 'ROLE_ADMIN'
+// =======================================================
+// 이 파일은 프로젝트 공용 member API 모듈입니다.
+// - 로그인: /jwt/login (단일 엔드포인트 고정)
+//   * 1차: credentials:"omit" (쿠키 미동반) → 2차: "include" 재시도
+// - 기타 API: 인증이 필요할 수 있어 credentials:"include" 사용
+// - BASE / PREFIX는 .env.local 로 덮어쓸 수 있음
+//   NEXT_PUBLIC_API_BASE=http://192.168.0.160:8000
+//   NEXT_PUBLIC_API_PREFIX=/anpetna
+// =======================================================
+
+// ======== (로컬 타입 선언: import 없이 동작하도록 최소 정의) ========
+export type MemberRole =
+  | "USER" | "ADMIN"
+  | "ROLE_USER" | "ROLE_ADMIN"
   | (string & {});
 
-interface MemberImage {
+export interface MemberImage {
   uuid?: number | string;
   fileName?: string;
   url?: string;
   sortOrder?: number;
 }
 
-interface Member {
+export interface Member {
+  // 식별 / 인증
   memberId: string;
   memberPw?: string;
+
+  // 기본 정보
   memberName: string;
 
+  // 생년월일(YYYY/MM/DD + 양/음력)
   memberBirthY: string;
   memberBirthM: string;
   memberBirthD: string;
-  memberBirthGM: string;
+  memberBirthGM: string; // '양력' | '음력'
 
-  memberGender: string;
-  memberHasPet: string;
+  // 기타 특성
+  memberGender: string;   // 'M' | 'F' | 'U' 등
+  memberHasPet: string;   // 'Y' | 'N'
 
+  // 연락
   memberPhone: string;
-  smsStsYn: string;
-
+  smsStsYn: string;       // 'Y' | 'N'
   memberEmail: string;
-  emailStsYn: string;
+  emailStsYn: string;     // 'Y' | 'N'
 
+  // 주소
   memberRoadAddress: string;
   memberZipCode: string;
   memberDetailAddress: string;
 
+  // 권한/소셜/비고
   memberRole: MemberRole;
   memberSocial?: boolean;
   memberEtc?: string;
 
+  // 프로필 이미지 (백엔드: List memberFileImage)
   images?: MemberImage[];
   memberFileImage?: Array<string | MemberImage>;
 
+  // 생성/수정 시간 (BaseEntity)
   createDate?: string;
   latestDate?: string;
 
+  // 서버가 다른 키로 줄 수도 있어 보조 키들
   social?: boolean;
   etc?: string;
 
+  // 백엔드 MemberDTO에 보일 수 있는 보조 필드들(관대 처리)
   status?: string;
   memberDTO?: Member;
 }
 
-type ReadMemberAllRes = Member[];
-interface ReadMemberOneRes extends Member {}
+export type ReadMemberAllRes = Member[];
+export interface ReadMemberOneRes extends Member {}
 
-interface JoinMemberReq {
+export interface JoinMemberReq {
   memberId: string;
   memberPw: string;
   memberName: string;
@@ -81,126 +102,111 @@ interface JoinMemberReq {
 
   memberRole: MemberRole;
 
+  // 선택
   memberSocial?: boolean;
   memberEtc?: string;
 
+  // 호환 키
   social?: boolean;
   etc?: string;
 }
-type JoinMemberRes = { memberId: string };
+export type JoinMemberRes = { memberId: string };
 
-type ModifyMemberReq = Partial<Omit<Member, 'memberId'>> & { memberId: string };
-type ModifyMemberRes = Member;
+export type ModifyMemberReq = Partial<Omit<Member, "memberId">> & { memberId: string };
+export type ModifyMemberRes = Member;
 
-interface LoginReq {
+export interface LoginReq {
   memberId: string;
   memberPw: string;
 }
-interface LoginRes {
+export interface LoginRes {
   accessToken?: string;
   refreshToken?: string;
   expiresIn?: number;
-  tokenType?: string;
+  tokenType?: string; // e.g. 'Bearer'
+  // 서버가 다른 키로 줄 수도 있어 대비
   token?: string;
   jwt?: string;
   memberId?: string;
 }
-// ======================================================================
-
 
 // ----- 환경값 & 유틸 -----
 const BASE =
   (process.env.NEXT_PUBLIC_API_BASE as string | undefined) ||
-  (typeof window !== 'undefined'
+  (typeof window !== "undefined"
     ? `${window.location.protocol}//${window.location.hostname}${
         window.location.port
-          ? `:${window.location.port === '3000' ? '8000' : window.location.port}`
-          : ''
-      }`.replace(/:$/, '')
-    : '');
+          ? `:${window.location.port === "3000" ? "8000" : window.location.port}`
+          : ""
+      }`.replace(/:$/, "")
+    : "");
 
 // 보드/FAQ에서 사용 중인 프리픽스와 동일하게 기본값 '/anpetna'
-const API_PREFIX = process.env.NEXT_PUBLIC_API_PREFIX || '/anpetna';
+const API_PREFIX = (process.env.NEXT_PUBLIC_API_PREFIX as string | undefined) || "/anpetna";
 
-
-const LOGIN_PATH_CANDIDATES = [
-  process.env.NEXT_PUBLIC_LOGIN_PATH || '/jwt/login', 
-  '/member/login',                                   
-  '/auth/login',                                      
-];
-
+/** 접두를 붙여 절대 URL 생성 */
 function apiURL(path: string) {
-  const normalized = path.startsWith('/') ? path : `/${path}`;
+  const normalized = path.startsWith("/") ? path : `/${path}`;
   return new URL(`${API_PREFIX}${normalized}`, BASE).toString();
 }
 
-type HeadersInitish = HeadersInit | Record<string, string>;
-
-function isBrowser() {
-  return typeof window !== 'undefined';
-}
-
-// 간단한 토큰 저장/조회 유틸
-const tokenKey = 'accessToken';
-const idKey = 'memberId';
-
-export const AuthStore = {
-  set(token?: string, memberId?: string) {
-    if (!isBrowser()) return;
-    if (token) localStorage.setItem(tokenKey, token);
-    if (memberId) localStorage.setItem(idKey, memberId);
-  },
-  clear() {
-    if (!isBrowser()) return;
-    localStorage.removeItem(tokenKey);
-    localStorage.removeItem(idKey);
-  },
-  token() {
-    return isBrowser() ? localStorage.getItem(tokenKey) || '' : '';
-  },
-  memberId() {
-    return isBrowser() ? localStorage.getItem(idKey) || '' : '';
-  },
-};
-
-function authHeaders(init?: HeadersInitish): HeadersInit {
-  const t = AuthStore.token();
-  return t
-    ? { Authorization: `Bearer ${t}`, ...(init || {}) }
-    : (init || {});
-}
-
+/** 응답을 JSON으로 파싱(빈 응답도 허용) */
 async function parseJson(resp: Response) {
-  // 서버가 ApiResult<T> 형태거나 바로 T를 줄 수 있어 풀어줌
-  const json = await resp.json().catch(() => ({}));
-  return (json?.result ?? json?.data ?? json);
+  const text = await resp.text();
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    return {};
+  }
 }
 
+/** 토큰을 Authorization 헤더에 실어줌 (객체 형태로 반환) */
+function authHeaderObject(): Record<string, string> {
+  let token: string | null = null;
+  if (typeof window !== "undefined") {
+    token = localStorage.getItem("accessToken") || null;
+  }
+  const headers: Record<string, string> = {};
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  return headers;
+}
+
+/** Headers 병합 유틸 (HeadersInit 안전 병합) */
+function buildHeaders(extra?: HeadersInit, withJson = false): Headers {
+  const h = new Headers(authHeaderObject());
+  if (withJson) h.set("Content-Type", "application/json");
+  if (extra) new Headers(extra).forEach((v, k) => h.set(k, v));
+  return h;
+}
+
+/** 공통 GET (credentials: include) */
 async function get<T>(path: string, init?: RequestInit): Promise<T> {
   const resp = await fetch(apiURL(path), {
-    method: 'GET',
-    credentials: 'include',
-    headers: authHeaders(init?.headers),
+    method: "GET",
+    credentials: "include",
+    headers: buildHeaders(init?.headers),
     ...init,
   });
   if (!resp.ok) {
-    const text = await resp.text().catch(() => '');
+    const text = await resp.text().catch(() => "");
     throw new Error(`${path} 실패 (HTTP ${resp.status})\n${text.slice(0, 300)}`);
   }
   const body = await parseJson(resp);
   return body as T;
 }
 
+/** 공통 POST (credentials: include) */
 async function post<T>(path: string, body: unknown, init?: RequestInit): Promise<T> {
   const resp = await fetch(apiURL(path), {
-    method: 'POST',
-    credentials: 'include',
-    headers: authHeaders({ 'Content-Type': 'application/json', ...(init?.headers || {}) }),
+    method: "POST",
+    credentials: "include",
+    headers: buildHeaders(init?.headers, true), // ← JSON 헤더 + 안전 병합
     body: JSON.stringify(body ?? {}),
     ...init,
   });
   if (!resp.ok) {
-    const text = await resp.text().catch(() => '');
+    const text = await resp.text().catch(() => "");
     throw new Error(`${path} 실패 (HTTP ${resp.status})\n${text.slice(0, 300)}`);
   }
   const data = await parseJson(resp);
@@ -209,59 +215,60 @@ async function post<T>(path: string, body: unknown, init?: RequestInit): Promise
 
 // ----- 엔드포인트 매핑 -----
 export const ENDPOINTS = {
-  signup: '/member/join',                                    // POST
-  list: '/member/readAll',                                   // GET
+  signup: "/member/join", // POST
+  list: "/member/readAll", // GET
   readOne: (memberId: string) => `/member/my_page/${encodeURIComponent(memberId)}`, // GET
-  modify: '/member/modify',                                  // POST
-  remove: '/member/delete',                                  // GET (인증 필요)
+  modify: "/member/modify", // POST
+  remove: "/member/delete", // GET (인증 필요)
+  // 로그인은 아래 login()에서 /jwt/login 고정 사용
 };
 
-// ----- API 함수들 -----
-export async function signup(body: JoinMemberReq): Promise<JoinMemberRes> {
-  // DTO 호환: (혹시 페이지에서 social/etc 이름으로 보낼 경우 대비)
-  const normalized = {
-    ...body,
-    memberSocial: (body as any).memberSocial ?? (body as any).social,
-    memberEtc: (body as any).memberEtc ?? (body as any).etc,
-  };
-  return await post<JoinMemberRes>(ENDPOINTS.signup, normalized);
-}
-
+// =============== 로그인 ===============
+// 로그인은 /jwt/login 하나로만 시도 (여러 경로 시도하다가 500이 섞이는 문제 방지)
 export async function login(body: LoginReq): Promise<LoginRes> {
-  let lastErr: unknown = null;
-  for (const p of LOGIN_PATH_CANDIDATES) {
+  const url = apiURL("/jwt/login");
+
+  // 1) 쿠키 없이 먼저 (기존 잔여 쿠키로 인한 충돌 방지)
+  let resp = await fetch(url, {
+    method: "POST",
+    credentials: "omit",
+    headers: buildHeaders(undefined, true),
+    body: JSON.stringify(body),
+  });
+
+  // 2) 서버가 쿠키 정책이면 include로 한 번 더
+  if (!resp.ok) {
     try {
-      const resp = await fetch(apiURL(p), {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+      resp = await fetch(url, {
+        method: "POST",
+        credentials: "include",
+        headers: buildHeaders(undefined, true),
         body: JSON.stringify(body),
       });
-      if (!resp.ok) continue;
-
-      const data = await parseJson(resp) as any;
-
-      const token: string | undefined =
-        data?.accessToken ?? data?.token ?? data?.jwt ?? data?.result?.token;
-      const mid: string | undefined =
-        data?.memberId ?? body.memberId;
-
-      if (token) AuthStore.set(token, mid);
-
-      const out: LoginRes = {
-        accessToken: data?.accessToken ?? token,
-        refreshToken: data?.refreshToken,
-        expiresIn: data?.expiresIn,
-        tokenType: data?.tokenType ?? (token ? 'Bearer' : undefined),
-        // 필요 시 로그인 응답에 memberId도 넘겨둠(타입 확장 가능)
-        ...(mid ? { memberId: mid } as any : {}),
-      };
-      return out;
-    } catch (e) {
-      lastErr = e;
+    } catch {
+      // ignore
     }
   }
-  throw new Error(`로그인 실패: 가능한 경로(${LOGIN_PATH_CANDIDATES.join(', ')}) 모두 실패했습니다.${lastErr ? `\n${String(lastErr)}` : ''}`);
+
+  if (resp.ok) {
+    return (await parseJson(resp)) as LoginRes;
+  }
+
+  const text = await resp.text().catch(() => "");
+  throw new Error(`로그인 실패 (/jwt/login)\nHTTP ${resp.status}${text ? `\n${text}` : ""}`);
+}
+
+// =============== 회원 API ===============
+export async function signup(body: JoinMemberReq): Promise<JoinMemberRes> {
+  const data = await post<any>(ENDPOINTS.signup, body);
+  // 서버 응답이 여러 형태일 수 있으니 관대하게 추출
+  const memberId =
+    data?.memberId ??
+    data?.result?.memberId ??
+    data?.dto?.memberId ??
+    data?.id ??
+    body.memberId;
+  return { memberId };
 }
 
 export async function listMembers(): Promise<ReadMemberAllRes> {
@@ -272,17 +279,14 @@ export async function listMembers(): Promise<ReadMemberAllRes> {
 
 export async function readMemberOne(memberId: string): Promise<ReadMemberOneRes> {
   const data = await get<any>(ENDPOINTS.readOne(memberId));
-  return (data as ReadMemberOneRes);
+  return data as ReadMemberOneRes;
 }
 
-export async function modifyMember(body: ModifyMemberReq): Promise<ModifyMemberRes> {
-  const normalized = {
-    ...body,
-    memberSocial: (body as any).memberSocial ?? (body as any).social,
-    memberEtc: (body as any).memberEtc ?? (body as any).etc,
-  };
-  const data = await post<any>(ENDPOINTS.modify, normalized);
-  return (data as ModifyMemberRes);
+export async function modifyMember(req: ModifyMemberReq): Promise<ModifyMemberRes> {
+  const data = await post<any>(ENDPOINTS.modify, req);
+  // 서버가 dto 를 래핑해서 줄 수도 있음
+  const m = (data?.dto ?? data) as ModifyMemberRes;
+  return m;
 }
 
 // ✅ 로컬 타입: DeleteMemberRes (member.types.ts에 없을 때를 대비)
@@ -291,7 +295,6 @@ type DeleteMemberRes = {
   success?: boolean;
   message?: string;
 };
-
 export async function removeMember(): Promise<DeleteMemberRes> {
   const data = await get<any>(ENDPOINTS.remove);
   return data as DeleteMemberRes;
