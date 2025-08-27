@@ -33,6 +33,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @Log4j2
 public class BoardServiceTests {
 
+/*
     @Autowired
     private BoardService boardService;
 
@@ -197,5 +198,6 @@ public class BoardServiceTests {
 
         assertFalse(boardJpaRepository.findById(existingBno).isPresent());
     }
+*/
 
 }

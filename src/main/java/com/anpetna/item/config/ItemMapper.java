@@ -8,6 +8,7 @@ import com.anpetna.item.dto.ItemDTO;
 import com.anpetna.item.dto.modifyItem.ModifyItemReq;
 import com.anpetna.item.dto.registerItem.RegisterItemReq;
 import com.anpetna.item.dto.searchOneItem.SearchOneItemRes;
+import jakarta.transaction.Transactional;
 import org.modelmapper.ModelMapper;
 import org.modelmapper.TypeMap;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,7 +23,10 @@ public class ItemMapper {
     //  필드를 final로 꼭 해야하는가
 
    public TypeMap<RegisterItemReq, ItemEntity> cItemMapReq() {
-       TypeMap<RegisterItemReq, ItemEntity> typeMap = modelMapper.createTypeMap(RegisterItemReq.class, ItemEntity.class);
+       TypeMap<RegisterItemReq, ItemEntity> typeMap = modelMapper.getTypeMap(RegisterItemReq.class, ItemEntity.class);
+       if (typeMap==null) {
+           typeMap = modelMapper.createTypeMap(RegisterItemReq.class, ItemEntity.class);
+       }
        typeMap.addMappings(mapper -> mapper.skip(ItemEntity::setItemId));
        return imageToEntity(typeMap);
    }
@@ -37,8 +41,12 @@ public class ItemMapper {
         return imageToDTO(typeMap);
     }
 
+
     public TypeMap<ItemEntity, ItemDTO> rItemMapRes() {
-        TypeMap<ItemEntity, ItemDTO> typeMap = modelMapper.createTypeMap(ItemEntity.class, ItemDTO.class);
+        TypeMap<ItemEntity, ItemDTO> typeMap = modelMapper.getTypeMap(ItemEntity.class, ItemDTO.class);
+        if (typeMap==null) {
+            typeMap = modelMapper.createTypeMap(ItemEntity.class, ItemDTO.class);
+        }
         return imageToDTO(typeMap);
     }
 

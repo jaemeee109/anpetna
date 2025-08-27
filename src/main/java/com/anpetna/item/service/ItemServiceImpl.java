@@ -17,6 +17,7 @@ import jakarta.persistence.EntityNotFoundException;
 import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -70,7 +71,6 @@ public class ItemServiceImpl implements ItemService {
 
      @Override
     public List<ItemDTO> getAllItems(SearchAllItemsReq req) {
-
         List<ItemEntity> found = null;
         //  사용자는 셋 중 하나를 선택하고 DTO에는 값이 하나만 지정된다.
         if (req.getSortByCategory() != null){
@@ -80,8 +80,7 @@ public class ItemServiceImpl implements ItemService {
         }else if (req.getOrderByPriceDir() != null){
             found  = repository.orderByPriceDir(req);
         }
-
-        List<ItemDTO> res  = null;
+        List<ItemDTO> res  = new ArrayList<>();
         found.forEach(itemEntity -> {
              res.add(itemMapper.rItemMapRes().map(itemEntity));
          });

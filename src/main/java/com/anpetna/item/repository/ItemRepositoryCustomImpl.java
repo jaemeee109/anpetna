@@ -1,5 +1,6 @@
 package com.anpetna.item.repository;
 
+import com.anpetna.item.constant.ItemSellStatus;
 import com.anpetna.item.domain.ItemEntity;
 import com.anpetna.item.domain.QItemEntity;
 import com.anpetna.item.dto.searchAllItem.SearchAllItemsReq;
@@ -33,12 +34,14 @@ public class ItemRepositoryCustomImpl implements ItemRepositoryCustom {
                 .fetch();
     }
 
-    @Override
+      @Override
     public List<ItemEntity> sortBySales(SearchAllItemsReq req) {
+       /* Item sortBySale = req.getSortBySale();
 
         return queryFactory.selectFrom(qItem)
-                .where(qItem.itemCategory.eq(req.getSortByCategory()))
-                .fetch();
+                .where(qItem.itemSaleStatus.in(sortBySale))
+                .fetch();*/
+          return null;
     }
 
     @Override
