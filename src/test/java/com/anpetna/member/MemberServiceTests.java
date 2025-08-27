@@ -65,9 +65,10 @@ public class MemberServiceTests {
 
     @AfterEach
     public void clearAuthentication() {
-        SecurityContextHolder.clearContext();
-    }
 
+        SecurityContextHolder.clearContext();
+
+    }
 
     @Test
     public void joinTest() throws MemberService.MemberIdExistException {

@@ -14,6 +14,7 @@ import java.util.List;
 
 @Entity
 @Table(name="anpetna_item")
+@Setter
 @Getter
 @Builder
 @AllArgsConstructor
@@ -23,7 +24,7 @@ public class ItemEntity extends BaseEntity {
 
     @Id
     @Column(name="item_id")
-    @GeneratedValue(strategy= GenerationType.AUTO)
+    @GeneratedValue(strategy= GenerationType.IDENTITY)
     private Long itemId; // 상품코드
 
     @Column(name="item_name", nullable=false,length=50)
