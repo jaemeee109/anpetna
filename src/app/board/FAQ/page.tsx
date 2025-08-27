@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import PawIcon from '@/components/icons/Paw';
 
 const WRAP = 'mx-auto w-full max-w-[700px] px-4';
 
@@ -204,7 +205,9 @@ export default function FAQPage() {
     <main className={WRAP}>
       {/* 타이틀/설명 */}
       <section className="faq-head">
-        <h1 className="faq-title">FAQ</h1>
+       <h1 className="faq-title inline-flex items-center gap-2 justify-center">
+  FAQ <PawIcon />
+</h1>
         <p className="faq-sub">자주 묻는 질문을 모았습니다. 찾는 답이 없다면 Q&amp;A로 문의해 주세요</p>
 
         {/* 카테고리 버튼 */}
