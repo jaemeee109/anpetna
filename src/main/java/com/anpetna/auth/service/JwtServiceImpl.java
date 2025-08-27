@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 @Service
@@ -108,7 +109,6 @@ public class JwtServiceImpl implements JwtService {
     }
 
     @Override
-    @Transactional
     public void logout(TokenRequest tokenRequest) {
         // 0) 입력 검증
         String refreshPlain = Optional.ofNullable(tokenRequest.getRefreshToken())

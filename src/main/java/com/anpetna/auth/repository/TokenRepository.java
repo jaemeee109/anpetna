@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.Instant;
 import java.util.Optional;
 
 public interface TokenRepository extends JpaRepository<TokenEntity, Long> {
@@ -19,4 +20,6 @@ public interface TokenRepository extends JpaRepository<TokenEntity, Long> {
     @Query("update TokenEntity t set t.revokedAt = CURRENT_TIMESTAMP " +
             "where t.memberId = :memberId and t.revokedAt is null")
     void revokeByMemberId(@Param("memberId") String memberId);
+
+    Optional<TokenEntity> findFirstByRefreshTokenAndRevokedAtIsNullAndExpiresAtAfter(String refreshToken, Instant revokedAt);
 }
