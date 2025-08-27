@@ -34,7 +34,9 @@ public class PageRequestDTO {
 
     private String link;  // 프론트에 페이징번호 클릭시 처리되는 문자열
     // list?page=3&type=w&keyword=kkw
+
    private String boardType;
+
     public String getLink(){
 
         if(link == null){

@@ -3,6 +3,7 @@ package com.anpetna.board.service;
 import com.anpetna.board.constant.BoardType;
 import com.anpetna.board.domain.BoardEntity;
 import com.anpetna.board.dto.BoardDTO;
+import com.anpetna.board.dto.ImageOrderReq;
 import com.anpetna.board.dto.createBoard.CreateBoardReq;
 import com.anpetna.board.dto.createBoard.CreateBoardRes;
 import com.anpetna.board.dto.deleteBoard.DeleteBoardReq;
@@ -16,7 +17,9 @@ import com.anpetna.coreDomain.ImageEntity;
 import com.anpetna.coreDto.ImageDTO;
 import com.anpetna.coreDto.PageRequestDTO;
 import com.anpetna.coreDto.PageResponseDTO;
+import com.anpetna.coreRepository.ImageJpaRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
@@ -28,11 +31,13 @@ import org.springframework.security.core.context.SecurityContextHolder;
 
 // 회원 존재 확인용
 import com.anpetna.member.repository.MemberRepository;
+import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
 
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Optional;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -45,6 +50,51 @@ public class BoardServiceImpl implements BoardService {
 
     // 멤버 확인용
     private final MemberRepository memberRepository;
+
+    // 이미지 확인용
+    private final ImageJpaRepository imageJpaRepository;
+
+    @Value("${app.upload.dir}")       // 실제 파일 저장 경로 (예: C:/uploads or /var/www/uploads)
+    private String uploadDir;
+
+    @Value("${app.upload.url-base}")  // 접근 URL 베이스 (예: /files or https://cdn.example.com/files)
+    private String uploadUrlBase;
+
+    private static final int MAX_FILES_PER_POST = 50; // 필요 시 조정
+
+    // 업로드된 파일들을 저장하고 이미지 엔티티로 추가
+    private void saveImages(BoardEntity board, List<MultipartFile> files, int appendFrom) {
+        int sort = appendFrom;
+
+        try {
+            Path base = Paths.get(uploadDir);
+            if (!Files.exists(base)) {
+                Files.createDirectories(base);
+            }
+
+            for (MultipartFile file : files) {
+                if (file == null || file.isEmpty()) continue;
+
+                String original = file.getOriginalFilename();
+                String ext = StringUtils.getFilenameExtension(original);
+                String uuid = UUID.randomUUID().toString();
+                String savedName = (ext == null || ext.isBlank()) ? uuid : (uuid + "." + ext);
+
+                Path target = base.resolve(savedName);
+                file.transferTo(target.toFile());
+
+                // 노출용 URL (정적 서빙 경로와 매핑되어 있어야 함)
+                String url = (uploadUrlBase.endsWith("/"))
+                        ? uploadUrlBase + savedName
+                        : uploadUrlBase + "/" + savedName;
+
+                // 정렬 순서 부여하며 연관관계 연결
+                ImageEntity.forBoard(savedName, url, board, sort++);
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("이미지 저장 중 오류가 발생했습니다.", e);
+        }
+    }
 
     // 로그인 + 회원여부 검증(필수 구간에서 사용)
     private String requireLoginAndMember() { //
@@ -96,10 +146,11 @@ public class BoardServiceImpl implements BoardService {
     //=================================================================================
     @Transactional
     @Override
-    public CreateBoardRes createBoard(CreateBoardReq req) {
+    public CreateBoardRes createBoard(CreateBoardReq req, List<MultipartFile> files) {
         // 1) 로그인 사용자 가져오기 (반드시 맨 앞에서)
         String memberId = requireLoginAndMember();
 
+        // 2) 게시글 엔티티 생성 (view/like는 신뢰 금지 → 0 고정 권장)
         BoardEntity board = BoardEntity.builder()
                 .bWriter(memberId)
                 .bTitle(req.getBTitle())
@@ -109,27 +160,30 @@ public class BoardServiceImpl implements BoardService {
                 .isSecret(Boolean.TRUE.equals(req.getIsSecret()))
                 .bViewCount(req.getBViewCount() == null ? 0 : req.getBViewCount())
                 .bLikeCount(req.getBLikeCount() == null ? 0 : req.getBLikeCount())
-                .faqCategory(req.getFaqCategory()) // ★ 추가
+                .faqCategory(req.getFaqCategory())
                 .build();
 
-        // 2) 이미지 추가
+        // 3) 선 저장(식별자 필요할 수 있으므로)
+        BoardEntity saved = boardJpaRepository.save(board);
+
+        // 4) (선택) JSON으로 넘어온 이미지(URL 기반) 붙이기
         List<ImageDTO> imageDTOS = Optional.ofNullable(req.getImages()).orElse(Collections.emptyList());
-        //                         Optional.ofNullable(...)이 null 일 수도 있는 걸 감싸는 안전 장치.
-        //                                                              .orElse(Collections.emptyList()) null 이면 변경 불가(empty) 리스트를 돌려줘.
-        if (!imageDTOS.isEmpty()) {  // 정렬 순서가 null 이면 0으로, 이미지가 1개라도 있을 때만 밑의 로직을 수행. 없으면 아무것도 안 함.
-            int idx = 0;  // 정렬 순서가 null 이면 0으로 자동 할당용 증가 인덱스를 0부터 시작.
-            for (ImageDTO imageDTO : imageDTOS) { // 이미지 DTO 들을 하나씩 순회.
-                Integer order = imageDTO.getSortOrder() != null ? imageDTO.getSortOrder() : idx++;
-                //              DTO 에 sortOrder 가 있으면 그대로 사용.
-                //                                       없으면(null) 현재 idx 값을 사용하고, 그 다음에 idx 를 1 증가(후위 증가 idx++)
-                ImageEntity.forBoard(imageDTO.getFileName(), imageDTO.getUrl(), board, order);
-                // 연관관계 편의 메서드 이용
+        if (!imageDTOS.isEmpty()) {
+            int idx = 0; // create 시 시작 인덱스 0
+            for (ImageDTO dto : imageDTOS) {
+                Integer order = (dto.getSortOrder() != null) ? dto.getSortOrder() : idx++;
+                // 편의 메서드가 양방향 세팅/컬렉션 add까지 해준다고 가정
+                ImageEntity.forBoard(dto.getFileName(), dto.getUrl(), saved, order);
             }
         }
 
-        BoardEntity saved = boardJpaRepository.save(board); //
+        // 5) (선택) 업로드된 파일들도 저장해서 이미지로 추가
+        if (files != null && !files.isEmpty()) {
+            int appendFrom = (saved.getImages() == null) ? 0 : saved.getImages().size();
+            saveImages(saved, files, appendFrom); // 기존 구현 재사용
+        }
 
-        // ★ 실제 저장된 이미지 엔티티 기준으로 응답 DTO 용 리스트 생성(정렬 포함)
+        // 6) 응답 DTO(정렬 포함)
         List<ImageDTO> imagesRes = Optional.ofNullable(saved.getImages()).orElse(List.of())
                 .stream()
                 .sorted(Comparator.comparing(img -> Optional.ofNullable(img.getSortOrder()).orElse(0)))
@@ -140,7 +194,6 @@ public class BoardServiceImpl implements BoardService {
                         .build())
                 .toList();
 
-        // ★ saved 기준으로 빌더 채우기
         return CreateBoardRes.builder()
                 .bno(saved.getBno())
                 .bTitle(saved.getBTitle())
@@ -148,16 +201,16 @@ public class BoardServiceImpl implements BoardService {
                 .bContent(saved.getBContent())
                 .bLikeCount(saved.getBLikeCount())
                 .images(imagesRes)
-                .createDate(saved.getCreateDate())   // BaseEntity에 있다면
-                .latestDate(saved.getLatestDate())   // BaseEntity에 있다면
+                .createDate(saved.getCreateDate())
+                .latestDate(saved.getLatestDate())
                 .build();
     }
 
     // ★ 추가 ==========================================================================
     @Override
     @Transactional
-    public CreateBoardRes create(CreateBoardReq req) {
-        return createBoard(req); // ✔ CreateBoardRes 그대로 리턴
+    public CreateBoardRes create(CreateBoardReq req, List<MultipartFile> files) {
+        return createBoard(req, files); // ✔ CreateBoardRes 그대로 리턴
     }
 
     //=================================================================================
@@ -259,37 +312,75 @@ public class BoardServiceImpl implements BoardService {
     //=================================================================================
     @Transactional
     @Override
-    public UpdateBoardRes updateBoard(UpdateBoardReq updateBoardReq) {
-        // 본인만 수정
+    public UpdateBoardRes updateBoard(
+            UpdateBoardReq req,
+            List<MultipartFile> addFiles,
+            List<Long> deleteUuids,
+            List<ImageOrderReq> orders
+    ) {
+        // 0) 로그인 + 본인 글 확인
         String memberId = requireLoginAndMember();
-
-        // 1. DB에서 기존 게시글 조회
-        BoardEntity boardEntity = boardJpaRepository.findById(updateBoardReq.getBno())
+        BoardEntity e = boardJpaRepository.findById(req.getBno())
                 .orElseThrow(() -> new RuntimeException("존재하지 않는 게시글 입니다."));
-
-        if (!memberId.equals(boardEntity.getBWriter())) {
+        if (!memberId.equals(e.getBWriter())) {
             throw new AccessDeniedException("본인 글만 수정할 수 있습니다.");
         }
 
-        // 2. 제목/내용 업데이트
-        if (updateBoardReq.getBTitle() != null) boardEntity.setBTitle(updateBoardReq.getBTitle());
-        if (updateBoardReq.getBContent() != null) boardEntity.setBContent(updateBoardReq.getBContent());
+        // 1) 본문 필드(널만 아닌 경우에만 갱신)
+        if (req.getBTitle() != null) e.setBTitle(req.getBTitle());
+        if (req.getBContent() != null) e.setBContent(req.getBContent());
+        if (req.getNoticeFlag() != null) e.setNoticeFlag(req.getNoticeFlag());
+        if (req.getIsSecret() != null) e.setIsSecret(req.getIsSecret());
 
-        // 3. 이미지 업데이트
-        if (updateBoardReq.getImages() != null) {
-            // 기존 이미지 삭제
-            boardEntity.getImages().clear();
+        // 2) 이미지 삭제
+        if (deleteUuids != null && !deleteUuids.isEmpty()) {
+            List<ImageEntity> toRemove = e.getImages().stream()
+                    .filter(img -> deleteUuids.contains(img.getUuid()))
+                    .toList();
+            toRemove.forEach(img -> {
+                // (선택) 실파일 삭제가 필요하면 구현해 두세요.
+                // deletePhysical(img.getUrl());
+                e.removeImage(img); // orphanRemoval=true 가 걸려 있어야 DB에서 삭제됨
+            });
+        }
 
-            // 새로운 이미지 추가 (attachToBoard 내부에서 양방향 처리)
-            for (var imgDTO : updateBoardReq.getImages()) {
-                ImageEntity.forBoard(imgDTO.getFileName(), imgDTO.getUrl(), boardEntity, imgDTO.getSortOrder());
+        // 3) 정렬 변경
+        if (orders != null && !orders.isEmpty()) {
+            Map<Long, Integer> orderMap = orders.stream()
+                    .collect(Collectors.toMap(ImageOrderReq::getUuid, ImageOrderReq::getSortOrder));
+            e.getImages().forEach(img -> {
+                Integer so = orderMap.get(img.getUuid());
+                if (so != null) img.setSortOrder(so);
+            });
+        }
+
+        // 4) 업로드된 새 파일 추가
+        if (addFiles != null && !addFiles.isEmpty()) {
+            int current = e.getImages().size();
+            // (선택) 개수 제한이 있다면 적용
+            if (current + addFiles.size() > MAX_FILES_PER_POST) {
+                throw new IllegalArgumentException("이미지는 최대 " + MAX_FILES_PER_POST + "개까지 업로드 가능합니다.");
+            }
+            saveImages(e, addFiles, current);  // 이미 BoardServiceImpl에 구현한 메서드 재사용
+        }
+
+        // 5) (선택) JSON으로 넘어온 URL 기반 이미지도 추가 지원
+        //    - req.getImages() 가 있다면 이어붙임(정렬번호 없으면 뒤에 순차 할당)
+        List<ImageDTO> incoming = Optional.ofNullable(req.getImages()).orElse(Collections.emptyList());
+        if (!incoming.isEmpty()) {
+            int idx = (e.getImages() == null) ? 0 : e.getImages().size();
+            for (ImageDTO dto : incoming) {
+                Integer order = (dto.getSortOrder() != null) ? dto.getSortOrder() : idx++;
+                ImageEntity.forBoard(dto.getFileName(), dto.getUrl(), e, order);
             }
         }
 
-        // DB에 즉시 반영
+        // 6) 즉시 반영(선택)
         boardJpaRepository.flush();
 
-        List<ImageDTO> imagesUpdate = Optional.ofNullable(boardEntity.getImages()).orElse(List.of()).stream()
+        // 7) 응답 DTO(정렬해서 반환)
+        List<ImageDTO> imagesUpdate = Optional.ofNullable(e.getImages()).orElse(List.of())
+                .stream()
                 .sorted(Comparator.comparing(img -> Optional.ofNullable(img.getSortOrder()).orElse(0)))
                 .map(img -> ImageDTO.builder()
                         .fileName(img.getFileName())
@@ -298,15 +389,14 @@ public class BoardServiceImpl implements BoardService {
                         .build())
                 .toList();
 
-        // JPA dirty checking
         return UpdateBoardRes.builder()
-                .bno(boardEntity.getBno())
-                .bTitle(boardEntity.getBTitle())
-                .bContent(boardEntity.getBContent())
-                .bLikeCount(boardEntity.getBLikeCount())
+                .bno(e.getBno())
+                .bTitle(e.getBTitle())
+                .bContent(e.getBContent())
+                .bLikeCount(e.getBLikeCount())
                 .images(imagesUpdate)
-                .createDate(boardEntity.getCreateDate())   // BaseEntity에 있다면
-                .latestDate(boardEntity.getLatestDate())   // BaseEntity에 있다면
+                .createDate(e.getCreateDate())
+                .latestDate(e.getLatestDate())
                 .build();
     }
 

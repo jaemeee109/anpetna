@@ -65,6 +65,7 @@ public class BoardEntity extends BaseEntity {
 
     @Builder.Default
     @OneToMany(mappedBy = "board", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("sortOrder ASC, uuid ASC") // 08.27 추가
     private List<ImageEntity> images = new ArrayList<>(); // 이미지
 
 

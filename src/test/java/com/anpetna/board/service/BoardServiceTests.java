@@ -1,4 +1,4 @@
-package com.anpetna.board;
+package com.anpetna.board.service;
 
 import com.anpetna.board.domain.BoardEntity;
 import com.anpetna.board.constant.BoardType;
@@ -11,21 +11,15 @@ import com.anpetna.board.dto.readOneBoard.ReadOneBoardRes;
 import com.anpetna.board.dto.updateBoard.UpdateBoardReq;
 import com.anpetna.board.dto.updateBoard.UpdateBoardRes;
 import com.anpetna.board.repository.BoardJpaRepository;
-import com.anpetna.board.service.BoardService;
+import com.anpetna.coreDomain.ImageEntity;
 import com.anpetna.coreDto.ImageDTO;
 import com.anpetna.coreDto.PageRequestDTO;
 import com.anpetna.coreDto.PageResponseDTO;
-import com.anpetna.member.constant.MemberRole;
-import com.anpetna.member.domain.MemberEntity;
-import com.anpetna.member.repository.MemberRepository;
 import lombok.extern.log4j.Log4j2;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.annotation.Rollback;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,44 +33,16 @@ import static org.junit.jupiter.api.Assertions.*;
 @Log4j2
 public class BoardServiceTests {
 
-/*
     @Autowired
     private BoardService boardService;
 
     @Autowired
     private BoardJpaRepository boardJpaRepository;
 
-    // 25.08.27 필드 추가
-    @Autowired
-    MemberRepository memberRepository;
-
-    @Autowired
-    PasswordEncoder passwordEncoder;
-
     private BoardEntity savedBoard;
 
-    // 25.08.27 추가 로그인 헬퍼
-    private void loginAs(String memberId) {
-        var auth = new UsernamePasswordAuthenticationToken(memberId, "N/A", java.util.List.of());
-        SecurityContextHolder.getContext().setAuthentication(auth);
-    }
-
-    @BeforeEach
-        //테스트용
+   @BeforeEach //테스트용
     void setUp() {
-        // 테스트용 회원 보장 후 로그인 25.08.27 추가
-        if (!memberRepository.existsById("admin")) {
-            memberRepository.save(
-                    MemberEntity.builder()
-                            .memberId("admin")
-                            .memberPw(passwordEncoder.encode("pw"))
-                            .memberName("admin")
-                            .memberRole(MemberRole.USER)
-                            .build()
-            );
-        }
-        loginAs("admin");
-
         // 게시글 + 이미지 생성
         List<ImageDTO> imageList = List.of(
                 ImageDTO.builder().fileName("img1.png").url("http://example.com/img1.png").sortOrder(1).build(),
@@ -93,10 +59,9 @@ public class BoardServiceTests {
                 .images(imageList)
                 .build();
 
-        // 변경: files 파라미터 추가 + 평탄화된 응답 사용 25.08.27 추가
-        CreateBoardRes created = boardService.createBoard(req, null); // ← 여기
-        savedBoard = boardJpaRepository.findById(created.getBno()).orElseThrow();
+        savedBoard = boardService.createBoard(req).getCreateBoard();
 
+        // 초기 조회수 0으로 세팅
         savedBoard.setBViewCount(0);
         boardJpaRepository.flush();
     }
@@ -118,12 +83,12 @@ public class BoardServiceTests {
                 .images(imageList)
                 .build();
 
-        // 변경: files 파라미터 추가 + 평탄화 응답 사용 25.08.27 밑에 내용 수정
-        CreateBoardRes res = boardService.createBoard(req, null); // ← 여기
+        CreateBoardRes res = boardService.createBoard(req);
+        BoardEntity created = res.getCreateBoard();
 
-        assertNotNull(res.getBno());
-        assertEquals("게시글 생성 테스트", res.getBTitle());
-        assertEquals(2, res.getImages().size());
+        assertNotNull(created.getBno());
+        assertEquals("게시글 생성 테스트", created.getBTitle());
+        assertEquals(2, created.getImages().size());
     }
 
     @Test
@@ -196,16 +161,13 @@ public class BoardServiceTests {
                 .images(updatedImages)
                 .build();
 
-        // 변경: 추가 파라미터 null 로 전달 25.08.27 추가
-        UpdateBoardRes updateRes = boardService.updateBoard(updateReq, null, null, null); // ← 여기
+        UpdateBoardRes updateRes = boardService.updateBoard(updateReq);
+        BoardEntity updated = updateRes.getUpdateBoard();
 
-        /*UpdateBoardRes updateRes = boardService.updateBoard(updateReq);
-        BoardEntity updated = updateRes.getUpdateBoard();*/
-
-        assertEquals("수정 제목", updateRes.getBTitle());
-        assertEquals("수정 내용", updateRes.getBContent());
-        assertEquals(1, updateRes.getImages().size());
-        assertEquals("img3.png", updateRes.getImages().get(0).getFileName());
+        assertEquals("수정 제목", updated.getBTitle());
+        assertEquals("수정 내용", updated.getBContent());
+        assertEquals(1, updated.getImages().size());
+        assertEquals("img3.png", updated.getImages().get(0).getFileName());
     }
 
     @Test
@@ -219,14 +181,11 @@ public class BoardServiceTests {
 
         int beforeLike = board.getBLikeCount() != null ? board.getBLikeCount() : 0;
 
-        // 25.08.27 추가
+        // 좋아요
         UpdateBoardRes res = boardService.likeBoard(existingBno);
+        BoardEntity likedBoard = res.getUpdateBoard();
 
-        /*// 좋아요
-        UpdateBoardRes res = boardService.likeBoard(existingBno);
-        BoardEntity likedBoard = res.getUpdateBoard();*/
-
-        assertEquals(beforeLike + 1, res.getBLikeCount());
+        assertEquals(beforeLike + 1, likedBoard.getBLikeCount());
     }
 
     @Test
@@ -238,6 +197,5 @@ public class BoardServiceTests {
 
         assertFalse(boardJpaRepository.findById(existingBno).isPresent());
     }
-*/
 
 }
