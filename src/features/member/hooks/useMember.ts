@@ -8,8 +8,9 @@ import type {
 } from '../data/member.types';
 import {
   listMembers, readMemberOne, modifyMember,
-  signup as apiSignup, login as apiLogin, removeMember, AuthStore,
+  signup as apiSignup, login as apiLogin, removeMember,
 } from '../data/member.api';
+import { AuthStore } from '../data/session'; // ✅ AuthStore는 session.ts에서 import
 
 export function useMemberList() {
   const [data, setData] = useState<ReadMemberAllRes>([]);

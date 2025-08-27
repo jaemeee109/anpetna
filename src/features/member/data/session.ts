@@ -1,44 +1,74 @@
 // features/member/data/session.ts
-export async function serverLogout() {
-  try {
-    const base =
-      (process.env.NEXT_PUBLIC_API_BASE as string | undefined) ||
-      (typeof window !== "undefined"
-        ? `${location.protocol}//${location.hostname}${
-            location.port ? `:${location.port === "3000" ? "8000" : location.port}` : ""
-          }`
-        : "");
-    const prefix = (process.env.NEXT_PUBLIC_API_PREFIX as string | undefined) ?? "/anpetna";
-    const url = `${base}${prefix}/jwt/logout`;
+// 클라이언트 전용 유틸이지만, 'use client'는 필요 없습니다.
+// (window 접근 전 안전 가드만 해주면 됨)
 
-    await fetch(url, {
-      method: "POST",
-      credentials: "include", // 서버가 쿠키/리프레시토큰으로 식별 → include 필요
-      headers: { "Content-Type": "application/json" },
-    });
-  } catch {
-    // 서버 통보 실패해도 클라 정리는 계속 진행
-  }
+type TokenPair = {
+  accessToken?: string | null;
+  refreshToken?: string | null;
+};
+
+function hasWindow() {
+  return typeof window !== 'undefined';
 }
 
-function deleteCookieEverywhere(name: string) {
-  if (typeof document === "undefined") return;
-  const host = location.hostname;
-  const domains = [undefined, host, `.${host}`];
-  const paths = ["/", "/anpetna"]; // 서버가 Path=/anpetna 로 설정했을 가능성 대비
-  for (const d of domains) {
-    for (const p of paths) {
-      document.cookie =
-        `${encodeURIComponent(name)}=; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0; Path=${p}` +
-        (d ? `; Domain=${d}` : "");
-    }
-  }
-}
+const KEY_ACCESS = 'accessToken';
+const KEY_REFRESH = 'refreshToken';
+const KEY_MEMBER = 'memberId';
 
-export function purgeAuthArtifacts() {
-  try {
-    localStorage.removeItem("accessToken");
-  } catch {}
-  // 서버/환경에 따라 이름이 다를 수 있으므로 후보 전부 제거
-  ["accessToken", "refreshToken", "JSESSIONID", "Authorization", "AUTH"].forEach(deleteCookieEverywhere);
-}
+export const AuthStore = {
+  /** 로그인 여부 */
+  isLoggedIn(): boolean {
+    if (!hasWindow()) return false;
+    return !!(localStorage.getItem(KEY_ACCESS) || localStorage.getItem(KEY_MEMBER));
+  },
+
+  /** memberId 읽기 */
+  memberId(): string | null {
+    if (!hasWindow()) return null;
+    return localStorage.getItem(KEY_MEMBER);
+  },
+
+  /** memberId 저장 */
+  setMemberId(id: string) {
+    if (!hasWindow()) return;
+    localStorage.setItem(KEY_MEMBER, id);
+  },
+
+  /** 토큰 저장 */
+  setTokens(tokens: TokenPair) {
+    if (!hasWindow()) return;
+    const { accessToken, refreshToken } = tokens;
+    if (accessToken != null) localStorage.setItem(KEY_ACCESS, accessToken);
+    if (refreshToken != null) localStorage.setItem(KEY_REFRESH, refreshToken);
+  },
+
+  /** 토큰/아이디 제거 + 쿠키 정리(가능한 범위) */
+  clear() {
+    if (!hasWindow()) return;
+
+    try {
+      localStorage.removeItem(KEY_ACCESS);
+      localStorage.removeItem(KEY_REFRESH);
+      localStorage.removeItem(KEY_MEMBER);
+    } catch {}
+
+    // 서버가 쿠키를 쓸 경우를 대비한 최소 정리(도메인/경로 조합별로 시도)
+    try {
+      const domains = ['', window.location.hostname];
+      const paths = ['/', '/anpetna', '/member', '/jwt'];
+      const cookieNames = ['accessToken', 'refreshToken', 'JSESSIONID', 'SESSION', 'Authorization'];
+
+      const past = 'Thu, 01 Jan 1970 00:00:00 GMT';
+      for (const name of cookieNames) {
+        for (const d of domains) {
+          for (const p of paths) {
+            document.cookie =
+              `${name}=; Expires=${past}; Path=${p};` +
+              (d ? ` Domain=${d};` : '') +
+              ' SameSite=Lax;';
+          }
+        }
+      }
+    } catch {}
+  },
+};
