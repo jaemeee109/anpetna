@@ -15,12 +15,9 @@ import com.anpetna.item.dto.searchOneItem.SearchOneItemRes;
 import com.anpetna.item.service.ItemService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
-import org.springframework.http.HttpStatus;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/items")
@@ -35,21 +32,21 @@ public class ItemController {
     //  컨트롤러나 서비스 메서드 실행 전에 SpEL(Security Expression Language)로 권한 검증
     public ResponseEntity<RegisterItemRes> registerItem(@RequestBody RegisterItemReq registerItemReq) {
         var postResult = itemService.registerItem(registerItemReq);
-        return new ResponseEntity<>(postResult, HttpStatus.OK);
+        return ResponseEntity.ok(postResult);
     }
 
     @PutMapping
     //@PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ModifyItemRes> updateItem(@RequestBody ModifyItemReq modifyItemReq) {
         var putResult = itemService.modifyItem(modifyItemReq);
-        return new ResponseEntity<>(putResult, HttpStatus.OK);
+        return ResponseEntity.ok(putResult);
     }
 
     @DeleteMapping
     //@PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<DeleteItemRes> deleteItem(@RequestBody DeleteItemReq deleteItemReq) {
         var deleteResult = itemService.deleteItem(deleteItemReq);
-        return new ResponseEntity<>(deleteResult, HttpStatus.OK);
+        return ResponseEntity.ok(deleteResult);
     }
 
 
@@ -57,14 +54,14 @@ public class ItemController {
     //@PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
     public ResponseEntity<SearchOneItemRes> searchOneItem(@RequestBody SearchOneItemReq req) {
         var getOneResult = itemService.getOneItem(req);
-        return new ResponseEntity<>(getOneResult, HttpStatus.OK);
+        return ResponseEntity.ok(getOneResult);
     }
 
     @GetMapping("/{sortItem}")
    // @PreAuthorize("hasAnyRole('USER','ADMIN')")
-    public ResponseEntity<List<ItemDTO>> searchAllItems(@RequestBody SearchAllItemsReq req) {
-        var getAllResult = itemService.getAllItems(req);
-        return new ResponseEntity<>(getAllResult, HttpStatus.OK);
+    public ResponseEntity<Page<ItemDTO>> searchAllItems(@RequestBody SearchAllItemsReq req) {
+        var getAllResult = itemService.searchItems(req);
+        return ResponseEntity.ok(getAllResult);
     }
 
     //  @PreAuthorize("#id == principal.id")            // 요청 파라미터 id와 로그인 사용자 id 같을 때만 허용

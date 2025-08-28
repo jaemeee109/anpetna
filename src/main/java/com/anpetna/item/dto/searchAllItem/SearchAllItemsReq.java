@@ -2,28 +2,30 @@ package com.anpetna.item.dto.searchAllItem;
 
 import com.anpetna.item.constant.ItemCategory;
 import com.anpetna.item.constant.ItemSellStatus;
+import groovyjarjarantlr4.v4.runtime.misc.NotNull;
 import lombok.Builder;
 import lombok.Getter;
 import org.hibernate.query.SortDirection;
 import org.springframework.data.domain.Sort;
 
 import java.time.LocalDate;
+import org.springframework.data.domain.Sort;
 
+import java.time.LocalDate;
+
+@Builder
 @Builder
 @Getter
 public class SearchAllItemsReq {
 
     //  정렬용 필드
-    private ItemCategory sortByCategory; // 상품 카테고리
+    @Builder.Default
+    private ItemCategory itemCategory = ItemCategory.ALL; // 상품 카테고리
+    // 상품 판매상태 (판매중은 앞에, 품절은 뒤에)
 
-    //  ============================
-    private LocalDate createDate;
-
+    //  정렬 옵셩
     private Sort.Direction orderByDate; // 최신순 / 오래된 순
-
-    private ItemSellStatus saleStatus; // 상품 판매상태
-
-    private Sort.Direction orderByPriceDir; // 가격순
+    private Sort.Direction orderByPrice; // 가격순
 
 
     //  Pagenation
@@ -32,8 +34,5 @@ public class SearchAllItemsReq {
 
     @Builder.Default
     private int size = 20;  // 페이지 크기
-
-    @Builder.Default
-    private Sort.Direction sort = Sort.Direction.DESC; // 페이지 정렬
 
 }
