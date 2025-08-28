@@ -71,6 +71,7 @@ public class ItemServiceImpl implements ItemService {
 
      @Override
     public List<ItemDTO> getAllItems(SearchAllItemsReq req) {
+/*
         List<ItemEntity> found = null;
         //  사용자는 셋 중 하나를 선택하고 DTO에는 값이 하나만 지정된다.
         if (req.getSortByCategory() != null){
@@ -84,7 +85,8 @@ public class ItemServiceImpl implements ItemService {
         found.forEach(itemEntity -> {
              res.add(itemMapper.rItemMapRes().map(itemEntity));
          });
-
         return res;
-    }
+     }*/
+         return null;
+     }
 }
