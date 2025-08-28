@@ -14,7 +14,6 @@ import org.springframework.data.domain.Sort;
 import java.time.LocalDate;
 
 @Builder
-@Builder
 @Getter
 public class SearchAllItemsReq {
 
