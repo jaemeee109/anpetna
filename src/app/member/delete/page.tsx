@@ -89,29 +89,34 @@ export default function DeleteAccountPage() {
       setErr(null);
       setOk(null);
 
-      // 백엔드가 확정되기 전까지 다중 후보 경로/메서드 순차 시도
+      // ✅ 백엔드 정리가 완료되면 첫 번째만 남기는 걸 추천!
       const body = { memberId, memberPw: password };
-      const candidates: { url: string; method: 'DELETE'|'POST'; withBody: boolean }[] = [
-        { url: apiURL(`/member/delete/${encodeURIComponent(memberId)}`), method: 'DELETE', withBody: false },
-        { url: apiURL(`/member/delete`), method: 'DELETE', withBody: true },
-        { url: apiURL(`/member/withdraw/${encodeURIComponent(memberId)}`), method: 'DELETE', withBody: false },
-        { url: apiURL(`/member/withdraw`), method: 'POST', withBody: true },
+      const candidates: { url: string; method: 'DELETE'|'POST'|'GET'; withBody: boolean }[] = [
+        // 권장 표준
+        { url: apiURL(`/member/remove`), method: 'DELETE', withBody: false },
+        // 비밀번호 확인이 필요한 서버라면
         { url: apiURL(`/member/remove`), method: 'POST', withBody: true },
+        // 레거시 호환 (현재 서버가 제공 중인 경우)
+        { url: apiURL(`/member/delete`), method: 'GET', withBody: false },
       ];
 
       let success = false;
       let last = '';
+
       for (const c of candidates) {
-        const resp = await fetch(c.url, {
+        const init: RequestInit = {
           method: c.method,
           credentials: 'include',
-          headers: authHeaders({ 'Content-Type': 'application/json' }),
-          body: c.withBody ? JSON.stringify(body) : undefined,
-        });
+          headers: authHeaders(c.withBody ? { 'Content-Type': 'application/json' } : {}),
+          ...(c.withBody ? { body: JSON.stringify(body) } : {}),
+        };
+
+        const resp = await fetch(c.url, init);
         if (resp.ok) { success = true; break; }
+
         const t = await parseJsonSafe(resp);
         last = `HTTP ${resp.status} ${typeof t?.raw === 'string' ? t.raw : JSON.stringify(t)}`;
-        if (resp.status === 401) break; // 인증 안 됨 → 반복 무의미
+        if (resp.status === 401) break; // 인증 실패면 반복 의미 없음
       }
 
       if (!success) throw new Error(`회원 탈퇴 실패\n${last}`);
@@ -154,13 +159,13 @@ export default function DeleteAccountPage() {
         · 회원 탈퇴는 영구적이며 되돌릴 수 없습니다.<br />
         · 고객 정보 및 개인형 서비스 이용 기록은 개인정보처리방침 기준에 따라 삭제됩니다.
       </p>
- <div className="row">
-          <label className="flex items-center gap-2 justify-center">
-            <input type="checkbox" className="checkbox" checked={agree} onChange={(e)=>setAgree(e.target.checked)} />
-            <span className="text-xs text-gray-500">안내 사항을 모두 확인하였으며, 이에 동의합니다.</span>
-          </label>
-        </div>
-        <br></br>
+      <div className="row">
+        <label className="flex items-center gap-2 justify-center">
+          <input type="checkbox" className="checkbox" checked={agree} onChange={(e)=>setAgree(e.target.checked)} />
+          <span className="text-xs text-gray-500">안내 사항을 모두 확인하였으며, 이에 동의합니다.</span>
+        </label>
+      </div>
+      <br></br>
       <div className="h-3" />
       <hr className="border-gray-200" />
       <div className="h-4" />
@@ -174,12 +179,10 @@ export default function DeleteAccountPage() {
           <input className="input" type="password" value={password} onChange={(e)=>setPassword(e.target.value)} />
         </Row>
 
-       
-
         <div className="h-2" />
         <hr className="border-gray-100" />
         <div className="h-4" />
-<br></br>
+        <br></br>
         <div className="flex items-center justify-center gap-3">
           <button className="btn-3d btn-white text-black min-w-[120px]" disabled={!canSubmit}>
             {submitting ? '처리 중…' : '회원탈퇴'}
@@ -188,13 +191,12 @@ export default function DeleteAccountPage() {
             취소
           </button>
         </div>
-    
 
         {err && <p className="text-red-600 text-xs text-center mt-10 whitespace-pre-wrap break-words">{err}</p>}
         {ok && <p className="text-green-600 text-xs text-center mt-10">{ok}</p>}
-            <br></br>
         <br></br>
-            <br></br>
+        <br></br>
+        <br></br>
         <br></br>
       </form>
 

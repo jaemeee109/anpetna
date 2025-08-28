@@ -29,7 +29,7 @@ function getCookie(name: string) {
 
 function hasToken(): boolean {
   if (typeof window === 'undefined') return false;
-  const ls = localStorage.getItem('accessToken');
+  const ls = localStorage.getItem('accessToken') || localStorage.getItem('memberId');
   const ck = getCookie('accessToken') || getCookie('JSESSIONID');
   return !!(ls || ck);
 }
@@ -56,14 +56,13 @@ export default function Header() {
     setAuthed(hasToken());
   }, []);
 
-  // ❗같은 탭에서 로그인/로그아웃 시 갱신을 위해 커스텀 이벤트 수신
+  // 같은 탭/다른 탭에서 로그인 상태가 바뀌면 반영
   useEffect(() => {
     const onAuthChanged = () => setAuthed(hasToken());
     window.addEventListener('auth-changed', onAuthChanged);
 
-    // 다른 탭에서 토큰이 바뀌면 storage 이벤트로 갱신
     const onStorage = (e: StorageEvent) => {
-      if (e.key === 'accessToken') setAuthed(hasToken());
+      if (e.key === 'accessToken' || e.key === 'memberId') setAuthed(hasToken());
     };
     window.addEventListener('storage', onStorage);
 
@@ -73,14 +72,14 @@ export default function Header() {
     };
   }, []);
 
-  // 라우트 이동 시에도 한 번 더 동기화(새로고침 없이 상태 변할 수 있으니)
+  // 라우트 이동 시 한 번 더 동기화
   useEffect(() => {
     setAuthed(hasToken());
   }, [pathname]);
 
- const handleLogout = async () => {
-   await serverLogout();
-   purgeAuthArtifacts();
+  const handleLogout = async () => {
+    await serverLogout();
+    purgeAuthArtifacts();
     window.dispatchEvent(new Event('auth-changed'));
     setMyOpen(false);
     router.replace('/');
@@ -106,7 +105,7 @@ export default function Header() {
             </>
           ) : (
             <>
-              {/* ▼ MYPAGE 드롭박스 (페이지 이동 없음) */}
+              {/* ▼ MYPAGE 드롭박스 */}
               <div
                 className="dropdown"
                 ref={myRef}
@@ -157,7 +156,7 @@ export default function Header() {
         </Link>
       </div>
 
-      {/* 네비게이션 (알약 버튼) */}
+      {/* 네비게이션 */}
       <nav className="container apn-nav">
         <NavLink href="/board/NOTICE">NOTICE</NavLink>
         <NavLink href="/items">STORE</NavLink>
@@ -178,17 +177,12 @@ export default function Header() {
             HELP
           </button>
           <div className="dropdown-menu" role="menu" aria-label="Help submenu">
-            <Link href="/board/FAQ" className="dropdown-item" role="menuitem">
-              FAQ
-            </Link>
-            <Link href="/board/QNA" className="dropdown-item" role="menuitem">
-              Q&A
-            </Link>
+            <Link href="/board/FAQ" className="dropdown-item" role="menuitem">FAQ</Link>
+            <Link href="/board/QNA" className="dropdown-item" role="menuitem">Q&A</Link>
           </div>
         </div>
       </nav>
 
-      {/* 얇은 가로선 */}
       <div className="apn-divider" />
     </header>
   );

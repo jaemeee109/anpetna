@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-
+import PawIcon from '@/components/icons/Paw';
 type GM = '양력' | '음력';
 type YesNo = 'Y' | 'N';
 
@@ -28,8 +28,14 @@ export default function MemberInfoPage() {
     const now = new Date().getFullYear();
     return Array.from({ length: 100 }, (_, i) => String(now - i));
   }, []);
-  const months = useMemo(() => Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0')), []);
-  const days = useMemo(() => Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, '0')), []);
+  const months = useMemo(
+    () => Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0')),
+    []
+  );
+  const days = useMemo(
+    () => Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, '0')),
+    []
+  );
 
   const [form, setForm] = useState<MemberForm>({
     memberId: '',
@@ -45,42 +51,56 @@ export default function MemberInfoPage() {
     memberDetailAddress: '',
     memberHasPet: 'N',
   });
-  const set = <K extends keyof MemberForm,>(k: K, v: MemberForm[K]) => setForm((f) => ({ ...f, [k]: v }));
+  const set = <K extends keyof MemberForm>(k: K, v: MemberForm[K]) =>
+    setForm((f) => ({ ...f, [k]: v }));
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
 
-  const BASE = (process.env.NEXT_PUBLIC_API_BASE as string | undefined) ||
+  // -------- API URL --------
+  const BASE =
+    (process.env.NEXT_PUBLIC_API_BASE as string | undefined) ||
     (typeof window !== 'undefined'
-      ? `${window.location.protocol}//${window.location.hostname}${window.location.port ? `:${window.location.port === '3000' ? '8000' : window.location.port}` : ''}`.replace(/:$/, '')
+      ? `${window.location.protocol}//${window.location.hostname}${
+          window.location.port
+            ? `:${window.location.port === '3000' ? '8000' : window.location.port}`
+            : ''
+        }`.replace(/:$/, '')
       : '');
-
   function api(path: string) {
     const prefix = (process.env.NEXT_PUBLIC_API_PREFIX as string | undefined) ?? '/anpetna';
     const normalized = path.startsWith('/') ? path : `/${path}`;
     return new URL(`${prefix}${normalized}`, BASE).toString();
   }
 
-  const nz = (v: any, dflt = '') => (String(v ?? '').trim() || dflt);
-
+  // -------- Auth --------
   function getCookie(name: string) {
     if (typeof document === 'undefined') return null;
     const safe = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const m = document.cookie.match(new RegExp('(?:^|; )' + safe + '=([^;]*)'));
     return m ? decodeURIComponent(m[1]) : null;
   }
-  function hasToken(): boolean {
-    if (typeof window === 'undefined') return false;
-    const ls = localStorage.getItem('accessToken');
-    const ck = getCookie('accessToken') || getCookie('JSESSIONID');
-    return !!(ls || ck);
-  }
-  function getAccessToken() {
+
+  // 토큰을 LS/쿠키 여러 키에서 탐색
+  function getAccessToken(): string | null {
     if (typeof window === 'undefined') return null;
-    return localStorage.getItem('accessToken');
+    const ls = localStorage;
+    let raw =
+      ls.getItem('accessToken') ||
+      ls.getItem('access_token') ||
+      ls.getItem('token') ||
+      ls.getItem('jwt') ||
+      ls.getItem('Authorization') ||
+      getCookie('Authorization') ||
+      getCookie('accessToken') ||
+      null;
+    if (!raw) return null;
+    raw = raw.trim();
+    return raw.startsWith('Bearer ') ? raw.slice(7).trim() : raw;
   }
+
   function authHeaders(base: Record<string, string> = {}) {
     const token = getAccessToken();
     const h: Record<string, string> = { ...base };
@@ -88,75 +108,135 @@ export default function MemberInfoPage() {
     return h;
   }
 
+  // JWT payload 디코딩(멤버 아이디 추출용)
+  function decodeJwtPayload(token?: string | null): any | null {
+    if (!token) return null;
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    try {
+      const json = atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'));
+      return JSON.parse(json);
+    } catch {
+      return null;
+    }
+  }
+
+  const nz = (v: any, dflt = '') => String(v ?? '').trim() || dflt;
+
+  // -------- 내 정보 로드: 토큰/LS에서 id → /member/my_page/{id} 먼저 --------
   useEffect(() => {
     let mounted = true;
-    if (!hasToken()) {
-      router.replace('/member/login');
-      return;
-    }
+
     (async () => {
       setLoading(true);
       setErr(null);
       setOk(null);
+
       try {
-        setLoading(true);
-        setErr(null);
-        setOk(null);
-
-        // 1) memberId 추론 로직 강화 (쿼리 → LS → 쿠키 → JWT)
-        const search = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
-        const qId = search?.get('memberId') || '';
         const ls = typeof window !== 'undefined' ? window.localStorage : null;
+        const token = getAccessToken();
+        const payload = decodeJwtPayload(token);
+        const idFromToken = payload?.memberId || payload?.username || payload?.sub || '';
+        const idFromLs =
+          ls?.getItem('memberId') || ls?.getItem('loginId') || ls?.getItem('username') || '';
 
-        function decodeJwtPayload(token?: string | null): any | null {
-          if (!token) return null;
-          const parts = token.split('.');
-          if (parts.length !== 3) return null;
-          try {
-            const json = atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'));
-            return JSON.parse(json);
-          } catch { return null; }
+        let myId = idFromToken || idFromLs;
+
+        // 1) 먼저 id가 있으면 바로 상세 조회
+        if (myId) {
+          const infoRes = await fetch(api(`/member/my_page/${encodeURIComponent(myId)}`), {
+            method: 'GET',
+            credentials: 'include',
+            headers: authHeaders(),
+          });
+
+          if (infoRes.ok) {
+            const data = await infoRes.json().catch(() => ({} as any));
+            const src =
+              data?.result?.readMemberOne ||
+              data?.result?.readOneMember ||
+              data?.result?.member ||
+              data?.result ||
+              data;
+
+            if (mounted) {
+              setForm({
+                memberId: nz(src.memberId || src.id),
+                memberPw: '',
+                memberName: nz(src.memberName || src.name),
+                memberBirthY: nz(src.memberBirthY || src.birthY),
+                memberBirthM: nz(src.memberBirthM || src.birthM).padStart(2, '0'),
+                memberBirthD: nz(src.memberBirthD || src.birthD).padStart(2, '0'),
+                memberBirthGM: ((src.memberBirthGM || src.birthGM || src.solarLunar) === '음력'
+                  ? '음력'
+                  : '양력') as GM,
+                memberEmail: nz(src.memberEmail || src.email),
+                memberZipCode: nz(src.memberZipCode || src.zipCode),
+                memberRoadAddress: nz(src.memberRoadAddress || src.roadAddress),
+                memberDetailAddress: nz(src.memberDetailAddress || src.detailAddress),
+                memberHasPet: ((src.memberHasPet || src.hasPet) === 'Y' ? 'Y' : 'N') as YesNo,
+              });
+            }
+            return; // 상세 조회 성공했으면 끝
+          }
         }
-        const jwtPayload = decodeJwtPayload(getAccessToken());
 
-        const memberId = qId
-          || ls?.getItem('memberId')
-          || ls?.getItem('loginId')
-          || ls?.getItem('username')
-          || getCookie('memberId')
-          || jwtPayload?.memberId || jwtPayload?.username || jwtPayload?.sub || '';
+        // 2) 토큰/LS에서 못 얻었거나 실패하면 /member/me로 보조 조회
+        const meRes = await fetch(api('/member/me'), {
+          method: 'GET',
+          credentials: 'include',
+          headers: authHeaders(),
+        });
 
-        if (!memberId) throw new Error('로그인 ID를 찾을 수 없습니다. (URL ?memberId=, localStorage.memberId/loginId/username, cookie.memberId 또는 JWT 클레임 필요)');
-
-        const url = api(`/member/my_page/${encodeURIComponent(memberId)}`);
-        const resp = await fetch(url, { credentials: 'include', headers: authHeaders() });
-        if (!resp.ok) {
-          const body = await resp.text().catch(()=>'');
-          throw new Error(`내 정보 조회 실패 (HTTP ${resp.status})
-${body}`);
+        if (!meRes.ok) {
+          // me가 401/403이어도 my_page로 이미 시도했으니 여기서 최종 로그인 이동
+          router.replace('/member/login');
+          return;
         }
-        const data = await resp.json().catch(() => ({} as any));
-        // ApiResult 래핑 및 다양한 키 대응
-        const src = data?.result?.readMemberOne
-          || data?.result?.readOneMember
-          || data?.result?.member
-          || data?.result
-          || data;
+
+        const meJson = await meRes.json().catch(() => ({} as any));
+        myId = meJson?.result || meJson?.memberId || meJson?.id;
+        if (!myId) {
+          router.replace('/member/login');
+          return;
+        }
+
+        // 3) me에서 얻은 id로 상세 조회
+        const infoRes2 = await fetch(api(`/member/my_page/${encodeURIComponent(myId)}`), {
+          method: 'GET',
+          credentials: 'include',
+          headers: authHeaders(),
+        });
+
+        if (!infoRes2.ok) {
+          router.replace('/member/login');
+          return;
+        }
+
+        const data2 = await infoRes2.json().catch(() => ({} as any));
+        const src2 =
+          data2?.result?.readMemberOne ||
+          data2?.result?.readOneMember ||
+          data2?.result?.member ||
+          data2?.result ||
+          data2;
 
         if (mounted) {
           setForm({
-            memberId: nz(src.memberId || src.id),
+            memberId: nz(src2.memberId || src2.id),
             memberPw: '',
-            memberName: nz(src.memberName || src.name),
-            memberBirthY: nz(src.memberBirthY || src.birthY),
-            memberBirthM: nz(src.memberBirthM || src.birthM).padStart(2, '0'),
-            memberBirthD: nz(src.memberBirthD || src.birthD).padStart(2, '0'),
-            memberBirthGM: ((src.memberBirthGM || src.birthGM || src.solarLunar) === '음력' ? '음력' : '양력') as GM,
-            memberEmail: nz(src.memberEmail || src.email),
-            memberZipCode: nz(src.memberZipCode || src.zipCode),
-            memberRoadAddress: nz(src.memberRoadAddress || src.roadAddress),
-            memberDetailAddress: nz(src.memberDetailAddress || src.detailAddress),
-            memberHasPet: ((src.memberHasPet || src.hasPet) === 'Y' ? 'Y' : 'N') as YesNo,
+            memberName: nz(src2.memberName || src2.name),
+            memberBirthY: nz(src2.memberBirthY || src2.birthY),
+            memberBirthM: nz(src2.memberBirthM || src2.birthM).padStart(2, '0'),
+            memberBirthD: nz(src2.memberBirthD || src2.birthD).padStart(2, '0'),
+            memberBirthGM: ((src2.memberBirthGM || src2.birthGM || src2.solarLunar) === '음력'
+              ? '음력'
+              : '양력') as GM,
+            memberEmail: nz(src2.memberEmail || src2.email),
+            memberZipCode: nz(src2.memberZipCode || src2.zipCode),
+            memberRoadAddress: nz(src2.memberRoadAddress || src2.roadAddress),
+            memberDetailAddress: nz(src2.memberDetailAddress || src2.detailAddress),
+            memberHasPet: ((src2.memberHasPet || src2.hasPet) === 'Y' ? 'Y' : 'N') as YesNo,
           });
         }
       } catch (e: any) {
@@ -165,26 +245,36 @@ ${body}`);
         if (mounted) setLoading(false);
       }
     })();
-    return () => { mounted = false; };
+
+    return () => {
+      mounted = false;
+    };
   }, [router]);
 
+  // -------- 저장 --------
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (submitting || loading) return;
     setErr(null);
     setOk(null);
+
     try {
       setSubmitting(true);
-      const flat = { ...form, memberPw: nz(form.memberPw) };
-      const bodyJSON = JSON.stringify(flat);
-      const url = api('/member/update');
-      const resp = await fetch(url, {
-        method: 'PUT',
+      const flat = { ...form, memberPw: (form.memberPw ?? '').trim() };
+
+      const resp = await fetch(api('/member/modify'), {
+        method: 'POST',
         credentials: 'include',
         headers: authHeaders({ 'Content-Type': 'application/json' }),
-        body: bodyJSON,
+        body: JSON.stringify(flat),
       });
+
+      if (resp.status === 401 || resp.status === 403) {
+        router.replace('/member/login');
+        return;
+      }
       if (!resp.ok) throw new Error(`회원 정보 수정 실패 (HTTP ${resp.status})`);
+
       setOk('수정이 완료되었습니다.');
       set('memberPw', '');
     } catch (e: any) {
@@ -194,16 +284,29 @@ ${body}`);
     }
   }
 
-  if (loading) return <main className="mx-auto max-w-[720px] px-4 py-12 text-center"><p>내 정보를 불러오는 중…</p></main>;
+  if (loading)
+    return (
+      <main className="mx-auto max-w-[720px] px-4 py-12 text-center">
+        <p>내 정보를 불러오는 중…</p>
+      </main>
+    );
 
   return (
     <main className="mx-auto max-w-[720px] px-4 py-8 text-center">
-      <h1 className="text-2xl font-semibold mb-6">My Information</h1>
+      <h1 className="text-2xl font-semibold mb-6">My Information&nbsp;<PawIcon/></h1>
       <hr className="border-gray-200 mb-8" />
 
       <form onSubmit={onSubmit}>
         <Row label="ID"><input className="input" value={form.memberId} disabled /></Row>
-        <Row label="PASSWORD"><input className="input" type="password" placeholder="변경 시 입력" value={form.memberPw} onChange={(e) => set('memberPw', e.target.value)} /></Row>
+        <Row label="PASSWORD">
+          <input
+            className="input"
+            type="password"
+            placeholder="비밀번호 변경"
+            value={form.memberPw}
+            onChange={(e) => set('memberPw', e.target.value)}
+          />
+        </Row>
         <Row label="NAME"><input className="input" value={form.memberName} disabled /></Row>
 
         <Row label="Birthday">
@@ -219,20 +322,34 @@ ${body}`);
             <option value="">DAY</option>
             {days.map((d) => <option key={d}>{d}</option>)}
           </select>
-          <label className="ml-3"><input type="radio" checked={form.memberBirthGM==='양력'} onChange={() => set('memberBirthGM','양력')} /> Solar</label>
-          <label className="ml-2"><input type="radio" checked={form.memberBirthGM==='음력'} onChange={() => set('memberBirthGM','음력')} /> Lunar</label>
+          <label className="ml-3">
+            <input type="radio" checked={form.memberBirthGM === '양력'} onChange={() => set('memberBirthGM', '양력')} /> Solar
+          </label>
+          <label className="ml-2">
+            <input type="radio" checked={form.memberBirthGM === '음력'} onChange={() => set('memberBirthGM', '음력')} /> Lunar
+          </label>
         </Row>
 
-        <Row label="E-mail"><input className="input" value={form.memberEmail} onChange={(e) => set('memberEmail', e.target.value)} /></Row>
-        <Row label="ZipCode"><input className="input input--xs" value={form.memberZipCode} onChange={(e) => set('memberZipCode', e.target.value)} /></Row>
-        <Row label="RoadAddress"><input className="input input--lgw" value={form.memberRoadAddress} onChange={(e) => set('memberRoadAddress', e.target.value)} /></Row>
-        <Row label="DetailAddress"><input className="input input--lgw" value={form.memberDetailAddress} onChange={(e) => set('memberDetailAddress', e.target.value)} /></Row>
+        <Row label="E-mail">
+          <input className="input" value={form.memberEmail} onChange={(e) => set('memberEmail', e.target.value)} />
+        </Row>
+        <Row label="ZipCode">
+          <input className="input input--xs" value={form.memberZipCode} onChange={(e) => set('memberZipCode', e.target.value)} />
+        </Row>
+        <Row label="RoadAddress">
+          <input className="input input--lgw" value={form.memberRoadAddress} onChange={(e) => set('memberRoadAddress', e.target.value)} />
+        </Row>
+        <Row label="DetailAddress">
+          <input className="input input--lgw" value={form.memberDetailAddress} onChange={(e) => set('memberDetailAddress', e.target.value)} />
+        </Row>
 
         <Row label="Have a Pet?">
-          <label><input type="radio" checked={form.memberHasPet==='Y'} onChange={() => set('memberHasPet','Y')} /> Yes</label>
-          <label className="ml-4"><input type="radio" checked={form.memberHasPet==='N'} onChange={() => set('memberHasPet','N')} /> No</label>
+          <label><input type="radio" checked={form.memberHasPet === 'Y'} onChange={() => set('memberHasPet', 'Y')} /> Yes</label>
+          <label className="ml-4"><input type="radio" checked={form.memberHasPet === 'N'} onChange={() => set('memberHasPet', 'N')} /> No</label>
         </Row>
-
+        <br></br>
+        <hr className="border-gray-200 mb-8" />
+  <br></br>
         <div className="mt-8 flex justify-center">
           <button type="submit" disabled={submitting} className="btn-3d btn-white min-w-[140px]">
             {submitting ? '처리 중…' : '수정하기'}
@@ -240,17 +357,19 @@ ${body}`);
         </div>
 
         {ok && <p className="text-green-600 mt-4">{ok}</p>}
-        {err && <p className="text-red-600 mt-4">{err}</p>}
+        {err && <p className="text-red-600 mt-4 whitespace-pre-wrap">{err}</p>}
       </form>
-
+  <br></br>
+    <br></br>
+      <br></br>
       <style jsx global>{`
-        .row { display:flex; align-items:center; justify-content:center; gap:12px; margin:14px 0; }
-        .label { width:120px; text-align:right; font-weight:500; }
-        .input { border:1px solid #ccc; border-radius:6px; padding:4px 8px; font-size:14px; }
-        .input--xs { width:80px; }
-        .input--lgw { width:260px; }
-        .btn-3d { padding:8px 14px; border-radius:10px; border:1px solid #2222; background:#fff; }
-        .btn-white { background:#fff; }
+        .row{display:flex;align-items:center;justify-content:center;gap:12px;margin:14px 0;}
+        .label{width:120px;text-align:right;font-weight:500;}
+        .input{border:1px solid #ccc;border-radius:6px;padding:4px 8px;font-size:14px;}
+        .input--xs{width:80px;}
+        .input--lgw{width:260px;}
+        .btn-3d{padding:8px 14px;border:1px solid #2222;border-radius:10px;background:#fff;}
+        .btn-white{background:#fff;}
       `}</style>
     </main>
   );

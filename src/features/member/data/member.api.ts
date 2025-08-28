@@ -1,13 +1,13 @@
 // features/member/data/member.api.ts
 
 // =======================================================
-// 이 파일은 프로젝트 공용 member API 모듈입니다.
+// 공용 member API 모듈 (프론트 요청 경로 단일화)
 // - 로그인: /jwt/login (단일 엔드포인트 고정)
 //   * 1차: credentials:"omit" (쿠키 미동반) → 2차: "include" 재시도
 // - 기타 API: 인증이 필요할 수 있어 credentials:"include" 사용
 // - BASE / PREFIX는 .env.local 로 덮어쓸 수 있음
 //   NEXT_PUBLIC_API_BASE=http://192.168.0.160:8000
-//   NEXT_PUBLIC_API_PREFIX=/anpetna
+//   NEXT_PUBLIC_API_PREFIX=                ← 기본값 '' (빈 값; /anpetna 미사용)
 // =======================================================
 
 // ======== (로컬 타입 선언: import 없이 동작하도록 최소 정의) ========
@@ -141,13 +141,15 @@ const BASE =
       }`.replace(/:$/, "")
     : "");
 
-// 보드/FAQ에서 사용 중인 프리픽스와 동일하게 기본값 '/anpetna'
-const API_PREFIX = (process.env.NEXT_PUBLIC_API_PREFIX as string | undefined) || "/anpetna";
+// ✅ 기본값을 ''(빈 값)으로. 실제로 /anpetna 컨텍스트를 쓰면 .env에 넣어 덮어써라.
+const API_PREFIX = (process.env.NEXT_PUBLIC_API_PREFIX as string | undefined) || "";
 
 /** 접두를 붙여 절대 URL 생성 */
 function apiURL(path: string) {
   const normalized = path.startsWith("/") ? path : `/${path}`;
-  return new URL(`${API_PREFIX}${normalized}`, BASE).toString();
+  // prefix가 ''이면 그냥 BASE + path
+  const prefixed = `${API_PREFIX}${normalized}`.replace(/\/{2,}/g, "/");
+  return new URL(prefixed, BASE).toString();
 }
 
 /** 응답을 JSON으로 파싱(빈 응답도 허용) */
@@ -215,16 +217,15 @@ async function post<T>(path: string, body: unknown, init?: RequestInit): Promise
 
 // ----- 엔드포인트 매핑 -----
 export const ENDPOINTS = {
-  signup: "/member/join", // POST
-  list: "/member/readAll", // GET
+  signup: "/member/join",          // POST
+  list: "/member/readAll",         // GET
   readOne: (memberId: string) => `/member/my_page/${encodeURIComponent(memberId)}`, // GET
-  modify: "/member/modify", // POST
-  remove: "/member/delete", // GET (인증 필요)
+  modify: "/member/modify",        // POST
+  remove: "/member/delete",        // GET (인증 필요)
   // 로그인은 아래 login()에서 /jwt/login 고정 사용
 };
 
 // =============== 로그인 ===============
-// 로그인은 /jwt/login 하나로만 시도 (여러 경로 시도하다가 500이 섞이는 문제 방지)
 export async function login(body: LoginReq): Promise<LoginRes> {
   const url = apiURL("/jwt/login");
 
