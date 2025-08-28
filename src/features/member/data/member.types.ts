@@ -1,12 +1,14 @@
 // features/member/data/member.types.ts
 
 // --- 백엔드 enum(com.anpetna.member.constant.MemberRole) 대응 ---
-// 기본적으로 USER/ADMIN 이지만, 서버에서 ROLE_* 혹은 다른 문자열을 줄 수도 있어
-// 안전하게 string fallback 허용
+// 현재 Enum 은 USER(0), ADMIN(1), BLACKLIST(2) 이고
+// 서버에서 문자열("USER", "ADMIN", "BLACKLIST", "ROLE_*")을 줄 수도 있어
+// 따라서 숫자/문자열 모두 대응하도록 정의
 export type MemberRole =
-  | 'USER' | 'ADMIN'
+  | 0 | 1 | 2                          // ORDINAL (DB 숫자값)
+  | 'USER' | 'ADMIN' | 'BLACKLIST'     // 문자열 (EnumType.STRING 또는 수동 변환)
   | 'ROLE_USER' | 'ROLE_ADMIN'
-  | (string & {});
+  | (string & {}); // fallback
 
 // --- 이미지(프로필) ---
 export interface MemberImage {

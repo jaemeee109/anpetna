@@ -132,23 +132,29 @@ export default function LoginPage() {
       }
 
       // 저장
-      localStorage.removeItem('jwt');
-      localStorage.setItem('accessToken', access);
-      localStorage.setItem('Authorization', access.startsWith('Bearer ') ? access : `Bearer ${access}`);
-      if (id) localStorage.setItem('memberId', id);
-      if (refresh) localStorage.setItem('refreshToken', refresh);
+localStorage.removeItem('jwt');
+localStorage.setItem('accessToken', access);
+localStorage.setItem('Authorization', access.startsWith('Bearer ') ? access : `Bearer ${access}`);
+if (id) localStorage.setItem('memberId', id);
+if (refresh) localStorage.setItem('refreshToken', refresh);
 
-      // 쿠키 보조 저장
-      const maxAge = 60 * 60 * 12;
-      document.cookie = `Authorization=${access.startsWith('Bearer ') ? access : 'Bearer ' + access}; Path=/; Max-Age=${maxAge}; SameSite=Lax`;
-      document.cookie = `accessToken=${access}; Path=/; Max-Age=${maxAge}; SameSite=Lax`;
-      if (refresh) document.cookie = `refreshToken=${refresh}; Path=/; Max-Age=${60*60*24*7}; SameSite=Lax`;
+// ✅ (추가) role 캐싱: 서버에서 memberRole 읽어와 localStorage에 저장
+if (id) {
+  const { cacheMemberRole } = await import('@/features/member/utils/memberRole');
+  await cacheMemberRole(id); // 내부에서 'auth-changed' 이벤트도 발생시킴
+}
 
-      // 헤더 갱신 브로드캐스트
-      window.dispatchEvent(new Event('auth-changed'));
+// 쿠키 보조 저장
+const maxAge = 60 * 60 * 12;
+document.cookie = `Authorization=${access.startsWith('Bearer ') ? access : 'Bearer ' + access}; Path=/; Max-Age=${maxAge}; SameSite=Lax`;
+document.cookie = `accessToken=${access}; Path=/; Max-Age=${maxAge}; SameSite=Lax`;
+if (refresh) document.cookie = `refreshToken=${refresh}; Path=/; Max-Age=${60*60*24*7}; SameSite=Lax`;
 
-      alert('로그인 되었습니다.');
-      router.replace('/');
+// 헤더 갱신 브로드캐스트 (cacheMemberRole에서도 쏘지만, 중복되어도 무해)
+window.dispatchEvent(new Event('auth-changed'));
+
+alert('로그인 되었습니다.');
+router.replace('/');
     } catch (e: any) {
       setErr(e?.message || '로그인 실패');
     } finally {

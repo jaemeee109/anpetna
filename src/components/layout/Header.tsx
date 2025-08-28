@@ -34,35 +34,67 @@ function hasToken(): boolean {
   return !!(ls || ck);
 }
 
+/** 로컬 저장소/쿠키에서 role을 추정 (백엔드가 주입해줄 때 사용) */
+function readRoleRaw(): string | null {
+  if (typeof window === 'undefined') return null;
+  // 프로젝트에서 사용하는 키가 있다면 여기에 추가
+  return (
+    localStorage.getItem('memberRole') ||
+    getCookie('memberRole') ||
+    null
+  );
+}
+
+/** ADMIN 여부 판별 (숫자/문자열 모두 허용) */
+function isAdminRole(raw: string | null): boolean {
+  if (!raw) return false;
+  const v = raw.trim().toUpperCase();
+  // 숫자 형태도 허용 (ORDINAL 1 = ADMIN 가정)
+  if (v === '1') return true;
+  return v === 'ADMIN' || v === 'ROLE_ADMIN';
+}
+
 export default function Header() {
   const router = useRouter();
   const pathname = usePathname();
   const [authed, setAuthed] = useState<boolean>(false);
+  const [admin, setAdmin] = useState<boolean>(false);
 
-  // ▼ MYPAGE 드롭박스 상태/외부클릭 닫기
+  // ▼ 드롭박스 상태/외부클릭 닫기 (MYPAGE / SYSTEM)
   const [myOpen, setMyOpen] = useState(false);
+  const [sysOpen, setSysOpen] = useState(false);
   const myRef = useRef<HTMLDivElement | null>(null);
+  const sysRef = useRef<HTMLDivElement | null>(null);
+
   useEffect(() => {
     const onDocClick = (e: MouseEvent) => {
-      if (!myRef.current) return;
-      if (!myRef.current.contains(e.target as Node)) setMyOpen(false);
+      const target = e.target as Node;
+      if (myRef.current && !myRef.current.contains(target)) setMyOpen(false);
+      if (sysRef.current && !sysRef.current.contains(target)) setSysOpen(false);
     };
     document.addEventListener('click', onDocClick);
     return () => document.removeEventListener('click', onDocClick);
   }, []);
 
-  // 초기 렌더에서 로그인 여부 계산
+  // 초기 렌더에서 로그인/역할 계산
   useEffect(() => {
     setAuthed(hasToken());
+    setAdmin(isAdminRole(readRoleRaw()));
   }, []);
 
-  // 같은 탭/다른 탭에서 로그인 상태가 바뀌면 반영
+  // 같은 탭/다른 탭에서 로그인 상태/역할 변경 반영
   useEffect(() => {
-    const onAuthChanged = () => setAuthed(hasToken());
+    const onAuthChanged = () => {
+      setAuthed(hasToken());
+      setAdmin(isAdminRole(readRoleRaw()));
+    };
     window.addEventListener('auth-changed', onAuthChanged);
 
     const onStorage = (e: StorageEvent) => {
-      if (e.key === 'accessToken' || e.key === 'memberId') setAuthed(hasToken());
+      if (e.key === 'accessToken' || e.key === 'memberId' || e.key === 'memberRole') {
+        setAuthed(hasToken());
+        setAdmin(isAdminRole(readRoleRaw()));
+      }
     };
     window.addEventListener('storage', onStorage);
 
@@ -75,6 +107,7 @@ export default function Header() {
   // 라우트 이동 시 한 번 더 동기화
   useEffect(() => {
     setAuthed(hasToken());
+    setAdmin(isAdminRole(readRoleRaw()));
   }, [pathname]);
 
   const handleLogout = async () => {
@@ -82,6 +115,7 @@ export default function Header() {
     purgeAuthArtifacts();
     window.dispatchEvent(new Event('auth-changed'));
     setMyOpen(false);
+    setSysOpen(false);
     router.replace('/');
   };
 
@@ -94,7 +128,7 @@ export default function Header() {
 
   return (
     <header className="apn-header">
-      {/* 상단 우측 JOIN/LOGIN or MYPAGE/CART/LOGOUT */}
+      {/* 상단 우측 JOIN/LOGIN or (SYSTEM) / MYPAGE / CART / LOGOUT */}
       <div className="container apn-topbar">
         <nav className="apn-auth">
           {!authed ? (
@@ -105,6 +139,70 @@ export default function Header() {
             </>
           ) : (
             <>
+              {/* ▼ SYSTEM 드롭박스 (ADMIN 전용) */}
+              {admin && (
+                <>
+                  <div
+                    className="dropdown"
+                    ref={sysRef}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setSysOpen((v) => !v);
+                      setMyOpen(false);
+                    }}
+                  >
+                    <button
+                      type="button"
+                      className="btn-link"
+                      aria-haspopup="true"
+                      aria-expanded={sysOpen ? 'true' : 'false'}
+                    >
+                      SYSTEM
+                    </button>
+                    {sysOpen && (
+                      <div className="dropdown-menu" role="menu" aria-label="System submenu">
+                        {/* 아직 실제 페이지 없음 → '#' + preventDefault */}
+                        <a
+                          href="#"
+                          className="dropdown-item"
+                          role="menuitem"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setSysOpen(false);
+                          }}
+                        >
+                          USER
+                        </a>
+                        <a
+                          href="#"
+                          className="dropdown-item"
+                          role="menuitem"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setSysOpen(false);
+                          }}
+                        >
+                          SALES
+                        </a>
+                        <a
+                          href="#"
+                          className="dropdown-item"
+                          role="menuitem"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setSysOpen(false);
+                          }}
+                        >
+                          INV
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                  <span className="sep">|</span>
+                </>
+              )}
+
               {/* ▼ MYPAGE 드롭박스 */}
               <div
                 className="dropdown"
@@ -113,6 +211,7 @@ export default function Header() {
                   e.preventDefault();
                   e.stopPropagation();
                   setMyOpen((v) => !v);
+                  setSysOpen(false);
                 }}
               >
                 <button

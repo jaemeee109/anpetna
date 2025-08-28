@@ -11,11 +11,13 @@
 // =======================================================
 
 // ======== (로컬 타입 선언: import 없이 동작하도록 최소 정의) ========
+// 백엔드: Enum ORDINAL(0,1,2) 또는 문자열(USER/ADMIN/BLACKLIST, ROLE_*)
+// → 둘 다 안전하게 수용
 export type MemberRole =
-  | "USER" | "ADMIN"
-  | "ROLE_USER" | "ROLE_ADMIN"
-  | (string & {});
-
+  | 0 | 1 | 2                          // 숫자 응답 (ORDINAL)
+  | 'USER' | 'ADMIN' | 'BLACKLIST'     // 문자열 응답
+  | 'ROLE_USER' | 'ROLE_ADMIN' | 'ROLE_BLACKLIST'
+  | (string & {});    
 export interface MemberImage {
   uuid?: number | string;
   fileName?: string;
