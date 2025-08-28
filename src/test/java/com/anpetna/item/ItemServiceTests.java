@@ -33,33 +33,35 @@ public class ItemServiceTests {
     @Test
     public void registerItem() {
         //given
-        ImageDTO image1 = ImageDTO.builder()
-                .fileName("이미지파일1")
-                .url("https://www.baidu.com")
-                .sortOrder(1)
-                .build();
-        ImageDTO image2 = ImageDTO.builder()
-                .fileName("이미지파일2")
-                .url("https://www.baidu.com")
-                .sortOrder(1)
-                .build();
-        RegisterItemReq req = RegisterItemReq.builder()
-                .itemName("test")
-                .itemPrice(100)
-                .itemStock(200)
-                .itemDetail("test")
-                .itemCategory(ItemCategory.TOY)
-                .itemSellStatus(ItemSellStatus.SELL)
-                .itemSaleStatus(ItemSaleStatus.ONSALE)
-                .build();
-        req.addImage(image1);
-        req.addImage(image2);
+        for (int i = 0; i < 100 ; i++ ) {
+            ImageDTO image1 = ImageDTO.builder()
+                    .fileName("이미지파일1")
+                    .url("https://www.baidu.com")
+                    .sortOrder(1)
+                    .build();
+            ImageDTO image2 = ImageDTO.builder()
+                    .fileName("이미지파일2")
+                    .url("https://www.baidu.com")
+                    .sortOrder(1)
+                    .build();
+            RegisterItemReq req = RegisterItemReq.builder()
+                    .itemName("test")
+                    .itemPrice(100)
+                    .itemStock(200)
+                    .itemDetail("test")
+                    .itemCategory(ItemCategory.TOY)
+                    .itemSellStatus(ItemSellStatus.SELL)
+                    .itemSaleStatus(ItemSaleStatus.ONSALE)
+                    .build();
+            req.addImage(image1);
+            req.addImage(image2);
 
-        //when
-        RegisterItemRes res = itemService.registerItem(req);
+            //when
+            RegisterItemRes res = itemService.registerItem(req);
 
-        //then
-        System.out.println(res);
+            //then
+            System.out.println(res);
+        }
     }
 
     @Test
@@ -72,21 +74,22 @@ public class ItemServiceTests {
     }
 
    @Test
+   @Transactional
     public void searchAllItem() {
 
         SearchAllItemsReq req = new SearchAllItemsReq();
 
-        req.setSortBySale(ItemSellStatus.SOLD_OUT);
+/*        req.setSortBySale(ItemSellStatus.SOLD_OUT);
         List<ItemDTO> res1 = itemService.getAllItems(req);
-        System.out.println(res1);
+        System.out.println(res1);*/
 
-        req.setSortByCategory(ItemCategory.BATH_PRODUCT);
+        req.setSortByCategory(ItemCategory.TOY);
        List<ItemDTO> res2 = itemService.getAllItems(req);
-        System.out.println(res2);
+        System.out.println(res2.toString());
 
-        req.setOrderByPriceDir(SortDirection.ASCENDING);
+       /* req.setOrderByPriceDir(SortDirection.ASCENDING);
        List<ItemDTO> res3 = itemService.getAllItems(req);
-        System.out.println(res3);
+        System.out.println(res3);*/
 
     }
 

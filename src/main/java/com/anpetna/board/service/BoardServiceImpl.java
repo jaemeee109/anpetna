@@ -17,7 +17,7 @@ import com.anpetna.coreDomain.ImageEntity;
 import com.anpetna.coreDto.ImageDTO;
 import com.anpetna.coreDto.PageRequestDTO;
 import com.anpetna.coreDto.PageResponseDTO;
-import com.anpetna.coreRepository.ImageJpaRepository;
+import com.anpetna.coreRepository.ImageRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Pageable;
@@ -52,7 +52,7 @@ public class BoardServiceImpl implements BoardService {
     private final MemberRepository memberRepository;
 
     // 이미지 확인용
-    private final ImageJpaRepository imageJpaRepository;
+    private final ImageRepository imageRepository;
 
     @Value("${app.upload.dir}")       // 실제 파일 저장 경로 (예: C:/uploads or /var/www/uploads)
     private String uploadDir;

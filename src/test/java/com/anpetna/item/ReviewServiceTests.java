@@ -25,7 +25,6 @@ public class ReviewServiceTests {
     ReviewService reviewService;
 
     @Test
-    @Transactional
     public void registerReview() {
         //given
         ImageDTO image1 = ImageDTO.builder()
@@ -82,7 +81,6 @@ public class ReviewServiceTests {
     }*/
 
     @Test
-    @Transactional
     public void modifyReview(){
         //  item은 건드릴 필요없음
         ImageDTO image1 = ImageDTO.builder()

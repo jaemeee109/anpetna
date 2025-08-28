@@ -38,15 +38,15 @@ public class ImageEntity {
     private BoardEntity board;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = true)
-    @JoinColumn(name = "member", foreignKey = @ForeignKey(name = "fk_image_member"))
+    @JoinColumn(name = "member_id", foreignKey = @ForeignKey(name = "fk_image_member"))
     private MemberEntity member;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = true)
-    @JoinColumn(name = "item", foreignKey = @ForeignKey(name = "fk_image_item"))
+    @JoinColumn(name = "item_id", foreignKey = @ForeignKey(name = "fk_image_item"))
     private ItemEntity item;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = true)
-    @JoinColumn(name = "review",foreignKey = @ForeignKey(name = "fk_image_review"))
+    @JoinColumn(name = "review_id",foreignKey = @ForeignKey(name = "fk_image_review"))
     private ReviewEntity review;
 
 
@@ -83,7 +83,7 @@ public class ImageEntity {
     // ====== JPA 생명주기에서 유효성 체크 (서비스 실수 방지) ======
     @PrePersist
     @PreUpdate
-    private void validateExactlyOneParent() {
+    public void validateExactlyOneParent() {
         int cnt = 0;
         if (board  != null) cnt++;
         if (member != null) cnt++;
@@ -116,7 +116,7 @@ public class ImageEntity {
         img.setFileName(fileName);
         img.setUrl(url);
         img.setSortOrder(order == null ? 0 : order);
-        img.attachToItem(i);
+/*        img.attachToItem(i);*/
         return img;
     }
     public static ImageEntity forReview(String fileName, String url, ReviewEntity r, Integer order) {

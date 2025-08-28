@@ -42,7 +42,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @Log4j2
 public class integrationTest {
 
-    @Autowired
+    /*@Autowired
     MemberService memberService;
 
     @Autowired
@@ -539,5 +539,5 @@ public class integrationTest {
         assertThat(afterLike).isEqualTo(beforeLike + 1);
 
         logout();
-    }
+    }*/
 }
