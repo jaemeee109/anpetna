@@ -10,6 +10,7 @@ import com.anpetna.item.dto.registerItem.RegisterItemRes;
 import com.anpetna.item.dto.searchAllItem.SearchAllItemsReq;
 import com.anpetna.item.dto.searchOneItem.SearchOneItemReq;
 import com.anpetna.item.dto.searchOneItem.SearchOneItemRes;
+import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 
 
@@ -18,7 +19,7 @@ import java.util.List;
 
 public interface ItemService {
 
-    List<ItemDTO> getAllItems(SearchAllItemsReq req);
+    Page<ItemDTO> searchItems(SearchAllItemsReq req);
 
     SearchOneItemRes getOneItem(SearchOneItemReq req);
 

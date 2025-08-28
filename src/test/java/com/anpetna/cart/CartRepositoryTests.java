@@ -4,7 +4,6 @@ import com.anpetna.cart.domain.CartEntity;
 import com.anpetna.cart.repository.CartRepository;
 import com.anpetna.item.domain.ItemEntity;
 import com.anpetna.item.constant.ItemCategory;
-import com.anpetna.item.constant.ItemSaleStatus;
 import com.anpetna.item.constant.ItemSellStatus;
 import com.anpetna.member.domain.MemberEntity;
 import com.anpetna.member.constant.MemberRole;
@@ -68,8 +67,8 @@ class CartRepositoryTests {
         item.setItemPrice(10000);
         item.setItemStock(5);
         item.setItemDetail("상세설명");
-        item.setItemSellStatus(ItemSellStatus.SELL);
-        item.setItemSaleStatus(ItemSaleStatus.ORIGIN);
+        item.setItemSellStatus(1);
+        item.setItemSaleStatus(30);
         item.setItemCategory(ItemCategory.FEED);
       //  item.setItemThumbsId("thumb-1");
         em.persist(item);
