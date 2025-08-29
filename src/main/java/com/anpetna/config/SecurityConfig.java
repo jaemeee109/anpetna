@@ -55,18 +55,29 @@ public class SecurityConfig {
                         .requestMatchers("/member/my_page/","member/modify").hasAnyRole("USER") // 로그인 유저 전용
 
                         // --- Board ---
-                        .requestMatchers("/anpetna/board/**").hasAnyRole("ADMIN", "USER")
+                        .requestMatchers("/board/**").hasAnyRole("ADMIN", "USER")
+                        // --- Comment ---
+                        .requestMatchers("/comment/**").hasAnyRole("ADMIN", "USER")
 
                         // --- Item ---
-                        .requestMatchers("/items/**").hasAnyRole("ADMIN", "USER")
+                        .requestMatchers(HttpMethod.GET,"/item/**").hasAnyRole("ADMIN", "USER")
+                        .requestMatchers(HttpMethod.POST,"/item").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT,"/item").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE,"/item").hasRole("ADMIN")
+                        // --- Review ---
+                        .requestMatchers(HttpMethod.GET,"/review/**").hasAnyRole("ADMIN", "USER")
+                        .requestMatchers(HttpMethod.POST,"/review").hasRole("USER")
+                        .requestMatchers(HttpMethod.PUT,"/review").hasRole("USER")
+                        .requestMatchers(HttpMethod.DELETE,"/review").hasAnyRole("ADMIN", "USER")
 
                         // --- Cart ---
-                        .requestMatchers("/anpetna/cart/**").hasAnyRole("ADMIN", "USER")
+                        .requestMatchers("/cart/**").hasAnyRole("ADMIN", "USER")
 
                         // --- Order ---
-                        .requestMatchers("/api/orders/**").hasAnyRole("ADMIN", "USER")
+                        .requestMatchers("/order/**").hasAnyRole("ADMIN", "USER")
 
                         .anyRequest().authenticated()
+
                 )
 
                 // ===== 예외 응답 통일 =====

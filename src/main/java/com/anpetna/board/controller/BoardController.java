@@ -26,7 +26,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
 
 @RestController
-@RequestMapping(value = "/anpetna/board")
+@RequestMapping(value = "/board")
 @RequiredArgsConstructor
 @Validated
 @Log4j2
