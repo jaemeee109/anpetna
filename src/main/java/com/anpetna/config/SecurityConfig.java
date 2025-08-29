@@ -47,21 +47,25 @@ public class SecurityConfig {
 
                         // --- 기존 허용 경로 유지 ---
                         .requestMatchers("/jwt/**").permitAll()                  // 토큰 발급/재발급 엔드포인트
-                        .requestMatchers(HttpMethod.POST, "/member/login").permitAll() // 기존 로그인 경로
-                        .requestMatchers("/member/join").permitAll()             // 회원가입
-                        .requestMatchers("/", "/signup", "/api/v1/**",
-                                "/member/readOne", "/member/readAll",
-                                "/member/my_page/*").permitAll()        // 기존 공개 경로들
+                        //.requestMatchers("/", "/signup", "/api/v1/**").permitAll()        // 기존 공개 경로들
 
-                        // --- ★추가: anpetna 네임스페이스 로그인/회원가입 허용 ---
-                        .requestMatchers("/member/login",
-                                "/member/modify").permitAll()  // 새 프론트 경로 허용
-
-                        // === 역할 기반 인가 ===
+                        // --- Member ---
+                        .requestMatchers("/member/login", "/member/join").permitAll()  // 새 프론트 경로 허용
                         .requestMatchers("/member/readOne","/member/readAll").hasRole("ADMIN")        // 관리자 전용
                         .requestMatchers("/member/my_page/","member/modify").hasAnyRole("USER") // 로그인 유저 전용
 
-                        // --- 그 외 모든 요청은 인증 필요 ---
+                        // --- Board ---
+                        .requestMatchers("/anpetna/board/**").hasAnyRole("ADMIN", "USER")
+
+                        // --- Item ---
+                        .requestMatchers("/items/**").hasAnyRole("ADMIN", "USER")
+
+                        // --- Cart ---
+                        .requestMatchers("/anpetna/cart/**").hasAnyRole("ADMIN", "USER")
+
+                        // --- Order ---
+                        .requestMatchers("/api/orders/**").hasAnyRole("ADMIN", "USER")
+
                         .anyRequest().authenticated()
                 )
 
