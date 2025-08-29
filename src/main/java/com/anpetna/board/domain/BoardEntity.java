@@ -1,8 +1,8 @@
 package com.anpetna.board.domain;
 
 import com.anpetna.board.constant.BoardType;
-import com.anpetna.coreDomain.BaseEntity;
-import com.anpetna.coreDomain.ImageEntity;
+import com.anpetna.core.coreDomain.BaseEntity;
+import com.anpetna.core.coreDomain.ImageEntity;
 import jakarta.persistence.*;
 import lombok.*;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;

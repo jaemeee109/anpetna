@@ -1,35 +1,13 @@
 package com.anpetna.board;
 
 import com.anpetna.board.domain.BoardEntity;
-import com.anpetna.board.constant.BoardType;
-import com.anpetna.board.dto.BoardDTO;
-import com.anpetna.board.dto.createBoard.CreateBoardReq;
-import com.anpetna.board.dto.createBoard.CreateBoardRes;
 import com.anpetna.board.dto.deleteBoard.DeleteBoardReq;
-import com.anpetna.board.dto.readOneBoard.ReadOneBoardReq;
-import com.anpetna.board.dto.readOneBoard.ReadOneBoardRes;
-import com.anpetna.board.dto.updateBoard.UpdateBoardReq;
 import com.anpetna.board.dto.updateBoard.UpdateBoardRes;
-import com.anpetna.board.repository.BoardJpaRepository;
-import com.anpetna.board.service.BoardService;
-import com.anpetna.coreDto.ImageDTO;
-import com.anpetna.coreDto.PageRequestDTO;
-import com.anpetna.coreDto.PageResponseDTO;
-import com.anpetna.member.constant.MemberRole;
-import com.anpetna.member.domain.MemberEntity;
-import com.anpetna.member.repository.MemberRepository;
 import lombok.extern.log4j.Log4j2;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.annotation.Rollback;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 

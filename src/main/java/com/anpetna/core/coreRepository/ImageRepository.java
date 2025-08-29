@@ -1,6 +1,6 @@
-package com.anpetna.coreRepository;
+package com.anpetna.core.coreRepository;
 
-import com.anpetna.coreDomain.ImageEntity;
+import com.anpetna.core.coreDomain.ImageEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface ImageRepository extends JpaRepository<ImageEntity, Long> {

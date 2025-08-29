@@ -1,8 +1,7 @@
 package com.anpetna.item;
 
-import com.anpetna.coreDomain.ImageEntity;
+import com.anpetna.core.coreDomain.ImageEntity;
 import com.anpetna.item.constant.ItemCategory;
-import com.anpetna.item.constant.ItemSellStatus;
 import com.anpetna.item.domain.ItemEntity;
 import com.anpetna.item.repository.ItemRepository;
 import org.junit.jupiter.api.Test;

@@ -1,6 +1,6 @@
 package com.anpetna.item;
 
-import com.anpetna.coreDto.ImageDTO;
+import com.anpetna.core.coreDto.ImageDTO;
 import com.anpetna.item.constant.ItemCategory;
 import com.anpetna.item.constant.ItemSellStatus;
 import com.anpetna.item.dto.ItemDTO;
@@ -22,7 +22,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Sort;
 import org.springframework.test.context.ActiveProfiles;
-import java.util.List;
 
 @SpringBootTest
 @ActiveProfiles("item")

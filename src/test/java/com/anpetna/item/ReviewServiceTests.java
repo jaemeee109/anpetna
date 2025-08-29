@@ -1,6 +1,6 @@
 package com.anpetna.item;
 
-import com.anpetna.coreDto.ImageDTO;
+import com.anpetna.core.coreDto.ImageDTO;
 import com.anpetna.item.dto.deleteReview.DeleteReviewReq;
 import com.anpetna.item.dto.deleteReview.DeleteReviewRes;
 import com.anpetna.item.dto.modifyReview.ModifyReviewReq;
@@ -13,8 +13,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
-
-import java.util.List;
 
 @Log4j2
 @SpringBootTest

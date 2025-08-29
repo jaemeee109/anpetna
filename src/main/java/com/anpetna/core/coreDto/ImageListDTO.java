@@ -1,4 +1,4 @@
-package com.anpetna.coreDto;
+package com.anpetna.core.coreDto;
 
 import lombok.Getter;
 import lombok.Setter;

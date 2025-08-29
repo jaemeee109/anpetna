@@ -11,7 +11,7 @@ import com.anpetna.board.dto.readComment.ReadCommRes;
 import com.anpetna.board.dto.updateComment.UpdateCommReq;
 import com.anpetna.board.dto.updateComment.UpdateCommRes;
 import com.anpetna.board.repository.CommentJpaRepository;
-import com.anpetna.coreDto.PageResponseDTO;
+import com.anpetna.core.coreDto.PageResponseDTO;
 import lombok.extern.log4j.Log4j2;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

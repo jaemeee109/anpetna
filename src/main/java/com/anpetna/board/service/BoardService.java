@@ -11,10 +11,8 @@ import com.anpetna.board.dto.readOneBoard.ReadOneBoardReq;
 import com.anpetna.board.dto.readOneBoard.ReadOneBoardRes;
 import com.anpetna.board.dto.updateBoard.UpdateBoardReq;
 import com.anpetna.board.dto.updateBoard.UpdateBoardRes;
-import com.anpetna.coreDto.PageRequestDTO;
-import com.anpetna.coreDto.PageResponseDTO;
-import com.anpetna.board.dto.readAllBoard.ReadAllBoardReq;
-import com.anpetna.board.dto.readAllBoard.ReadAllBoardRes;
+import com.anpetna.core.coreDto.PageRequestDTO;
+import com.anpetna.core.coreDto.PageResponseDTO;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;

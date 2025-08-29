@@ -1,14 +1,13 @@
 package com.anpetna.item.config;
 
-import com.anpetna.coreDomain.ImageEntity;
-import com.anpetna.coreDto.ImageDTO;
-import com.anpetna.coreDto.ImageListDTO;
+import com.anpetna.core.coreDomain.ImageEntity;
+import com.anpetna.core.coreDto.ImageDTO;
+import com.anpetna.core.coreDto.ImageListDTO;
 import com.anpetna.item.domain.ItemEntity;
 import com.anpetna.item.dto.ItemDTO;
 import com.anpetna.item.dto.modifyItem.ModifyItemReq;
 import com.anpetna.item.dto.registerItem.RegisterItemReq;
 import com.anpetna.item.dto.searchOneItem.SearchOneItemRes;
-import jakarta.transaction.Transactional;
 import org.modelmapper.ModelMapper;
 import org.modelmapper.TypeMap;
 import org.springframework.beans.factory.annotation.Autowired;

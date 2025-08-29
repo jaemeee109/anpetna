@@ -1,6 +1,6 @@
 package com.anpetna.item.dto.modifyItem;
 
-import com.anpetna.coreDto.ImageListDTO;
+import com.anpetna.core.coreDto.ImageListDTO;
 import com.anpetna.item.constant.ItemSellStatus;
 import lombok.Builder;
 import lombok.Getter;

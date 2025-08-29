@@ -1,6 +1,6 @@
 package com.anpetna.board.dto.updateBoard;
 
-import com.anpetna.coreDto.ImageDTO;
+import com.anpetna.core.coreDto.ImageDTO;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.*;

@@ -1,6 +1,6 @@
-package com.anpetna.coreDto;
+package com.anpetna.core.coreDto;
 
-import com.anpetna.coreDomain.ImageEntity;
+import com.anpetna.core.coreDomain.ImageEntity;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
