@@ -12,6 +12,17 @@ export default function FAQNewPage() {
   const router = useRouter();
   const sp = useSearchParams();
 
+
+  // 토큰을 Authorization 헤더로 붙여주는 초소형 헬퍼
+function authHeaders(): Record<string, string> {
+  if (typeof window === 'undefined') return {};
+  const token =
+    localStorage.getItem('accessToken') || // 프로젝트에서 저장한 키 이름에 맞춰 조정
+    sessionStorage.getItem('accessToken') ||
+    '';
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
   // 쿼리로 넘어온 카테고리 기본 선택 (없으면 회원계정)
   const initialCat = useMemo<Cat>(() => {
     const q = (sp.get('category') || '').trim();
@@ -48,7 +59,7 @@ export default function FAQNewPage() {
 
     try {
       // ✅ 실제 등록 엔드포인트로 변경
-      const url = new URL('/anpetna/board/create', base);
+    const url = new URL('/board/create', base);
 
       // ✅ 서버 DTO에 맞춰 필드 정리
       const payload = {
@@ -62,12 +73,16 @@ export default function FAQNewPage() {
         images: [],            // 이미지 없으면 빈 배열
       };
 
-      const resp = await fetch(url.toString(), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(payload),
-      });
+      // 백엔드가 @RequestPart("json")로 받으므로 JSON을 Blob으로 감싸서 넣음
+const fd = new FormData();
+fd.append('json', new Blob([JSON.stringify(payload)], { type: 'application/json' }));
+
+    const resp = await fetch(url.toString(), {
+  method: 'POST',
+  // Authorization을 자동으로 붙이는 기존 util을 사용 (★ Content-Type 수동 지정 금지!)
+  headers: authHeaders(), 
+  body: fd,
+});
 
       if (!resp.ok) {
         const text = await resp.text();

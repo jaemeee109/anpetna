@@ -1,81 +1,93 @@
-// features/board/hooks/useBoards.ts
-import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
-import { fetchBoards } from "@/features/board/data/board.api";
-import { boardApi } from "../data/board.api";
-import type { CreateBoardReq, UpdateBoardReq, BoardDetail } from "../data/board.types";
+// src/features/board/hooks/useBoards.ts
+'use client';
 
-/* 기존 주석된 버전은 냅둬도 되고 지워도 됨
-export const useBoardList = (page=1, size=10, type?: string, keyword?: string) =>
-  useQuery({
-    queryKey: ["board","list", page, size, type ?? "", keyword ?? ""],
-    queryFn: () => boardApi.list({ page, size, type, keyword }),
-  });
-*/
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  fetchBoards,
+  fetchBoardById,
+  createBoard,
+  updateBoard,
+  removeBoard,
+  likeBoard,
+   updateBoardByFormData,  
+  type FetchBoardsParams,
+} from '@/features/board/data/board.api';
+import type { UpdateBoardReq } from '@/features/board/data/board.types';
 
-export function useBoardList(page: number, size: number, type: string, keyword: string) {
-  const boardType = (type || "").toUpperCase();
+type UpdateBoardArg = UpdateBoardReq & { images?: File[] };
+type UpdateBoardFormArg = { bno: number; formData: FormData };
 
+const qk = {
+  list: (params?: FetchBoardsParams) => ['board', 'list', params] as const,
+  detail: (bno: number) => ['board', 'detail', bno] as const,
+};
+
+export function useBoardList(params?: FetchBoardsParams) {
   return useQuery({
-    queryKey: ["boards", boardType, page, size, keyword],
-    queryFn: async () => {
-      const res = await fetchBoards({ page, size, boardType, keyword });
-      if (typeof window !== "undefined") console.log("[useBoardList] response:", res);
-      return res;
-    },
-    placeholderData: keepPreviousData,   // ← v5 방식
-    staleTime: 5_000,
+    queryKey: qk.list(params),
+    queryFn: () => fetchBoards(params ?? {}),
+    staleTime: 30_000,
   });
 }
 
-/** ✅ 상세 훅 */
-export const useBoardDetail = (bno: number) =>
-  useQuery<BoardDetail>({
-    queryKey: ["board", "detail", bno],
-    queryFn: () => boardApi.get(bno),
-    enabled: Number.isFinite(bno),
+export function useBoardDetail(bno: number | string | undefined) {
+  const id = typeof bno === 'string' ? Number(bno) : bno;
+  return useQuery({
+    enabled: !!id,
+    queryKey: qk.detail(id as number),
+    queryFn: () => fetchBoardById(id as number),
   });
+}
 
-export const useCreateBoard = () => {
+export function useCreateBoard() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (payload: CreateBoardReq) => boardApi.create(payload),
+    // Create는 프론트 전용 업로드 타입이므로 any로 받아도 무방(실제 검사는 컴파일러가 파일 타입 체크함)
+    mutationFn: (payload: any) => createBoard(payload),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["board", "list"] });
+      qc.invalidateQueries({ queryKey: ['board', 'list'] });
     },
   });
-};
+}
 
-export const useUpdateBoard = () => {
-  const qc = useQueryClient();
+export function useUpdateBoard() {
+   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (payload: UpdateBoardReq) => boardApi.update(payload),
-    onSuccess: (_res, vars) => {
-      if (typeof vars?.bno === "number") {
-        qc.invalidateQueries({ queryKey: ["board", "detail", vars.bno] });
+    // 두 형태 모두 지원
+    mutationFn: (payload: UpdateBoardArg | UpdateBoardFormArg) => {
+      if ((payload as any).formData) {
+        return updateBoardByFormData(payload as UpdateBoardFormArg);
       }
-      qc.invalidateQueries({ queryKey: ["board", "list"] });
+      return updateBoard(payload as UpdateBoardArg);
+    },
+    onSuccess: (_data, vars) => {
+      const bno = (vars as any).bno ?? (vars as any).id;
+      qc.invalidateQueries({ queryKey: ['board', 'list'] });
+      if (bno) qc.invalidateQueries({ queryKey: ['board', 'detail', bno] });
     },
   });
-};
+}
 
-export const useRemoveBoard = () => {
+export function useRemoveBoard() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (bno: number) => boardApi.remove(bno),
-    onSuccess: (_res, bno) => {
-      qc.invalidateQueries({ queryKey: ["board", "list"] });
-      qc.invalidateQueries({ queryKey: ["board", "detail", bno] });
+    mutationFn: (bno: number) => removeBoard(bno),
+    onSuccess: (_data, bno) => {
+      qc.invalidateQueries({ queryKey: ['board', 'list'] });
+      if (bno) qc.removeQueries({ queryKey: qk.detail(bno) });
     },
   });
-};
+}
 
-export const useLikeBoard = () => {
+export function useLikeBoard() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (bno: number) => boardApi.like(bno),
-    onSuccess: (_res, bno) => {
-      qc.invalidateQueries({ queryKey: ["board", "detail", bno] });
-      qc.invalidateQueries({ queryKey: ["board", "list"] });
+    mutationFn: (bno: number) => likeBoard(bno),
+    onSuccess: (_data, bno) => {
+      if (bno) qc.invalidateQueries({ queryKey: qk.detail(bno) });
     },
   });
-};
+}
+
+// 선택: 밖으로 타입 노출
+export type { FetchBoardsParams } from '@/features/board/data/board.api';

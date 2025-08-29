@@ -1,64 +1,32 @@
 // src/lib/api.ts
+/**
+ * API 경로 유틸 + 상수
+ * - 백엔드가 루트(/) 또는 /anpetna 아래여도 withPrefix()가 알아서 붙임
+ */
 
-// ===== BASE / PREFIX =====
-export const BASE =
-  (process.env.NEXT_PUBLIC_API_BASE as string | undefined) ||
-  (typeof window !== 'undefined'
-    ? `${window.location.protocol}//${window.location.hostname}${
-        window.location.port
-          ? `:${window.location.port === '3000' ? '8000' : window.location.port}`
-          : ''
-      }`.replace(/:$/, '')
-    : '');
+export const API_PREFIX = ((process.env.NEXT_PUBLIC_API_PREFIX as string | undefined) ?? "")
+  .replace(/\/+$/, "");
 
-export const API_PREFIX =
-  (process.env.NEXT_PUBLIC_API_PREFIX as string | undefined) ?? '/anpetna';
-
-export function apiURL(path: string) {
-  const normalized = path.startsWith('/') ? path : `/${path}`;
-  return new URL(`${API_PREFIX}${normalized}`, BASE).toString();
+export function withPrefix(p: string): string {
+  const path = p.startsWith("/") ? p : `/${p}`;
+  if (!API_PREFIX) return path;
+  // 이미 prefix 들어있으면 그대로 사용
+  if (path === API_PREFIX || path.startsWith(`${API_PREFIX}/`)) return path;
+  return `${API_PREFIX}${path}`.replace(/\/{2,}/g, "/");
 }
 
-// ===== 쿠키 읽기 =====
-function getCookie(name: string): string | null {
-  if (typeof document === 'undefined') return null;
-  const safe = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const m = document.cookie.match(new RegExp('(?:^|; )' + safe + '=([^;]*)'));
-  return m ? decodeURIComponent(m[1]) : null;
-}
-
-// ===== 토큰 읽기 (Bearer 제거해서 순수 토큰만 반환) =====
-export function getAccessToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  const ls = window.localStorage;
-
-  let raw =
-    ls.getItem('accessToken') ||
-    ls.getItem('access_token') ||
-    ls.getItem('token') ||
-    ls.getItem('jwt') ||
-    ls.getItem('Authorization') || // 저장돼 있다면 "Bearer ..."일 수 있음
-    getCookie('Authorization') ||
-    getCookie('accessToken') ||
-    null;
-
-  if (!raw) return null;
-  raw = raw.trim();
-  return raw.startsWith('Bearer ') ? raw.slice(7).trim() : raw;
-}
-
-// ===== Authorization 헤더 생성 =====
-export function buildAuthHeaders(base?: HeadersInit): HeadersInit {
-  const token = getAccessToken();
-  const h = new Headers(base || {});
-  if (token && !h.has('Authorization')) {
-    h.set('Authorization', `Bearer ${token}`);
-  }
-  return h;
-}
-
-// ===== fetch 래퍼: 항상 Authorization 붙이고 credentials 포함 =====
-export async function authFetch(input: string, init?: RequestInit): Promise<Response> {
-  const headers = buildAuthHeaders(init?.headers);
-  return fetch(input, { ...init, credentials: 'include', headers });
-}
+export const ENDPOINT = {
+  LOGIN: (process.env.NEXT_PUBLIC_LOGIN_PATH as string | undefined) ?? "/jwt/login",
+  REFRESH: withPrefix("/jwt/refresh"),
+  ME: withPrefix((process.env.NEXT_PUBLIC_ME_PATH as string | undefined) ?? "/member/me"),
+  MY_PAGE_PREFIX: withPrefix(
+    (process.env.NEXT_PUBLIC_MY_PAGE_PREFIX as string | undefined) ?? "/member/my_page"
+  ),
+  BOARD: {
+    READ_ALL: withPrefix("/board/readAll"),
+    BASE: withPrefix("/board"),
+  },
+  COMMENT: {
+    BASE: withPrefix("/comment"),
+  },
+} as const;

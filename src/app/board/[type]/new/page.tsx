@@ -1,40 +1,63 @@
 "use client";
 
 import * as React from "react";
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import { useCreateBoard } from "@/features/board/hooks/useBoards";
-import { BoardTitle } from "@/shared/ui/BoardTitle";
-// 상세/목록과 동일한 컨테이너 폭 + 가운데 정렬
-const WRAP = "mx-auto w-full max-w-[700px] px-4";
 
-export default function NewBoardPage({
-  params,
-}: {
-  params: Promise<{ type: string }>;
-}) {
-  // Next 15 / React 19: Promise 언랩
-  const { type } = React.use(params);
+export default function NewBoardPage() {
   const router = useRouter();
+  const { type } = useParams<{ type: string }>();
+
   const createMut = useCreateBoard();
 
-  // 작성자: 로그인 시 localStorage의 memberId 사용
-  const [writer, setWriter] = useState("");
-  useEffect(() => {
+  const [writer, setWriter] = React.useState("");
+  const [title, setTitle] = React.useState("");
+  const [content, setContent] = React.useState("");
+  const [pinned, setPinned] = React.useState(false);
+  const [secret, setSecret] = React.useState(false);
+
+  // === 이미지 첨부 상태 ===
+  const [files, setFiles] = React.useState<File[]>([]);
+  const [previewUrls, setPreviewUrls] = React.useState<string[]>([]);
+  const fileRef = React.useRef<HTMLInputElement | null>(null);
+
+  // 로그인한 작성자 아이디 자동 채우기(있으면)
+  React.useEffect(() => {
     if (typeof window !== "undefined") {
       setWriter(localStorage.getItem("memberId") || "");
     }
   }, []);
 
-  const [title, setTitle] = useState("");
-  const [content, setContent] = useState("");
-  const [pinned, setPinned] = useState(false); // 고정글
-  const [secret, setSecret] = useState(false); // 비밀글
+  // ✅ files가 바뀔 때마다 blob URL을 만들어 state에 저장
+  //    cleanup에서 해당 URL만 revoke (Strict 모드에서도 안전)
+  React.useEffect(() => {
+    if (files.length === 0) {
+      setPreviewUrls([]);
+      return;
+    }
+    const urls = files.map((f) => URL.createObjectURL(f));
+    setPreviewUrls(urls);
+    return () => {
+      urls.forEach((u) => URL.revokeObjectURL(u));
+    };
+  }, [files]);
+
+  const onPick = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const picked = Array.from(e.target.files ?? []);
+    if (picked.length === 0) return;
+    setFiles((prev) => [...prev, ...picked]);
+    // 같은 파일 다시 선택 가능하게 초기화
+    e.currentTarget.value = "";
+  };
+
+  const removePicked = (i: number) => {
+    setFiles((prev) => prev.filter((_, idx) => idx !== i));
+  };
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    const payload = {
+    const json = {
       bWriter: writer,
       bTitle: title,
       bContent: content,
@@ -43,31 +66,28 @@ export default function NewBoardPage({
       isSecret: secret,
     };
 
-    createMut.mutate(payload as any, {
+    const fd = new FormData();
+    fd.append("json", new Blob([JSON.stringify(json)], { type: "application/json" }));
+    files.forEach((f) => fd.append("files", f));
+
+    createMut.mutate(fd, {
       onSuccess: (res: any) => {
-        const bno =
-          res?.createBoard?.bno ??
-          res?.createBoard?.id ??
-          res?.bno ??
-          res?.id;
-        alert("등록 성공!");
+        alert("등록 성공");
+        const bno = res?.createBoard?.bno ?? res?.bno ?? res?.id ?? null;
         router.push(bno ? `/board/${type}/${bno}` : `/board/${type}`);
       },
       onError: (err: any) => {
-        const status = err?.response?.status;
-        const data = err?.response?.data;
-        alert(`등록 실패 (status: ${status})\n${JSON.stringify(data ?? err?.message, null, 2)}`);
+        alert(`등록 실패\n${err?.response?.status ?? ""}`);
       },
     });
   };
 
   return (
-    <section className={WRAP}>
-      {/* 제목 라인 */}
-      <div className="mt-[40px] flex items-center gap-3 mb-[20px] ">
-        <span className="w-16 shrink-0 text-base text-gray-700">제목&nbsp;:&nbsp;</span>
+    <section className="mx-auto w-full max-w-[700px] px-4">
+      <div className="mt-10 mb-5 flex items-center gap-3">
+        <span className="w-16 text-gray-700">제목 :</span>
         <input
-          className="flex-1 bg-transparent border-0 outline-none focus:ring-0 placeholder-gray-400"
+          className="flex-1 bg-transparent border-0 outline-none focus:ring-0"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="제목을 입력하세요"
@@ -75,11 +95,10 @@ export default function NewBoardPage({
         />
       </div>
 
-      {/* 작성자 라인 */}
-      <div className="mt-4 flex items-center gap-3 mb-[20px]">
-        <span className="w-16 shrink-0 text-base text-gray-700">작성자&nbsp;:&nbsp;</span>
+      <div className="mb-5 flex items-center gap-3">
+        <span className="w-16 text-gray-700">작성자 :</span>
         <input
-          className="flex-1 bg-transparent border-0 outline-none focus:ring-0 placeholder-gray-400"
+          className="flex-1 bg-transparent border-0 outline-none focus:ring-0"
           value={writer}
           onChange={(e) => setWriter(e.target.value)}
           placeholder="작성자를 입력하세요"
@@ -87,11 +106,9 @@ export default function NewBoardPage({
         />
       </div>
 
-      {/* 내용 */}
-      <div className="mt-8">
-        <div className="mb-[20px] text-sm text-gray-700"></div>
+      <div className="mt-6">
         <textarea
-          className="w-full h-56 rounded border border-gray-300 px-7 py-6 text-base outline-none focus:ring-2 focus:ring-gray-200"
+          className="h-56 w-full rounded border border-gray-300 px-6 py-5 text-base outline-none focus:ring-2 focus:ring-gray-200"
           value={content}
           onChange={(e) => setContent(e.target.value)}
           placeholder="내용을 입력하세요"
@@ -99,43 +116,66 @@ export default function NewBoardPage({
         />
       </div>
 
-      {/* 고정글 / 비밀글 (가운데 정렬) */}
-      <div className="mt-[20px] mb-[50px] flex justify-center gap-[10px]">
+      {/* === 이미지 첨부 (내용 아래, 고정/비밀 위) === */}
+      <div className="mt-4 mb-4">
+        <div className="mb-2 text-sm text-gray-700">이미지 첨부</div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className="btn-3d btn-white px-3 py-1 text-sm"
+            onClick={() => fileRef.current?.click()}
+          >
+            파일 선택
+          </button>
+          <span className="text-xs text-gray-500">(여러 장 선택 가능)</span>
+        </div>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          multiple
+          className="hidden"
+          onChange={onPick}
+        />
+
+        {/* ✅ 미리보기: previewUrls 기준으로 표시 */}
+        {previewUrls.length > 0 && (
+          <div className="mt-3 grid grid-cols-3 gap-3">
+            {previewUrls.map((src, i) => (
+              <div key={i} className="relative border border-gray-200 rounded p-1">
+                <img src={src} alt={`p-${i}`} className="w-full h-28 object-cover rounded" />
+                <button
+                  type="button"
+                  onClick={() => removePicked(i)}
+                  className="absolute top-1 right-1 text-[11px] btn-3d btn-white px-1 py-0.5"
+                >
+                  삭제
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* 고정/비밀 체크 */}
+      <div className="mt-5 mb-10 flex justify-center gap-3">
         <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={pinned}
-            onChange={(e) => setPinned(e.target.checked)}
-          />
+          <input type="checkbox" checked={pinned} onChange={(e) => setPinned(e.target.checked)} />
           고정글
         </label>
         <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={secret}
-            onChange={(e) => setSecret(e.target.checked)}
-          />
+          <input type="checkbox" checked={secret} onChange={(e) => setSecret(e.target.checked)} />
           비밀글
         </label>
       </div>
 
-      {/* 등록 / 취소 (가운데 정렬, 상세페이지와 동일한 버튼 톤) */}
-      <form onSubmit={onSubmit} className="mt-8 mb-16">
-        <div className="flex justify-center gap-3 mb-[50px]">
-          <button
-            className="btn-3d btn-white px-4 py-2 text-sm"
-            disabled={createMut.isPending}
-          >
-            {createMut.isPending ? "등록 중..." : "등록"}
-          </button>
-          <button
-            type="button"
-            onClick={() => router.back()}
-            className="btn-3d btn-white px-4 py-2 text-sm"
-          >
-            취소
-          </button>
-        </div>
+      <form onSubmit={onSubmit} className="mb-16 flex justify-center gap-3">
+        <button className="btn-3d btn-white px-4 py-2 text-sm" disabled={createMut.isPending}>
+          {createMut.isPending ? "등록 중..." : "등록"}
+        </button>
+        <button type="button" onClick={() => router.back()} className="btn-3d btn-white px-4 py-2 text-sm">
+          취소
+        </button>
       </form>
     </section>
   );

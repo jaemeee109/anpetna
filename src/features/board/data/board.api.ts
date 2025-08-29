@@ -1,95 +1,133 @@
-// features/board/data/board.api.ts
-import { http } from '@/shared/data/http';
+// src/features/board/data/board.api.ts
+import { http, getAccessToken } from '@/shared/data/http';
 import type {
-  BoardDetail as BoardDTO,
+  BoardDetail,
   CreateBoardReq,
   UpdateBoardReq,
   PageRes,
-  BoardDetail,
 } from './board.types';
 
-const BASE_PATH = '/anpetna/board';
+const BASE_PATH = '/board'; // 백엔드가 /anpetna/board 라면 '/anpetna/board'로 바꿔주세요.
 
 function unwrap<T>(r: any): T {
-  return (r?.data?.result ?? r?.data) as T;
+  const data = (r as any)?.data ?? r;
+  return (data?.result ?? data) as T;
 }
 
-export const boardApi = {
-  get: async (bno: number): Promise<BoardDetail> => {
-    // ✅ 1차: /readOne/{bno} (PathVariable 방식)
-    try {
-      const r = await http.get(`${BASE_PATH}/readOne/${bno}`);
-      const data = (r as any)?.data ?? r;
-      const result = data?.result ?? data;
-      const detail =
-        result?.readOneBoard ??    // { result: { readOneBoard: {...} } }
-        result?.board ??           // { result: { board: {...} } }
-        result ??                  // { result: {...} } or {...}
-        null;
-      if (!detail) throw new Error('board/readOne invalid response');
-      return detail as BoardDetail;
-    } catch (err) {
-      // ✅ 2차 폴백: /readOne?bno= (RequestParam 방식일 때)
-      const r2 = await http.get(`${BASE_PATH}/readOne`, { params: { bno } });
-      const data2 = (r2 as any)?.data ?? r2;
-      const result2 = data2?.result ?? data2;
-      const detail2 =
-        result2?.readOneBoard ??
-        result2?.board ??
-        result2 ?? null;
-      if (!detail2) throw new Error('board/readOne invalid response (fallback)');
-      return detail2 as BoardDetail;
-    }
-  },
-
-
-  list: (opts: {
-    page?: number | string;
-    size?: number | string;
-    keyword?: string;
-    boardType?: string;
-    type?: string;
-  }) => {
-    const page1 = Number(opts.page ?? 1);
-    const sizeN = Number(opts.size ?? 10);
-    const boardKind =
-      (opts.boardType ?? opts.type ?? '').toString().trim().toUpperCase() || 'NOTICE';
-
-    return http
-      .get(`${BASE_PATH}/readAll`, {
-        params: { page: page1, size: sizeN, type: boardKind, keyword: opts.keyword ?? '' },
-      })
-      .then((r) => unwrap<PageRes<BoardDTO>>(r));
-  },
-
-  create: (payload: CreateBoardReq) =>
-    http.post(`${BASE_PATH}/create`, payload).then((r) => unwrap<{ createBoard: BoardDTO }>(r)),
-  update: (payload: UpdateBoardReq) =>
-    http.post(`${BASE_PATH}/update/${payload.bno}`, payload).then((r) => unwrap<{ updateBoard: BoardDTO }>(r)),
-  remove: (bno: number) =>
-    http.post(`${BASE_PATH}/delete/${bno}`).then((r) => unwrap<{ deleteBoard: BoardDTO }>(r)),
-  like: (bno: number) =>
-    http.post(`${BASE_PATH}/like/${bno}`).then((r) => unwrap<{ updateBoard: BoardDTO }>(r)),
-};
-
-// 목록 조회
-export async function fetchBoards(params: {
-  page: number;
-  size: number;
-  boardType: string;  // "NOTICE" | "FREE" | "QNA" | "FAQ"
+/** 목록 조회 */
+export async function fetchBoardList(params?: {
+  page?: number;
+  size?: number;
+  type?: string;        // t,c,w 등 검색 타입 사용 시
   keyword?: string;
+  boardType?: string;   // NOTICE/FREE/QNA/FAQ
+  category?: string;
 }) {
-  const { page, size, boardType, keyword } = params;
+  // [HARDEN] params undefined로 들어올 때 axios 내부에서 병합 에러 방지
+  const safe = params ?? {};
+  const r = await http.get(`${BASE_PATH}/readAll`, { params: safe });
+  return unwrap<PageRes<BoardDetail>>(r);
+}
 
-  // ✅ 컨트롤러 URL과 동일 (/anpetna/board/readAll)
-  const { data } = await http.get("/anpetna/board/readAll", {
-    params: {
-      page,
-      size,
-      boardType,             // ✅ 반드시 전송
-      keyword: keyword || "",
-    },
+/** 단건 조회 */
+export async function fetchBoardById(bno: number, opts?: { like?: boolean }) {
+  const like = opts?.like ?? false;
+  const r = await http.get(`${BASE_PATH}/readOne/${bno}`, { params: { like } });
+  return unwrap<BoardDetail>(r);
+}
+
+/** 등록 (FormData: json + files[]) */
+export async function createBoardByFormData(body: CreateBoardReq, files?: File[]) {
+  const fd = new FormData();
+
+  // [FIX] Spring이 @RequestPart("json")를 안정적으로 파싱하도록 파일명까지 함께 지정
+  fd.append(
+    'json',
+    new Blob([JSON.stringify(body ?? {})], { type: 'application/json' }),
+    'payload.json'
+  );
+
+  (files ?? []).forEach(f => fd.append('files', f));
+
+  const token = getAccessToken(); // localStorage 또는 쿠키에서 읽음
+
+  const r = await http.post(`${BASE_PATH}/create`, fd, {
+    // [KEEP] Content-Type 수동 지정 금지(axios가 boundary 포함 자동 세팅)
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    withCredentials: true, // 쿠키를 병행한다면 유지, 아니라면 제거해도 무방
   });
 
-  return data;
+  return unwrap<any>(r);
 }
+
+/** 수정 (FormData: json + addFiles[] + deleteUuids(JSON) + orders(JSON)) */
+export async function updateBoardByFormData(
+  bno: number,
+  body: Omit<UpdateBoardReq, 'bno'>,
+  opts?: {
+    addFiles?: File[];
+    deleteUuids?: number[];              // 삭제할 이미지 uuid들
+    orders?: Array<{ uuid: number; sortOrder: number }>;
+  }
+) {
+  const fd = new FormData();
+
+  // [FIX] 여기서도 파일명 지정
+  fd.append(
+    'json',
+    new Blob([JSON.stringify(body ?? {})], { type: 'application/json' }),
+    'payload.json'
+  );
+
+  (opts?.addFiles ?? []).forEach(f => fd.append('addFiles', f));
+
+  if (opts?.deleteUuids?.length) {
+    fd.append('deleteUuids',
+      new Blob([JSON.stringify(opts.deleteUuids)], { type: 'application/json' }),
+      'deleteUuids.json'
+    );
+  }
+  if (opts?.orders?.length) {
+    fd.append('orders',
+      new Blob([JSON.stringify(opts.orders)], { type: 'application/json' }),
+      'orders.json'
+    );
+  }
+
+  const token = getAccessToken();
+
+  const r = await http.post(`${BASE_PATH}/update/${bno}`, fd, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    withCredentials: true,
+  });
+
+  return unwrap<any>(r);
+}
+
+/** 삭제 */
+export async function removeBoard(bno: number) {
+  const token = getAccessToken();
+  const r = await http.post(`${BASE_PATH}/delete/${bno}`, undefined, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    withCredentials: true,
+  });
+  return unwrap<any>(r);
+}
+
+/** 좋아요 */
+export async function likeBoard(bno: number) {
+  const token = getAccessToken();
+  const r = await http.post(`${BASE_PATH}/like/${bno}`, undefined, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    withCredentials: true,
+  });
+  return unwrap<any>(r);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   훅(useBoards.ts)과의 호환용 이름들
+   - useBoards.ts 가 fetchBoards, createBoard, updateBoard 를 임포트함
+   ──────────────────────────────────────────────────────────── */
+export { fetchBoardList as fetchBoards };
+export { createBoardByFormData as createBoard };
+export { updateBoardByFormData as updateBoard };
