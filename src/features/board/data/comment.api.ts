@@ -1,18 +1,71 @@
-// src/features/comment/data/comment.api.ts
-import { http } from "@/shared/data/http";
-import { withPrefix } from "@/lib/api";
+import http from "@/shared/data/http";
+import type { CommentDetail, CreateCommentReq, UpdateCommentReq, PageRes } from "./comment.types";
 
-export async function fetchComments(boardId: number | string) {
-  const res = await http.get(withPrefix(`/comment`), { params: { boardId } });
-  return res.data;
+/** 공통 unwrap: data.result 또는 그대로 */
+function unwrap<T>(r: any): T {
+  const data = (r as any)?.data ?? r;
+  return (data?.result ?? data) as T;
 }
 
-export async function createComment(payload: { boardId: number | string; content: string }) {
-  const res = await http.post(withPrefix(`/comment`), payload);
-  return res.data;
+/** 응답을 항상 Page 형태로 정규화 */
+export function normalizeCommentPage(raw: any): PageRes<CommentDetail> {
+  const base =
+    raw?.page ??
+    raw?.result?.page ??
+    raw?.result?.data?.page ??
+    raw?.result?.data ??
+    raw;
+
+  const list =
+    base?.dtoList ??
+    raw?.dtoList ??
+    raw?.list ??
+    (Array.isArray(raw) ? raw : []) ??
+    [];
+
+  const dtoList: CommentDetail[] = Array.isArray(list) ? list : [];
+  const total =
+    base?.total ??
+    raw?.total ??
+    (Array.isArray(dtoList) ? dtoList.length : 0);
+
+  const page = Number(base?.page ?? raw?.page ?? 1) || 1;
+  const size = Number(base?.size ?? raw?.size ?? 20) || 20;
+
+  return { dtoList, total, page, size };
 }
 
-export async function deleteComment(commentId: number | string) {
-  const res = await http.delete(withPrefix(`/comment/${commentId}`));
-  return res.data;
+/** 목록: GET /comment/read?bno=&page=&size= */
+export async function fetchComments(bno: number, page = 1, size = 20) {
+  const r = await http.get("/comment/read", { params: { bno, page, size } });
+  return normalizeCommentPage(unwrap<any>(r));
+}
+
+/** 등록: POST JSON /comment/create */
+export async function createComment(payload: CreateCommentReq) {
+  const r = await http.post("/comment/create", payload, {
+    headers: { "Content-Type": "application/json" },
+  });
+  return unwrap<any>(r);
+}
+
+/** 수정: POST JSON /comment/{cno}/update */
+export async function updateComment(payload: UpdateCommentReq) {
+  const { cno, ...rest } = payload;
+  const r = await http.post(`/comment/${cno}/update`, rest, {
+    headers: { "Content-Type": "application/json" },
+  });
+  return unwrap<any>(r);
+}
+
+/** 삭제: POST /comment/{cno}/delete */
+export async function removeComment(cno: number) {
+  const r = await http.post(`/comment/${cno}/delete`);
+  return unwrap<any>(r);
+}
+
+/** 좋아요: POST /comment/{cno}/like */
+export async function likeComment(cno: number) {
+  const r = await http.post(`/comment/${cno}/like`);
+  return unwrap<any>(r);
 }

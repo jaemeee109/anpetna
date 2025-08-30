@@ -6,7 +6,7 @@ import {
   fetchBoards,
   fetchBoardById,
   createBoard,
-  createBoardByFormData, // ✅ 추가
+  createBoardByFormData,
   updateBoard,
   removeBoard,
   likeBoard,
@@ -24,9 +24,17 @@ const qk = {
 };
 
 export function useBoardList(params?: FetchBoardsParams) {
+  // ✅ 훅에서 한번 더 안전 정규화 (type → boardType)
+  const page = Number(params?.page ?? 1) || 1;
+  const size = Number(params?.size ?? 10) || 10;
+  const boardType = (params?.boardType ?? params?.type ?? '').toUpperCase();
+  const keyword = params?.keyword ?? params?.q ?? '';
+
+  const norm: FetchBoardsParams = { page, size, boardType, keyword };
+
   return useQuery({
-    queryKey: qk.list(params),
-    queryFn: () => fetchBoards(params ?? {}),
+    queryKey: qk.list(norm),
+    queryFn: () => fetchBoards(norm),
     staleTime: 30_000,
   });
 }
@@ -43,7 +51,6 @@ export function useBoardDetail(bno: number | string | undefined) {
 export function useCreateBoard() {
   const qc = useQueryClient();
   return useMutation({
-    // ✅ FormData가 오면 그대로 전송, 아니면 기존 JSON + files 방식
     mutationFn: (payload: any) => {
       if (typeof FormData !== 'undefined' && payload instanceof FormData) {
         return createBoardByFormData(payload);

@@ -1,54 +1,49 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { commentApi } from "../data/comment.api";
+import {
+  fetchComments,
+  createComment as apiCreate,
+  updateComment as apiUpdate,
+  removeComment as apiRemove,
+  likeComment as apiLike,
+} from "@/features/board/data/comment.api";
 
-export const useComments = (bno: number, page = 1, size = 10, sortBy = "cno") =>
-  useQuery({
-    queryKey: ["comment", "list", bno, page, size, sortBy],
-    queryFn: () => commentApi.read({ bno, page, size, sortBy }),
-    select: (res: any) => res, // { bno, page: { dtoList: [...] } }
-    enabled: Number.isFinite(bno),
+export function useComments(bno: number, page = 1, size = 20) {
+  return useQuery({
+    queryKey: ["comments", bno, page, size],
+    queryFn: () => fetchComments(bno, page, size),
   });
+}
 
-export const useCreateComment = () => {
+export function useCreateComment() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: { bno: number; cWriter: string; cContent: string }) =>
-      commentApi.create(body),
+    mutationFn: apiCreate,
     onSuccess: (_res, vars) => {
-      // vars.bno 기준으로 해당 글의 댓글 리스트만 갱신
-      qc.invalidateQueries({ queryKey: ["comment", "list", vars.bno] });
+      qc.invalidateQueries({ queryKey: ["comments", vars.bno] });
     },
   });
-};
+}
 
-/** ✅ 수정 훅: bno를 인자로 받아 해당 글의 목록 쿼리만 갱신 */
-export const useUpdateComment = (bno: number) => {
+export function useUpdateComment(bno: number) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (args: { cno: number; cContent: string; cWriter?: string }) =>
-      commentApi.update(args.cno, args), // commentApi.update(cno, body)
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["comment", "list", bno] });
-    },
+    mutationFn: apiUpdate,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["comments", bno] }),
   });
-};
+}
 
-export const useRemoveComment = (bno: number) => {
+export function useRemoveComment(bno: number) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (cno: number) => commentApi.remove(cno),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["comment", "list", bno] });
-    },
+    mutationFn: apiRemove,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["comments", bno] }),
   });
-};
+}
 
-export const useLikeComment = (bno: number) => {
+export function useLikeComment(bno: number) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (cno: number) => commentApi.like(cno),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["comment", "list", bno] });
-    },
+    mutationFn: apiLike,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["comments", bno] }),
   });
-};
+}

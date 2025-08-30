@@ -11,23 +11,50 @@ const BASE_PATH = '/board';
 
 function unwrap<T>(r: any): T {
   const data = (r as any)?.data ?? r;
-  return (data?.result ?? data) as T;
+  if (data?.result) return data.result as T;
+  return data as T;
 }
 
 export type FetchBoardsParams = {
   page?: number;
   size?: number;
-  type?: string;
+  type?: string;       // 라우트에서 넘어오는 NOTICE 등
   keyword?: string;
-  boardType?: string;
+  boardType?: string;  // 서버 규격
   category?: string;
   q?: string;
 };
 
+/** 목록: 비인증 1차 호출 → 401이면 토큰으로 재시도(환경 대응) */
 export async function fetchBoards(params?: FetchBoardsParams) {
-  const safe = params ?? {};
-  const r = await http.get(`${BASE_PATH}/readAll`, { params: safe });
-  return unwrap<PageRes<BoardDetail>>(r);
+  const p = params ?? {};
+  const page = Number(p.page ?? 1) || 1;
+  const size = Number(p.size ?? 10) || 10;
+
+  // ✅ 항상 boardType으로 보냄 (type → boardType 매핑)
+  const boardType = (p.boardType ?? p.type ?? '').toUpperCase();
+  const keyword = p.keyword ?? p.q ?? '';
+
+  // 1) 비인증 시도
+  try {
+    const r = await http.get(`${BASE_PATH}/readAll`, {
+      params: { page, size, boardType, keyword },
+      headers: { 'X-Skip-Auth': '1' },
+      withCredentials: false,
+    });
+    return unwrap<PageRes<BoardDetail>>(r);
+  } catch (e: any) {
+    if (e?.response?.status !== 401) throw e;
+  }
+
+  // 2) 401이면 토큰으로 재시도(일부 환경에서 목록도 인증 요구하는 경우용)
+  const token = getAccessToken();
+  const r2 = await http.get(`${BASE_PATH}/readAll`, {
+    params: { page, size, boardType, keyword },
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    withCredentials: !!token,
+  });
+  return unwrap<PageRes<BoardDetail>>(r2);
 }
 
 export async function fetchBoardById(bno: number, opts?: { like?: boolean }) {
@@ -53,7 +80,7 @@ export async function createBoard(body: CreateBoardReq, files?: File[]) {
   return unwrap<any>(r);
 }
 
-/** ✅ 등록 (이미 FormData가 준비되어 있을 때 그대로 전송) */
+/** 등록 (이미 FormData 준비돼 있을 때) */
 export async function createBoardByFormData(fd: FormData) {
   const token = getAccessToken();
   const r = await http.post(`${BASE_PATH}/create`, fd, {
