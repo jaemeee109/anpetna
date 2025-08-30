@@ -6,10 +6,11 @@ import {
   fetchBoards,
   fetchBoardById,
   createBoard,
+  createBoardByFormData, // ✅ 추가
   updateBoard,
   removeBoard,
   likeBoard,
-   updateBoardByFormData,  
+  updateBoardByFormData,
   type FetchBoardsParams,
 } from '@/features/board/data/board.api';
 import type { UpdateBoardReq } from '@/features/board/data/board.types';
@@ -42,8 +43,13 @@ export function useBoardDetail(bno: number | string | undefined) {
 export function useCreateBoard() {
   const qc = useQueryClient();
   return useMutation({
-    // Create는 프론트 전용 업로드 타입이므로 any로 받아도 무방(실제 검사는 컴파일러가 파일 타입 체크함)
-    mutationFn: (payload: any) => createBoard(payload),
+    // ✅ FormData가 오면 그대로 전송, 아니면 기존 JSON + files 방식
+    mutationFn: (payload: any) => {
+      if (typeof FormData !== 'undefined' && payload instanceof FormData) {
+        return createBoardByFormData(payload);
+      }
+      return createBoard(payload?.json ?? payload, payload?.files);
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['board', 'list'] });
     },
@@ -51,13 +57,10 @@ export function useCreateBoard() {
 }
 
 export function useUpdateBoard() {
-   const qc = useQueryClient();
+  const qc = useQueryClient();
   return useMutation({
-    // 두 형태 모두 지원
     mutationFn: (payload: UpdateBoardArg | UpdateBoardFormArg) => {
-      if ((payload as any).formData) {
-        return updateBoardByFormData(payload as UpdateBoardFormArg);
-      }
+      if ((payload as any).formData) return updateBoardByFormData(payload as UpdateBoardFormArg);
       return updateBoard(payload as UpdateBoardArg);
     },
     onSuccess: (_data, vars) => {

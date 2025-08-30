@@ -7,7 +7,6 @@ import { useCreateBoard } from "@/features/board/hooks/useBoards";
 export default function NewBoardPage() {
   const router = useRouter();
   const { type } = useParams<{ type: string }>();
-
   const createMut = useCreateBoard();
 
   const [writer, setWriter] = React.useState("");
@@ -16,20 +15,24 @@ export default function NewBoardPage() {
   const [pinned, setPinned] = React.useState(false);
   const [secret, setSecret] = React.useState(false);
 
-  // === 이미지 첨부 상태 ===
   const [files, setFiles] = React.useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = React.useState<string[]>([]);
   const fileRef = React.useRef<HTMLInputElement | null>(null);
 
-  // 로그인한 작성자 아이디 자동 채우기(있으면)
+  // 로그인한 작성자 자동 세팅
   React.useEffect(() => {
     if (typeof window !== "undefined") {
-      setWriter(localStorage.getItem("memberId") || "");
+      // 프로젝트에서 실제 저장하는 키명에 맞춰 순서대로 조회
+      const id =
+        localStorage.getItem("memberId") ||
+        localStorage.getItem("username") ||
+        localStorage.getItem("userId") ||
+        "";
+      setWriter(id);
     }
   }, []);
 
-  // ✅ files가 바뀔 때마다 blob URL을 만들어 state에 저장
-  //    cleanup에서 해당 URL만 revoke (Strict 모드에서도 안전)
+  // 미리보기 URL 관리
   React.useEffect(() => {
     if (files.length === 0) {
       setPreviewUrls([]);
@@ -46,13 +49,31 @@ export default function NewBoardPage() {
     const picked = Array.from(e.target.files ?? []);
     if (picked.length === 0) return;
     setFiles((prev) => [...prev, ...picked]);
-    // 같은 파일 다시 선택 가능하게 초기화
-    e.currentTarget.value = "";
+    e.currentTarget.value = ""; // 같은 파일 다시 선택 가능
   };
 
   const removePicked = (i: number) => {
     setFiles((prev) => prev.filter((_, idx) => idx !== i));
   };
+
+  // ✅ 서버 응답 성공 판정 보강
+  function isCreateOk(res: any) {
+    if (!res) return false;
+
+    // 1) 전형적인 래핑 성공
+    if (res.isSuccess === true) return true;
+    if (res?.result?.isSuccess === true) return true;
+    if (res?.resCode && Number(res.resCode) === 200) return true;
+
+    // 2) 엔티티 자체가 내려오는 경우 (bno가 있으면 성공으로 간주)
+    const ent = res?.result ?? res;
+    if (typeof ent === "object" && ent !== null) {
+      if (ent.bno || ent.id) return true;
+      // 생성일 필드가 같이 오면 역시 성공 가능성 큼
+      if (ent.createDate || ent.createdAt) return true;
+    }
+    return false;
+  }
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,18 +87,53 @@ export default function NewBoardPage() {
       isSecret: secret,
     };
 
+    // 서버가 요구하는 포맷: FormData(json + files[])
     const fd = new FormData();
     fd.append("json", new Blob([JSON.stringify(json)], { type: "application/json" }));
     files.forEach((f) => fd.append("files", f));
 
+    // 디버그 로그
+    if (process.env.NODE_ENV !== "production") {
+      console.log("[createBoard] payload(json):", json);
+      console.log(
+        "[createBoard] files:",
+        files.map((f) => f.name)
+      );
+    }
+
+    // useCreateBoard는 FormData를 넘기면 그대로 전송함
     createMut.mutate(fd, {
       onSuccess: (res: any) => {
-        alert("등록 성공");
-        const bno = res?.createBoard?.bno ?? res?.bno ?? res?.id ?? null;
-        router.push(bno ? `/board/${type}/${bno}` : `/board/${type}`);
+        // ✅ 여기서 성공/실패를 재판정
+        const ok = isCreateOk(res);
+
+        if (ok) {
+          const result = res?.result ?? res;
+          const newBno =
+            result?.bno ??
+            result?.id ??
+            res?.createBoard?.bno ??
+            null;
+
+          alert("등록 성공");
+          router.push(newBno ? `/board/${type}/${newBno}` : `/board/${type}`);
+        } else {
+          // 실패 메시지는 최대한 백엔드 원문 유지
+          const msg =
+            res?.resMessage ||
+            res?.message ||
+            "등록 실패";
+          alert(msg);
+          console.error("[createBoard] fail:", res);
+        }
       },
       onError: (err: any) => {
-        alert(`등록 실패\n${err?.response?.status ?? ""}`);
+        const msg =
+          err?.response?.data?.resMessage ||
+          err?.message ||
+          "등록 실패";
+        alert(msg);
+        console.error("[createBoard] error:", err);
       },
     });
   };
@@ -116,7 +172,7 @@ export default function NewBoardPage() {
         />
       </div>
 
-      {/* === 이미지 첨부 (내용 아래, 고정/비밀 위) === */}
+      {/* 이미지 첨부 */}
       <div className="mt-4 mb-4">
         <div className="mb-2 text-sm text-gray-700">이미지 첨부</div>
         <div className="flex items-center gap-2">
@@ -138,7 +194,6 @@ export default function NewBoardPage() {
           onChange={onPick}
         />
 
-        {/* ✅ 미리보기: previewUrls 기준으로 표시 */}
         {previewUrls.length > 0 && (
           <div className="mt-3 grid grid-cols-3 gap-3">
             {previewUrls.map((src, i) => (

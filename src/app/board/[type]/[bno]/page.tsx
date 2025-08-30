@@ -1,111 +1,174 @@
+// src/app/board/[type]/page.tsx
 "use client";
 
-import * as React from "react";
-import { useRouter, useParams, usePathname } from "next/navigation";
-import { useBoardDetail, useLikeBoard, useRemoveBoard } from "@/features/board/hooks/useBoards";
+import { useSearchParams, useRouter } from "next/navigation";
+import { useBoardList } from "@/features/board/hooks/useBoards";
+import { BoardViewSwitcher } from "@/features/board/ui/BoardViewSwitcher";
 
-export default function BoardDetailPage() {
-  const router = useRouter();
+const PAGE_SIZE = 10;
+const WRAP = "mx-auto w-full max-w-[960px] px-4";
 
-  // ✅ Next 버전에 따라 제네릭 사용 시 타입에러가 나므로, 캐스팅으로 처리
-  const raw = (typeof useParams === "function" ? useParams() : {}) as {
-    type?: string;
-    bno?: string;
+/** ★ 로컬 페이징 (번호 5개씩, 번호는 텍스트 / 앞뒤는 버튼) */
+function Pager({
+  current,
+  total,
+  size,
+  onPage,
+}: {
+  current: number;
+  total: number;
+  size: number;
+  onPage: (p: number) => void;
+}) {
+  const totalPages = Math.max(1, Math.ceil((total ?? 0) / Math.max(1, size)));
+  const cur = Math.min(Math.max(1, current || 1), totalPages);
+
+  const goto = (p: number) => {
+    const page = Math.min(Math.max(1, p), totalPages);
+    if (page !== cur) onPage(page);
   };
 
-  let type = raw?.type ?? "";
-  let bno = raw?.bno ?? "";
+  const groupSize = 5;
+  const currentGroup = Math.floor((cur - 1) / groupSize);
+  const startPage = currentGroup * groupSize + 1;
+  const endPage = Math.min(startPage + groupSize - 1, totalPages);
 
-  // 🔁 드물게 useParams가 못 잡히는 환경 대비: pathname 분해 백업
-  if (!type || !bno) {
-    try {
-      const pathname = usePathname?.();
-      if (pathname) {
-        const parts = pathname.split("/").filter(Boolean); // ["board", "{type}", "{bno}"]
-        if (parts[0] === "board") {
-          type = type || (parts[1] as string);
-          bno = bno || (parts[2] as string);
-        }
-      }
-    } catch {}
-  }
+  const pages: number[] = [];
+  for (let p = startPage; p <= endPage; p++) pages.push(p);
 
-  const id = Number(bno);
+  const BTN = "btn-3d btn-white px-3 py-1 text-xs no-underline";
+  const DISABLED = "opacity-60 cursor-not-allowed";
+  const ACTIVE_NUM = "font-bold text-black";
 
-  const { data: board, isLoading, error } = useBoardDetail(id);
-  const likeMut = useLikeBoard();
-  const removeMut = useRemoveBoard();
-
-  if (!type || !bno || Number.isNaN(id)) {
-    return <div className="mx-auto max-w-[960px] px-4">잘못된 경로입니다.</div>;
-  }
-
-  if (isLoading) return <div className="mx-auto max-w-[960px] px-4">로딩중…</div>;
-  if (error || !board) return <div className="mx-auto max-w-[960px] px-4">글을 불러오지 못했어요.</div>;
-
-  const title = (board as any).bTitle ?? (board as any).title ?? "(제목 없음)";
-  const writer = (board as any).bWriter ?? (board as any).writer ?? "-";
-  const content = (board as any).bContent ?? (board as any).content ?? "";
-  const likeCount = (board as any).bLikeCount ?? (board as any).likeCount ?? 0;
-  const images: Array<{ uuid?: number; url?: string; fileName?: string }> = (board as any).images ?? [];
+  const WRAP_GAP = "gap-[6px]";
+  const NUM_GAP = "gap-[6px]";
+  const NUM_SIDE_MARGIN = "mx-[10px]";
 
   return (
-    <section className="mx-auto w-full max-w-[960px] px-4">
-      <h1 className="mt-8 text-2xl font-semibold text-center">{title}</h1>
-      <div className="mt-4 mb-4 border-t border-gray-200 px-12" />
-      <div className="flex items-center justify-end gap-3 px-12 py-3 text-sm text-gray-600 mb-10">
-        <span className="whitespace-nowrap">{writer}</span>
-        <button className="btn-3d btn-white" onClick={() => router.push(`/board/${type}/${bno}/edit`)}>
-          수정
-        </button>
-        <button
-          className="btn-3d btn-white"
-          disabled={removeMut.isPending}
-          onClick={() => {
-            if (!confirm("정말 삭제하시겠습니까?")) return;
-            removeMut.mutate(id, {
-              onSuccess: () => {
-                alert("삭제되었습니다.");
-                router.push(`/board/${type}`);
-              },
-              onError: () => alert("삭제 실패"),
-            });
+    <nav className={`flex items-center justify-center ${WRAP_GAP}`}>
+      <button
+        type="button"
+        className={`${BTN} ${startPage === 1 ? DISABLED : ""}`}
+        onClick={() => goto(1)}
+        disabled={startPage === 1}
+      >
+        처음
+      </button>
+      <button
+        type="button"
+        className={`${BTN} ${startPage === 1 ? DISABLED : ""}`}
+        onClick={() => goto(startPage - 1)}
+        disabled={startPage === 1}
+      >
+        이전
+      </button>
+
+      <div className={`flex ${NUM_GAP} ${NUM_SIDE_MARGIN}`}>
+        {pages.map((p) =>
+          p === cur ? (
+            <span key={p} className={ACTIVE_NUM} aria-current="page">
+              {p}
+            </span>
+          ) : (
+            <span
+              key={p}
+              onClick={() => goto(p)}
+              className="cursor-pointer text-gray-600 hover:text-black"
+            >
+              {p}
+            </span>
+          )
+        )}
+      </div>
+
+      <button
+        type="button"
+        className={`${BTN} ${endPage === totalPages ? DISABLED : ""}`}
+        onClick={() => goto(endPage + 1)}
+        disabled={endPage === totalPages}
+      >
+        다음
+      </button>
+      <button
+        type="button"
+        className={`${BTN} ${endPage === totalPages ? DISABLED : ""}`}
+        onClick={() => goto(totalPages)}
+        disabled={endPage === totalPages}
+      >
+        마지막
+      </button>
+    </nav>
+  );
+}
+
+export default function BoardListPage({ params }: { params: { type: string } }) {
+  const { type } = params; // 클라 컴포넌트에서는 Promise 아님
+  const boardType = (type || "").toUpperCase();
+
+  const search = useSearchParams();
+  const router = useRouter();
+  const page = Number(search.get("page") ?? "1");
+  const keyword = search.get("q") ?? "";
+
+  // ✅ 훅이 객체 인자를 받도록 호출(시그니처 불일치로 뜨던 빨간줄 제거)
+  const { data, isLoading, error } = (useBoardList as any)({
+    page,
+    size: PAGE_SIZE,
+    boardType,      // 서버에 NOTICE/FREE/QNA/FAQ로 보낼 값
+    keyword,
+  });
+
+  if (typeof window !== "undefined") {
+    console.log("[BoardList] type:", boardType);
+    console.log("[BoardList] raw data:", data);
+    console.log("[BoardList] error:", error);
+  }
+
+  const rawItems =
+    (data as any)?.dtoList ??
+    (data as any)?.page?.dtoList ??
+    (data as any)?.result?.dtoList ??
+    [];
+
+  const safeTotal =
+    (data as any)?.total ??
+    (data as any)?.page?.total ??
+    (data as any)?.result?.total ??
+    0;
+
+  // 임시 필터(백엔드 boardType 잘 들어오면 제거 가능)
+  const safeItems = Array.isArray(rawItems)
+    ? rawItems.filter((it: any) => {
+        const t = (it.boardType ?? it.type ?? "").toUpperCase();
+        return !boardType || t === boardType;
+      })
+    : [];
+
+  if (error) return <div className={WRAP}>에러가 발생했어요</div>;
+
+  return (
+    <section className={WRAP}>
+      <BoardViewSwitcher
+        type={boardType}
+        page={page}
+        size={PAGE_SIZE}
+        total={safeTotal}
+        items={safeItems}
+        isLoading={isLoading}
+      />
+
+      <div className={`${WRAP} flex justify-center`} style={{ marginTop: 16, marginBottom: 64 }}>
+        <Pager
+          current={page}
+          total={safeTotal}
+          size={PAGE_SIZE}
+          onPage={(p) => {
+            const qs = new URLSearchParams();
+            qs.set("page", String(p));
+            if (keyword) qs.set("q", keyword);
+            router.push(`/board/${type}?${qs.toString()}`);
           }}
-        >
-          {removeMut.isPending ? "삭제 중..." : "삭제"}
-        </button>
-      </div>
-
-      <div className="my-16 flex justify-center">
-        <article className="w-full max-w-[720px] whitespace-pre-wrap leading-7 text-gray-900 text-center">
-          {content}
-          {images?.length > 0 && (
-            <div className="mt-6 space-y-4">
-              {images.map((img, i) =>
-                img?.url ? (
-                  <img
-                    key={img.uuid ?? i}
-                    src={img.url}
-                    alt={img.fileName ?? `image-${i}`}
-                    className="w-full rounded border border-gray-200"
-                  />
-                ) : null
-              )}
-            </div>
-          )}
-        </article>
-      </div>
-
-      <div className="flex justify-center mt-10 mb-16">
-        <button className="btn-3d btn-white" onClick={() => likeMut.mutate(id)}>
-          좋아요 {likeCount}
-        </button>
-      </div>
-
-      <div className="flex justify-center py-12">
-        <button className="btn-3d btn-white mb-16" onClick={() => router.push(`/board/${type}`)}>
-          목록으로
-        </button>
+        />
       </div>
     </section>
   );
