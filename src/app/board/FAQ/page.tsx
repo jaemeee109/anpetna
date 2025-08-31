@@ -3,9 +3,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import PawIcon from '@/components/icons/Paw';
+import PawIcon from '@/src/components/icons/Paw';
 
-const WRAP = 'mx-auto w-full max-w-[700px] px-4';
+const WRAP = 'mx-auto w-full max-w-[960px] px-4';
 
 // FAQ 카테고리 버튼 목록 (표시 라벨)
 const CATS = ['회원계정', '주문/배송', '교환/반품', '이용안내'] as const;
@@ -19,42 +19,87 @@ type Row = {
   bWriter?: string; writer?: string; bwriter?: string;
   createDate?: string; createdAt?: string; regDate?: string;
 
-  // 서버 필드 이름이 다를 수 있어 최대한 유연하게 케이스를 모아둠
   category?: string; bCategory?: string; faqCategory?: string; cat?: string; group?: string; section?: string; type2?: string;
+
+  // 서버마다 다른 보드 타입 키들
+  boardType?: string; type?: string; bType?: string; board?: string; type1?: string;
 };
 
-/** 응답이 비어 있어도 안전하게 JSON으로 파싱 */
-async function parseJsonSafe(resp: Response): Promise<any> {
-  const text = await resp.text();
-  if (!text) return {};
-  try { return JSON.parse(text); } catch { return {}; }
+/* ====== 인증 유틸(클라에서 관리자 판별 + 삭제 요청용) ====== */
+function getCookie(name: string) {
+  if (typeof document === 'undefined') return null;
+  const safe = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const m = document.cookie.match(new RegExp('(?:^|; )' + safe + '=([^;]*)'));
+  return m ? decodeURIComponent(m[1]) : null;
 }
-
-/** 개발 중엔 3000 → 8000 자동 스왑하여 백엔드로 보냄 */
-function buildBase(): string {
-  const env = process.env.NEXT_PUBLIC_API_BASE as string | undefined;
-  if (env) return env.replace(/\/+$/, '');
+function getTokenFromStorage() {
   if (typeof window === 'undefined') return '';
-  const { protocol, hostname, port } = window.location;
-  const usePort = port ? (port === '3000' ? '8000' : port) : '';
-  return `${protocol}//${hostname}${usePort ? `:${usePort}` : ''}`;
+  let t =
+    localStorage.getItem('accessToken') ||
+    sessionStorage.getItem('accessToken') ||
+    localStorage.getItem('access_token') ||
+    sessionStorage.getItem('access_token') ||
+    '';
+  if (!t) {
+    const raw =
+      getCookie('Authorization') ||
+      getCookie('authorization') ||
+      getCookie('accessToken') ||
+      '';
+    if (raw) t = raw.replace(/^Bearer\s+/i, '');
+  }
+  return t || '';
 }
-
-/** Authorization 헤더(있으면) + 기타 헤더 병합 */
-function authHeaders(extra?: HeadersInit, json = false): Headers {
-  const h = new Headers(extra);
-  if (json) h.set('Content-Type', 'application/json');
+function authHeaders(): HeadersInit {
+  const t = getTokenFromStorage();
+  if (!t) return {};
+  return { Authorization: t.startsWith('Bearer ') ? t : `Bearer ${t}` };
+}
+function parseJwt(token: string): any | null {
   try {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-    if (token) h.set('Authorization', `Bearer ${token}`);
-  } catch {}
-  return h;
+    const clean = token.replace(/^Bearer\s+/i, '');
+    const [_, body] = clean.split('.');
+    if (!body) return null;
+    const base64 = body.replace(/-/g, '+').replace(/_/g, '/');
+    const pad = base64.length % 4 ? 4 - (base64.length % 4) : 0;
+    const json = atob(base64 + '='.repeat(pad));
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
+function arrayify(v: any): string[] {
+  if (!v) return [];
+  if (Array.isArray(v)) return v.map(String);
+  if (typeof v === 'string') return v.split(/[,\s]+/).filter(Boolean);
+  return [String(v)];
+}
+function isAdminFromClaims(claims: any): boolean {
+  if (!claims) return false;
+  const candidates = [
+    claims.role, claims.roles, claims.authority, claims.authorities,
+    claims.auth, claims.memberRole, claims.scope, claims.scp,
+  ];
+  const all = candidates.flatMap(arrayify).map((s) => s.toUpperCase());
+  const numericAdmin =
+    Number((claims.roleId ?? claims.role_id ?? claims.adminLevel ?? -1)) === 1;
+  const booleanAdmin = !!(claims.isAdmin ?? claims.admin);
+  return numericAdmin || booleanAdmin || all.includes('ADMIN') || all.includes('ROLE_ADMIN');
+}
+function detectAdminOnce(): boolean {
+  const stored = (getCookie('memberRole') || localStorage.getItem('memberRole') || '').toUpperCase();
+  if (stored === 'ADMIN' || stored === 'ROLE_ADMIN') return true;
+  const t = getTokenFromStorage();
+  return isAdminFromClaims(parseJwt(t));
 }
 
 /** 서버에서 FAQ 목록을 가져옵니다.
- *  ✅ boardType & category를 서버에 전달해 서버 측에서 먼저 필터링
+ *  ✅ 목록은 "완전 공개" 우선: page/size만 보냄
+ *  ✅ 1차: credentials: 'omit' (완전 공개)
+ *  ✅ 2차: 401/403이면 credentials: 'include' (쿠키만), Authorization 헤더는 붙이지 않음
+ *  ✅ 기본 base는 8000 포트로 강제 (env 없을 때)
  */
-function useFaqList(page: number, size: number, selectedCat: Cat) {
+function useFaqList(page: number, size: number) {
   const [data, setData] = useState<any>(null);
   const [isLoading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
@@ -67,23 +112,33 @@ function useFaqList(page: number, size: number, selectedCat: Cat) {
         setLoading(true);
         setError(null);
 
-        const base = buildBase();
-        const url = new URL('/anpetna/board/readAll', base);
+        const base =
+          process.env.NEXT_PUBLIC_API_BASE ||
+          (typeof window !== 'undefined' ? window.location.origin.replace(':3000', ':8000') : '');
+
+        const url = new URL('/board/readAll', base);
         url.search = new URLSearchParams({
           page: String(page),
           size: String(size),
-          boardType: 'FAQ',
-          category: selectedCat,
         }).toString();
 
-        const resp: Response = await fetch(url.toString(), {
-          credentials: 'include',
-          headers: authHeaders(), // ← Authorization 헤더 자동 부착
+        // 1) 완전 공개 요청
+        let resp: Response = await fetch(url.toString(), {
+          credentials: 'omit',
           signal: ac.signal,
         });
+
+        // 2) 공개가 막혀있으면 쿠키만 동봉으로 재시도 (Authorization 헤더는 절대 안 보냄)
+        if ((resp.status === 401 || resp.status === 403) && !ac.signal.aborted) {
+          resp = await fetch(url.toString(), {
+            credentials: 'include',
+            signal: ac.signal,
+          });
+        }
+
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
 
-        const json: any = await parseJsonSafe(resp);
+        const json: any = await resp.json();
         setData(json);
       } catch (e: unknown) {
         if ((e as any)?.name === 'AbortError') return;
@@ -94,12 +149,22 @@ function useFaqList(page: number, size: number, selectedCat: Cat) {
     })();
 
     return () => ac.abort();
-  }, [page, size, selectedCat]);
+  }, [page, size]);
 
   return { data, isLoading, error };
 }
 
-// 레코드에서 카테고리 텍스트를 최대한 안전하게 추출
+// 보드 타입 판별(FAQ만 남기기)
+function pickBoardType(r: Partial<Row>): string {
+  const v = r.boardType ?? r.type ?? r.bType ?? r.board ?? r.type1 ?? '';
+  return String(v || '').trim().toUpperCase().replace(/\s+/g, '');
+}
+function isFAQType(v: string): boolean {
+  const s = (v || '').toUpperCase().replace(/\s+/g, '');
+  return s === 'FAQ' || s.endsWith('FAQ') || s.includes('FAQ');
+}
+
+// 레코드에서 카테고리 텍스트 추출
 function pickCategory(r: Row): string {
   const raw =
     r.category ??
@@ -113,7 +178,7 @@ function pickCategory(r: Row): string {
   return String(raw ?? '').trim();
 }
 
-// 레코드의 카테고리를 우리 버튼 4개 중 하나로 정규화 (대강의 단어 포함으로 매칭)
+// 버튼 4개 중 하나로 정규화
 function normalizeToCat(label: string): Cat | '기타' {
   const s = label.toLowerCase();
   if (!s) return '기타';
@@ -126,10 +191,10 @@ function normalizeToCat(label: string): Cat | '기타' {
 
 export default function FAQPage() {
   const [page] = useState(1);
-  const [size] = useState(200); // FAQ는 카테고리 필터링이라 많이 가져와도 OK
+  const [size] = useState(200);
   const [selectedCat, setSelectedCat] = useState<Cat>('회원계정');
 
-  // URL의 ?category= 값을 읽어 초기/동기화
+  // URL ?category= 동기화
   const sp = useSearchParams();
   useEffect(() => {
     const initialFromUrl = (sp.get('category') || '').trim();
@@ -137,36 +202,52 @@ export default function FAQPage() {
     setSelectedCat(hit as Cat);
   }, [sp]);
 
-  // 검색 입력값(입력창)과 실제 적용된 검색어를 분리
+  // 검색
   const [kwInput, setKwInput] = useState('');
   const [q, setQ] = useState('');
 
-  const { data, isLoading, error } = useFaqList(page, size, selectedCat);
+  const { data, isLoading, error } = useFaqList(page, size);
 
-  // 삭제된 글 가려두기용
+  // 관리자 감지(버튼 노출용)
+  const [admin, setAdmin] = useState<boolean>(detectAdminOnce());
+  useEffect(() => {
+    const onStorage = () => setAdmin(detectAdminOnce());
+    const onFocus = () => setAdmin(detectAdminOnce());
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('focus', onFocus);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, []);
+
+  // 삭제된 글 가려두기
   const [deletedIds, setDeletedIds] = useState<number[]>([]);
 
   async function handleDelete(bno: number) {
+    if (!admin) return alert('관리자만 삭제할 수 있습니다.');
     if (!confirm('정말 삭제하시겠어요?')) return;
     try {
-      const base = buildBase();
-      const url = new URL(`/anpetna/board/delete/${bno}`, base);
+      const base =
+        process.env.NEXT_PUBLIC_API_BASE ||
+        (typeof window !== 'undefined' ? window.location.origin.replace(':3000', ':8000') : '');
+      const url = new URL(`/board/delete/${bno}`, base);
+
       const resp = await fetch(url.toString(), {
         method: 'POST',
         credentials: 'include',
-        headers: authHeaders(), // 인증 포함
+        headers: { ...authHeaders() }, // 관리자 토큰 필요
       });
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      // 화면에서 즉시 제거
       setDeletedIds(prev => [...prev, bno]);
-    } catch {
-      alert('삭제 중 오류가 발생했어요.');
+    } catch (e: any) {
+      alert(e?.message || '삭제 중 오류가 발생했어요.');
     }
   }
 
-  // ✅ 리스트 안전 매핑 (result.dtoList 우선)
+  // 리스트 안전 매핑
   const list: Row[] = useMemo(() => {
-    const d = data as any; 
+    const d = data as any;
     const raw =
       d?.result?.dtoList ??
       d?.result?.page?.dtoList ??
@@ -177,13 +258,18 @@ export default function FAQPage() {
     return Array.isArray(raw) ? raw : [];
   }, [data]);
 
-  // DTO에 카테고리 값이 전혀 없을 때를 대비해, 선택 카테고리로 간주
-  const hasAnyCategory = useMemo(() => list.some(r => pickCategory(r) !== ''), [list]);
+  // 먼저 FAQ만 남김 (QNA 섞임 방지)
+  const onlyFAQ: Row[] = useMemo(() => {
+    return list.filter((r) => isFAQType(pickBoardType(r)));
+  }, [list]);
 
-  // 카테고리 + 키워드 필터
+  // 서버 응답에 카테고리 필드가 없을 수도 있으니 보정
+  const hasAnyCategory = useMemo(() => onlyFAQ.some(r => pickCategory(r) !== ''), [onlyFAQ]);
+
+  // 클라 필터(카테고리 + 검색)
   const filtered = useMemo(() => {
     const kw = q.trim().toLowerCase();
-    return list.filter((r) => {
+    return onlyFAQ.filter((r) => {
       const idVal = (r.bno ?? r.id) as number | undefined;
       if (idVal && deletedIds.includes(idVal)) return false;
 
@@ -196,7 +282,7 @@ export default function FAQPage() {
       const body = (r.bContent ?? r.content ?? r.bcontent ?? '').toString().toLowerCase();
       return title.includes(kw) || body.includes(kw);
     });
-  }, [list, selectedCat, q, hasAnyCategory, deletedIds]);
+  }, [onlyFAQ, selectedCat, q, hasAnyCategory, deletedIds]);
 
   if (isLoading) return <div className={WRAP}>FAQ 불러오는 중…</div>;
   if (error) return <div className={WRAP}>FAQ 로딩 오류가 발생했어요</div>;
@@ -205,10 +291,8 @@ export default function FAQPage() {
     <main className={WRAP}>
       {/* 타이틀/설명 */}
       <section className="faq-head">
-       <h1 className="faq-title inline-flex items-center gap-2 justify-center">
-  FAQ <PawIcon />
-</h1>
-        <p className="faq-sub">자주 묻는 질문을 모았습니다. 찾는 답이 없다면 Q&amp;A로 문의해 주세요</p>
+        <h1 className="faq-title">FAQ <PawIcon/></h1>
+        <p className="faq-sub"></p>
 
         {/* 카테고리 버튼 */}
         <div className="faq-catbar" role="tablist" aria-label="FAQ categories">
@@ -236,7 +320,7 @@ export default function FAQPage() {
           <input
             value={kwInput}
             onChange={(e) => setKwInput(e.target.value)}
-            placeholder="검색 내용을 입력해주세요 ^ㅅ^ "
+            placeholder="자주 묻는 질문을 모았습니다. 찾는 답이 없다면 Q&amp;A로 문의해 주세요"
             className="faq-search"
             aria-label="FAQ 검색"
           />
@@ -252,7 +336,7 @@ export default function FAQPage() {
 
       {/* 선택 카테고리의 글 목록 */}
       <section aria-live="polite" className="faq-listwrap">
-        {/*  <h2 className="faq-listtitle">{selectedCat} </h2>*/}
+        <h2 className="faq-listtitle"></h2>
 
         {filtered.length === 0 ? (
           <div className="faq-empty">검색 결과가 없습니다.</div>
@@ -276,13 +360,13 @@ export default function FAQPage() {
                   >
                     <span className="faq-q-label">Q.</span>
 
-                    {/* 제목은 가운데 영역을 꽉 채우도록 */}
+                    {/* 제목 */}
                     <span className="faq-q-text" style={{ flex: '1 1 auto', minWidth: 0 }}>
                       {title}
                     </span>
 
-                    {/* 오른쪽 액션(수정/삭제) – 검정 글씨 + 작은 폰트 */}
-                    {(r.bno ?? r.id) && (
+                    {/* 오른쪽 액션(수정/삭제) – 관리자만 노출 */}
+                    {admin && (r.bno ?? r.id) && (
                       <span
                         className="faq-row-actions"
                         style={{
@@ -338,7 +422,7 @@ export default function FAQPage() {
                       </span>
                     )}
 
-                    {/* + 아이콘은 액션 옆 같은 줄 */}
+                    {/* + 아이콘 */}
                     <span className="faq-caret" aria-hidden style={{ marginLeft: 8 }}>+</span>
                   </summary>
 
@@ -356,15 +440,17 @@ export default function FAQPage() {
       {/* 구분선 */}
       <hr className="faq-sep" />
 
-      {/* 하단 우측 정렬: 등록 버튼 */}
+      {/* 하단 우측 정렬: 등록 버튼 — 관리자만 노출 */}
       <div className="faq-bottom">
-        <Link
-          href={`/board/FAQ/new?category=${encodeURIComponent(selectedCat)}`}
-          className="btn-3d btn-primary"
-          prefetch={false}
-        >
-          등록
-        </Link>
+        {admin && (
+          <Link
+            href={`/board/FAQ/new?category=${encodeURIComponent(selectedCat)}`}
+            className="btn-3d btn-primary"
+            prefetch={false}
+          >
+            등록
+          </Link>
+        )}
       </div>
     </main>
   );

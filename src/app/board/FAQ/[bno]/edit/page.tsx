@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, FormEvent } from 'react';
+import { useEffect, useState, FormEvent } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 
@@ -14,7 +14,62 @@ type ReadOne = {
   bContent?: string; bcontent?: string;
   bWriter?: string; bwriter?: string;
   faqCategory?: string; category?: string; bCategory?: string; type2?: string; group?: string; section?: string; cat?: string;
+
+  // 서버마다 다른 보드 타입 키들
+  boardType?: string; type?: string; bType?: string; board?: string; type1?: string;
 };
+
+/* ====== 인증 유틸 ====== */
+function getCookie(name: string) {
+  if (typeof document === 'undefined') return null;
+  const safe = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const m = document.cookie.match(new RegExp('(?:^|; )' + safe + '=([^;]*)'));
+  return m ? decodeURIComponent(m[1]) : null;
+}
+function getTokenFromStorage() {
+  if (typeof window === 'undefined') return '';
+  let t =
+    localStorage.getItem('accessToken') ||
+    sessionStorage.getItem('accessToken') ||
+    localStorage.getItem('access_token') ||
+    sessionStorage.getItem('access_token') ||
+    '';
+  if (!t) {
+    const raw =
+      getCookie('Authorization') ||
+      getCookie('authorization') ||
+      getCookie('accessToken') ||
+      '';
+    if (raw) t = raw.replace(/^Bearer\s+/i, '');
+  }
+  return t || '';
+}
+function authHeaders(): HeadersInit {
+  const t = getTokenFromStorage();
+  if (!t) return {};
+  return { Authorization: t.startsWith('Bearer ') ? t : `Bearer ${t}` };
+}
+/* ======================= */
+
+// 보드 타입 판별(FQA만 허용)
+function pickBoardType(r: Partial<ReadOne>): string {
+  const v = r.boardType ?? r.type ?? r.bType ?? r.board ?? r.type1 ?? '';
+  return String(v || '').trim().toUpperCase().replace(/\s+/g, '');
+}
+function isFAQType(v: string): boolean {
+  const s = (v || '').toUpperCase().replace(/\s+/g, '');
+  return s === 'FAQ' || s.endsWith('FAQ') || s.includes('FAQ');
+}
+
+function normalizeToCat(label: string | undefined | null): Cat {
+  const s = (label ?? '').toLowerCase();
+  if (s.includes('회원') || s.includes('계정') || s.includes('account')) return '회원계정';
+  if (s.includes('주문') || s.includes('배송') || s.includes('order') || s.includes('shipping')) return '주문/배송';
+  if (s.includes('교환') || s.includes('반품') || s.includes('환불') || s.includes('return') || s.includes('exchange')) return '교환/반품';
+  if (s.includes('이용') || s.includes('안내') || s.includes('guide') || s.includes('help')) return '이용안내';
+  if ((CATS as readonly string[]).includes(label ?? '')) return (label as Cat);
+  return '회원계정';
+}
 
 export default function FAQEditPage() {
   const router = useRouter();
@@ -33,38 +88,41 @@ export default function FAQEditPage() {
 
   const base =
     process.env.NEXT_PUBLIC_API_BASE ||
-    (typeof window !== 'undefined' ? window.location.origin : '');
+    (typeof window !== 'undefined' ? window.location.origin.replace(':3000', ':8000') : '');
 
-  // 카테고리 정규화
-  function normalizeToCat(label: string | undefined | null): Cat {
-    const s = (label ?? '').toLowerCase();
-    if (s.includes('회원') || s.includes('계정') || s.includes('account')) return '회원계정';
-    if (s.includes('주문') || s.includes('배송') || s.includes('order') || s.includes('shipping')) return '주문/배송';
-    if (s.includes('교환') || s.includes('반품') || s.includes('환불') || s.includes('return') || s.includes('exchange')) return '교환/반품';
-    if (s.includes('이용') || s.includes('안내') || s.includes('guide') || s.includes('help')) return '이용안내';
-    // 서버에 정확 라벨이 들어있는 경우
-    if ((CATS as readonly string[]).includes(label ?? '')) return (label as Cat);
-    return '회원계정';
-  }
-
-  // 상세 불러와서 폼 채우기
+  // 상세 불러오기(관리자)
   useEffect(() => {
     let alive = true;
     (async () => {
       try {
         setLoading(true);
         setErrMsg(null);
-        const url = new URL(`/anpetna/board/readOne/${bno}`, base);
-        const resp = await fetch(url.toString(), { credentials: 'include' });
+        const url = new URL(`/board/readOne/${bno}`, base);
+        const resp = await fetch(url.toString(), {
+          credentials: 'include',
+          headers: { ...authHeaders() },
+        });
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const json = await resp.json();
         const r: ReadOne = (json?.result ?? json) as ReadOne;
 
         if (!alive) return;
+
+        // FAQ만 편집
+        const bt = pickBoardType(r);
+        if (bt && !isFAQType(bt)) {
+          setErrMsg('FAQ 글이 아닙니다.');
+          return;
+        }
+
         setTitle(r.bTitle ?? r.btitle ?? '');
         setWriter(r.bWriter ?? r.bwriter ?? '');
         setContent(r.bContent ?? r.bcontent ?? '');
-        setCat(normalizeToCat(r.faqCategory ?? r.category ?? r.bCategory ?? r.type2 ?? r.group ?? r.section ?? r.cat));
+        setCat(
+          normalizeToCat(
+            r.faqCategory ?? r.category ?? r.bCategory ?? r.type2 ?? r.group ?? r.section ?? r.cat
+          )
+        );
       } catch (e: any) {
         if (!alive) return;
         setErrMsg(e?.message || '상세 로딩 중 오류가 발생했어요.');
@@ -73,8 +131,7 @@ export default function FAQEditPage() {
       }
     })();
     return () => { alive = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bno]);
+  }, [bno, base]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -89,22 +146,21 @@ export default function FAQEditPage() {
     setErrMsg(null);
 
     try {
-      const url = new URL(`/anpetna/board/update/${bno}`, base);
-      // 서버가 인지하는 키를 최대한 넓게 같이 전송(모르는 키는 무시됨)
+      const url = new URL(`/board/update/${bno}`, base);
       const payload = {
         bTitle: title,
         bContent: content,
         bWriter: writer,
-        boardType: type,          // 'FAQ'
-        faqCategory: cat,         // ★ 카테고리 변경 반영
+        boardType: 'FAQ', // 확실히 FAQ로 고정
+        faqCategory: cat,
         category: cat,
         bCategory: cat,
-        images: []                // 이미지 없으면 빈 배열
+        images: []
       };
 
       const resp = await fetch(url.toString(), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         credentials: 'include',
         body: JSON.stringify(payload),
       });
@@ -113,7 +169,6 @@ export default function FAQEditPage() {
         throw new Error(`수정 실패 (HTTP ${resp.status})\n${text.slice(0, 200)}`);
       }
 
-      // 성공 → 목록으로
       router.replace(`/board/FAQ?category=${encodeURIComponent(cat)}`);
     } catch (e: any) {
       setErrMsg(e?.message || '수정 중 오류가 발생했습니다.');
@@ -195,7 +250,7 @@ export default function FAQEditPage() {
           <p style={{ color: '#c00', margin: '8px 0 0 120px', whiteSpace: 'pre-wrap' }}>{errMsg}</p>
         )}
 
-        {/* 버튼 영역 (등록 페이지와 동일 UI) */}
+        {/* 버튼 영역 */}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
           <Link href={`/board/FAQ?category=${encodeURIComponent(cat)}`} className="btn-3d btn-white" prefetch={false} style={{ textDecoration: 'none' }}>
             취소

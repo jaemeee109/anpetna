@@ -1,316 +1,249 @@
 // features/member/data/member.api.ts
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import type {
+  Member,
+  ReadMemberAllRes,
+  ReadMemberOneRes,
+  ModifyMemberReq,
+  JoinMemberReq,
+  JoinMemberRes,
+  LoginReq,
+  LoginRes,
+} from './member.types';
 
-// =======================================================
-// 공용 member API 모듈 (프론트 요청 경로 단일화)
-// - 로그인: /jwt/login
-// - 기타 API: credentials:"include"
-// - BASE / PREFIX는 .env.local 로 덮어쓸 수 있음
-//   NEXT_PUBLIC_API_BASE=http://192.168.0.160:8000
-//   NEXT_PUBLIC_API_PREFIX=
-// =======================================================
-
-// ======== (로컬 타입 선언: import 없이 동작하도록 최소 정의) ========
-export type MemberRole =
-  | 0 | 1 | 2
-  | 'USER' | 'ADMIN' | 'BLACKLIST'
-  | 'ROLE_USER' | 'ROLE_ADMIN' | 'ROLE_BLACKLIST'
-  | (string & {});
-export interface MemberImage {
-  uuid?: number | string;
-  fileName?: string;
-  url?: string;
-  sortOrder?: number;
-}
-export interface Member {
-  memberId: string;
-  memberPw?: string;
-  memberName: string;
-  memberBirthY: string;
-  memberBirthM: string;
-  memberBirthD: string;
-  memberBirthGM: string; // '양력' | '음력'
-  memberGender: string;   // 'M' | 'F' | 'U'
-  memberHasPet: string;   // 'Y' | 'N'
-  memberPhone: string;
-  smsStsYn: string;
-  memberEmail: string;
-  emailStsYn: string;
-  memberRoadAddress: string;
-  memberZipCode: string;
-  memberDetailAddress: string;
-  memberRole: MemberRole;
-  memberSocial?: boolean;
-  memberEtc?: string;
-  images?: MemberImage[];
-  memberFileImage?: Array<string | MemberImage>;
-  createDate?: string;
-  latestDate?: string;
-  social?: boolean;
-  etc?: string;
-  status?: string;
-  memberDTO?: Member;
-}
-export type ReadMemberAllRes = Member[];
-export interface ReadMemberOneRes extends Member {}
-
-export interface JoinMemberReq {
-  memberId: string;
-  memberPw: string;
-  memberName: string;
-  memberBirthY: string;
-  memberBirthM: string;
-  memberBirthD: string;
-  memberBirthGM: string;
-  memberGender: string;
-  memberHasPet: string;
-  memberPhone: string;
-  smsStsYn: string;
-  memberEmail: string;
-  emailStsYn: string;
-  memberRoadAddress: string;
-  memberZipCode: string;
-  memberDetailAddress: string;
-  memberRole: MemberRole;
-  memberSocial?: boolean;
-  memberEtc?: string;
-  social?: boolean;
-  etc?: string;
-}
-export type JoinMemberRes = { memberId: string };
-
-export type ModifyMemberReq = Partial<Omit<Member, "memberId">> & { memberId: string };
-export type ModifyMemberRes = Member;
-
-export interface LoginReq {
-  memberId: string;
-  memberPw: string;
-}
-export interface LoginRes {
-  accessToken?: string;
-  refreshToken?: string;
-  expiresIn?: number;
-  tokenType?: string;
-  token?: string;
-  jwt?: string;
-  memberId?: string;
-}
-
-// ----- 환경값 & 유틸 -----
-const BASE =
-  (process.env.NEXT_PUBLIC_API_BASE as string | undefined) ||
-  (typeof window !== "undefined"
-    ? `${window.location.protocol}//${window.location.hostname}${
-        window.location.port
-          ? `:${window.location.port === "3000" ? "8000" : window.location.port}`
-          : ""
-      }`.replace(/:$/, "")
-    : "");
-
-const API_PREFIX = (process.env.NEXT_PUBLIC_API_PREFIX as string | undefined) || "";
-
-/** 접두를 붙여 절대 URL 생성 */
-function apiURL(path: string) {
-  const normalized = path.startsWith("/") ? path : `/${path}`;
-  const prefixed = `${API_PREFIX}${normalized}`.replace(/\/{2,}/g, "/");
-  return new URL(prefixed, BASE).toString();
-}
-
-/** 응답을 JSON으로 파싱(빈 응답도 허용) */
-async function parseJson(resp: Response) {
-  const text = await resp.text();
-  if (!text) return {};
+/* ---------------- 공통 유틸 ---------------- */
+function setCookie(name: string, value: string, days = 7) {
   try {
-    return JSON.parse(text);
-  } catch {
-    return {};
-  }
+    const d = new Date();
+    d.setTime(d.getTime() + days * 24 * 60 * 60 * 1000);
+    document.cookie = `${encodeURIComponent(name)}=${encodeURIComponent(
+      value
+    )}; path=/; expires=${d.toUTCString()}`;
+  } catch {}
 }
-
-/** ===== 토큰 유틸(이 파일 독립 동작용) ===== */
-const hasWindow = () => typeof window !== "undefined";
-const stripBearer = (v?: string | null) => (v ? v.replace(/^Bearer\s+/i, "") : "");
-
-function setAccessToken(token?: string | null) {
-  if (!hasWindow() || !token) return;
-  const plain = stripBearer(token);
-  localStorage.setItem("accessToken", plain);
-  const maxAge = 60 * 60 * 12; // 12h
-  document.cookie = `Authorization=Bearer ${plain}; Path=/; Max-Age=${maxAge}; SameSite=Lax`;
-  window.dispatchEvent(new Event("auth-changed"));
+function deleteCookie(name: string) {
+  try { document.cookie = `${encodeURIComponent(name)}=; Max-Age=0; path=/`; } catch {}
 }
-function setRefreshToken(token?: string | null) {
-  if (!hasWindow() || !token) return;
-  const plain = stripBearer(token);
-  localStorage.setItem("refreshToken", plain);
-  const maxAge = 60 * 60 * 24 * 10; // 10d
-  document.cookie = `refreshToken=${plain}; Path=/; Max-Age=${maxAge}; SameSite=Lax`;
-}
-export function clearTokens() {
-  if (!hasWindow()) return;
+function getAccessToken(): string {
   try {
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("refreshToken");
-    document.cookie = `Authorization=; Path=/; Max-Age=0; SameSite=Lax`;
-    document.cookie = `refreshToken=; Path=/; Max-Age=0; SameSite=Lax`;
-    window.dispatchEvent(new Event("auth-changed"));
+    return (
+      localStorage.getItem('accessToken') ||
+      localStorage.getItem('access_token') ||
+      ''
+    );
+  } catch { return ''; }
+}
+function authHeaders(): HeadersInit {
+  const t = getAccessToken();
+  return t ? { Authorization: t.startsWith('Bearer ') ? t : `Bearer ${t}` } : {};
+}
+
+/** ADMIN일 때만 저장, 아니면 키 삭제(절대 USER로 덮어쓰지 않음) */
+function persistRoleAdminOnly(isAdmin: boolean) {
+  try {
+    if (isAdmin) {
+      localStorage.setItem('memberRole', 'ADMIN');
+      setCookie('memberRole', 'ADMIN', 7);
+    } else {
+      localStorage.removeItem('memberRole');
+      deleteCookie('memberRole');
+    }
   } catch {}
 }
 
-/** 토큰을 Authorization 헤더에 실어줌 (객체 형태로 반환) */
-function authHeaderObject(): Record<string, string> {
-  let token: string | null = null;
-  if (hasWindow()) token = localStorage.getItem("accessToken");
-  const headers: Record<string, string> = {};
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-  return headers;
+/** API 베이스 후보 */
+function bases(): string[] {
+  return Array.from(new Set([
+    (process.env.NEXT_PUBLIC_API_BASE || '').replace(/\/$/, ''),
+    typeof window !== 'undefined' ? window.location.origin.replace(':3000', ':8000') : '',
+    typeof window !== 'undefined' ? window.location.origin : '',
+  ].filter(Boolean)));
 }
 
-/** Headers 병합 유틸 (HeadersInit 안전 병합) */
-function buildHeaders(extra?: HeadersInit, withJson = false): Headers {
-  const h = new Headers(authHeaderObject());
-  if (withJson) h.set("Content-Type", "application/json");
-  if (extra) new Headers(extra).forEach((v, k) => h.set(k, v));
-  return h;
-}
-
-/** 공통 GET (credentials: include) */
-async function get<T>(path: string, init?: RequestInit): Promise<T> {
-  const resp = await fetch(apiURL(path), {
-    method: "GET",
-    credentials: "include",
-    headers: buildHeaders(init?.headers),
-    ...init,
-  });
-  if (!resp.ok) {
-    const text = await resp.text().catch(() => "");
-    throw new Error(`${path} 실패 (HTTP ${resp.status})\n${text.slice(0, 300)}`);
-  }
-  const body = await parseJson(resp);
-  return body as T;
-}
-
-/** 공통 POST (credentials: include, JSON 바디) */
-async function post<T>(path: string, body: unknown, init?: RequestInit): Promise<T> {
-  const resp = await fetch(apiURL(path), {
-    method: "POST",
-    credentials: "include",
-    headers: buildHeaders(init?.headers, true),
-    body: JSON.stringify(body ?? {}),
-    ...init,
-  });
-  if (!resp.ok) {
-    const text = await resp.text().catch(() => "");
-    throw new Error(`${path} 실패 (HTTP ${resp.status})\n${text.slice(0, 300)}`);
-  }
-  const data = await parseJson(resp);
+async function jsonFetch<T=any>(url: string, init?: RequestInit): Promise<T> {
+  const r = await fetch(url, init);
+  const text = await r.text();
+  const data = text ? JSON.parse(text) : null;
+  if (!r.ok) throw new Error((data && (data.message||data.error)) || `HTTP ${r.status}`);
   return data as T;
 }
 
-// ----- 엔드포인트 매핑 -----
-export const ENDPOINTS = {
-  signup: "/member/join",          // POST
-  list: "/member/readAll",         // GET
-  readOne: (memberId: string) => `/member/my_page/${encodeURIComponent(memberId)}`, // GET
-  modify: "/member/modify",        // POST
-  remove: "/member/delete",        // GET
-};
+/* ---------------- ADMIN 판별 유틸 ---------------- */
+function parseJwt(token: string): any | null {
+  try {
+    const clean = token.replace(/^Bearer\s+/i, '');
+    const [, body] = clean.split('.');
+    if (!body) return null;
+    const b64 = body.replace(/-/g, '+').replace(/_/g, '/');
+    const pad = b64.length % 4 ? 4 - (b64.length % 4) : 0;
+    const json = atob(b64 + '='.repeat(pad));
+    return JSON.parse(json);
+  } catch { return null; }
+}
+function arrayify(v: any): string[] {
+  if (!v) return [];
+  if (Array.isArray(v)) return v.map(x => x && typeof x==='object' && 'authority' in x ? String((x as any).authority) : String(x));
+  if (typeof v === 'string') return v.split(/[,\s]+/).filter(Boolean);
+  return [String(v)];
+}
+function isAdminFromClaims(claims: any): boolean {
+  if (!claims) return false;
+  const cs = [
+    claims.role, claims.roles, claims.authority, claims.authorities,
+    claims.auth, claims.memberRole, claims.member_role, claims.scope, claims.scp,
+  ];
+  const all = cs.flatMap(arrayify).map(s => s.toUpperCase());
+  const numeric = claims.memberRole ?? claims.member_role ?? claims.roleId ?? claims.role_id ?? claims.adminLevel;
+  const numericAdmin = Number(numeric) === 1 || String(numeric) === '1';
+  const booleanAdmin = !!(claims.isAdmin ?? claims.admin);
+  return numericAdmin || booleanAdmin || all.includes('ADMIN') || all.includes('ROLE_ADMIN');
+}
 
-// =============== 로그인 (토큰 저장 포함) ===============
-export async function login(body: LoginReq): Promise<LoginRes> {
-  const url = apiURL("/jwt/login"); // 백엔드가 /jwt/login에서 토큰 발급 
+/** 서버에서 역할 확인: me/info + /member/read/{id} 모두 시도 */
+async function resolveRoleFromServer(memberId?: string|number): Promise<'ADMIN'|'USER'|null> {
+  const mePaths = ['/jwt/info','/member/info','/auth/me','/api/auth/me','/anpetna/jwt/info','/anpetna/member/info','/anpetna/auth/me'];
+  const readById = (memberId ? [`/member/read/${memberId}`, `/anpetna/member/read/${memberId}`] : []);
+  for (const b of bases()) {
+    for (const p of mePaths) {
+      try {
+        const d: any = await jsonFetch(`${b}${p}`, { method:'GET', credentials:'include', headers: authHeaders() });
+        const src = d?.result ?? d?.data ?? d?.user ?? d?.member ?? d ?? {};
+        const claimsLike = src?.claims ?? src?.tokenPayload ?? src;
+        if (isAdminFromClaims(claimsLike)) return 'ADMIN';
+        const serverField =
+          src?.memberRole ?? src?.member_role ?? src?.role ?? src?.roles ?? src?.roleId ?? src?.role_id;
+        if (String(serverField).toUpperCase().includes('ADMIN') || Number(serverField)===1) return 'ADMIN';
+        return 'USER';
+      } catch {}
+    }
+    for (const p of readById) {
+      try {
+        const d: any = await jsonFetch(`${b}${p}`, { method:'GET', credentials:'include', headers: authHeaders() });
+        const src = d?.result ?? d ?? {};
+        const v = src?.memberRole ?? src?.member_role ?? src?.role ?? src?.roles ?? src?.roleId ?? src?.role_id;
+        if (String(v).toUpperCase().includes('ADMIN') || Number(v)===1) return 'ADMIN';
+        return 'USER';
+      } catch {}
+    }
+  }
+  return null;
+}
 
-  // 1) credentials: omit
-  let resp = await fetch(url, {
-    method: "POST",
-    credentials: "omit",
-    headers: buildHeaders(undefined, true),
-    body: JSON.stringify(body),
-  });
-
-  // 2) 실패 시 include 재시도 (서버가 쿠키/세션 정책일 때)
-  if (!resp.ok) {
+/* ---------------- 회원 API ---------------- */
+export async function listMembers(): Promise<ReadMemberAllRes> {
+  for (const b of bases()) {
     try {
-      resp = await fetch(url, {
-        method: "POST",
-        credentials: "include",
-        headers: buildHeaders(undefined, true),
+      const d: any = await jsonFetch(`${b}/member/readAll`, { credentials:'include', headers:authHeaders() });
+      return (d?.result ?? d ?? []) as ReadMemberAllRes;
+    } catch {}
+  }
+  return [] as ReadMemberAllRes;
+}
+
+export async function readMemberOne(id: string): Promise<ReadMemberOneRes> {
+  for (const b of bases()) {
+    try {
+      const d: any = await jsonFetch(`${b}/member/read/${id}`, { credentials:'include', headers:authHeaders() });
+      return (d?.result ?? d ?? null) as ReadMemberOneRes;
+    } catch {}
+  }
+  throw new Error('회원 정보 조회 실패');
+}
+
+export async function modifyMember(body: ModifyMemberReq): Promise<ReadMemberOneRes> {
+  for (const b of bases()) {
+    try {
+      const d: any = await jsonFetch(`${b}/member/update`, {
+        method:'POST', credentials:'include',
+        headers:{ 'Content-Type':'application/json', ...authHeaders() },
         body: JSON.stringify(body),
       });
-    } catch { /* ignore */ }
+      return (d?.result ?? d ?? null) as ReadMemberOneRes;
+    } catch {}
   }
-
-  const data = resp.ok ? await parseJson(resp) : null;
-  if (!resp.ok || !data) {
-    const text = await resp.text().catch(() => "");
-    throw new Error(`로그인 실패 (/jwt/login)\nHTTP ${resp.status}${text ? `\n${text}` : ""}`);
-  }
-
-  // ── 토큰 추출: 바디 우선, 없으면 헤더 ─────────────────────────
-  const accessFromBody =
-    (data as any)?.accessToken ??
-    (data as any)?.result?.accessToken ??
-    (data as any)?.dto?.accessToken ??
-    (data as any)?.token ??
-    (data as any)?.jwt ??
-    null;
-
-  const refreshFromBody =
-    (data as any)?.refreshToken ??
-    (data as any)?.result?.refreshToken ??
-    (data as any)?.dto?.refreshToken ??
-    null;
-
-  // 헤더에서 Authorization 노출 시 (서버가 expose-headers: Authorization 설정)
-  const authHeader = resp.headers.get("authorization") || resp.headers.get("Authorization");
-  const accessFromHeader = authHeader?.startsWith("Bearer ")
-    ? authHeader.slice(7)
-    : authHeader || null;
-
-  // 저장: accessToken 필수, refresh 있으면 같이
-  const access = accessFromBody || accessFromHeader;
-  if (access) setAccessToken(access);
-  if (refreshFromBody) setRefreshToken(refreshFromBody);
-
-  // 호출부 호환을 위해 원본 응답 형태 반환
-  return (data as LoginRes);
+  throw new Error('회원 수정 실패');
 }
 
-// =============== 회원 API ===============
+export async function removeMember(): Promise<{ok:true}> {
+  for (const b of bases()) {
+    try {
+      await jsonFetch(`${b}/member/delete`, { method:'POST', credentials:'include', headers:authHeaders() });
+      return { ok:true };
+    } catch {}
+  }
+  throw new Error('회원 탈퇴 실패');
+}
+
 export async function signup(body: JoinMemberReq): Promise<JoinMemberRes> {
-  const data = await post<any>(ENDPOINTS.signup, body);
-  const memberId =
-    (data as any)?.memberId ??
-    (data as any)?.result?.memberId ??
-    (data as any)?.dto?.memberId ??
-    (data as any)?.id ??
-    body.memberId;
-  return { memberId };
+  const paths = ['/jwt/signup','/member/signup','/anpetna/jwt/signup'];
+  for (const b of bases()) {
+    for (const p of paths) {
+      try {
+        return await jsonFetch<JoinMemberRes>(`${b}${p}`, {
+          method:'POST', credentials:'include',
+          headers:{ 'Content-Type':'application/json' },
+          body: JSON.stringify(body),
+        });
+      } catch {}
+    }
+  }
+  throw new Error('회원가입 실패');
 }
 
-export async function listMembers(): Promise<ReadMemberAllRes> {
-  const data = await get<any>(ENDPOINTS.list);
-  const arr = (data as any)?.dtoList ?? (data as any)?.list ?? (data as any)?.members ?? data ?? [];
-  return Array.isArray(arr) ? (arr as ReadMemberAllRes) : [];
-}
+/** ⭐ 로그인: 여기서 바로 ADMIN 확정 → memberRole 저장 */
+export async function login(body: LoginReq): Promise<LoginRes> {
+  const paths = ['/jwt/login','/member/login','/api/auth/login','/anpetna/jwt/login'];
+  let last: any;
+  for (const b of bases()) {
+    for (const p of paths) {
+      try {
+        const data = await jsonFetch<LoginRes>(`${b}${p}`, {
+          method:'POST', credentials:'include',
+          headers:{ 'Content-Type':'application/json' },
+          body: JSON.stringify(body),
+        });
 
-export async function readMemberOne(memberId: string): Promise<ReadMemberOneRes> {
-  const data = await get<any>(ENDPOINTS.readOne(memberId));
-  return data as ReadMemberOneRes;
-}
+        // 1) 토큰/아이디 저장
+        const r: any = (data as any)?.result ?? (data as any);
+        const access: string|undefined = r?.accessToken || r?.token || r?.access_token;
+        const refresh: string|undefined = r?.refreshToken || r?.refresh_token;
+        const mid: string|number|undefined = r?.memberId || r?.id || r?.username || r?.loginId;
+        try {
+          if (access) localStorage.setItem('accessToken', access);
+          if (refresh) localStorage.setItem('refreshToken', refresh);
+          if (mid !== undefined) localStorage.setItem('memberId', String(mid));
+        } catch {}
 
-export async function modifyMember(req: ModifyMemberReq): Promise<ModifyMemberRes> {
-  const data = await post<any>(ENDPOINTS.modify, req);
-  const m = ((data as any)?.dto ?? data) as ModifyMemberRes;
-  return m;
-}
+        // 2) 1차 판별: 응답필드 + JWT
+        let isAdmin =
+          String(
+            r?.memberRole ?? r?.member_role ?? r?.role ?? r?.roles ?? r?.roleId
+          ).toUpperCase().includes('ADMIN') ||
+          Number(r?.roleId) === 1 ||
+          Number(r?.memberRole) === 1 ||
+          Number(r?.member_role) === 1;
 
-// ✅ 로컬 타입: DeleteMemberRes (member.types.ts에 없을 때를 대비)
-type DeleteMemberRes = {
-  memberId?: string;
-  success?: boolean;
-  message?: string;
-};
-export async function removeMember(): Promise<DeleteMemberRes> {
-  const data = await get<any>(ENDPOINTS.remove);
-  return data as DeleteMemberRes;
+        if (!isAdmin && access) {
+          const claims = parseJwt(access);
+          isAdmin = isAdminFromClaims(claims);
+        }
+
+        // 3) 2차 판별: 서버 질의
+        if (!isAdmin) {
+          const role = await resolveRoleFromServer(mid);
+          if (role === 'ADMIN') isAdmin = true;
+        }
+
+        // 4) 최후 안전장치: 아이디가 master면 ADMIN
+        if (!isAdmin && typeof mid !== 'undefined') {
+          if (String(mid).toLowerCase() === 'master') isAdmin = true;
+        }
+
+        // 5) 최종 저장 정책
+        persistRoleAdminOnly(isAdmin);
+        return data;
+      } catch (e) { last = e; }
+    }
+  }
+  throw last instanceof Error ? last : new Error('로그인 실패');
 }

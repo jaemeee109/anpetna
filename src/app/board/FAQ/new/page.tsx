@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, FormEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
-const WRAP = 'mx-auto w-full max-w-[960px] px-4';
+const WRAP = 'mx-auto w.full max-w-[960px] px-4'.replace('.','-'); // 클래스 그대로 유지
 const CATS = ['회원계정', '주문/배송', '교환/반품', '이용안내'] as const;
 type Cat = (typeof CATS)[number];
 
@@ -12,87 +12,125 @@ export default function FAQNewPage() {
   const router = useRouter();
   const sp = useSearchParams();
 
+  function authHeaders(): Record<string, string> {
+    if (typeof window === 'undefined') return {};
+    const token = localStorage.getItem('accessToken') || sessionStorage.getItem('accessToken') || '';
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  }
 
-  // 토큰을 Authorization 헤더로 붙여주는 초소형 헬퍼
-function authHeaders(): Record<string, string> {
-  if (typeof window === 'undefined') return {};
-  const token =
-    localStorage.getItem('accessToken') || // 프로젝트에서 저장한 키 이름에 맞춰 조정
-    sessionStorage.getItem('accessToken') ||
-    '';
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
-  // 쿼리로 넘어온 카테고리 기본 선택 (없으면 회원계정)
   const initialCat = useMemo<Cat>(() => {
     const q = (sp.get('category') || '').trim();
     const hit = CATS.find((c) => c === q);
     return hit || '회원계정';
   }, [sp]);
 
-  // 폼 상태
   const [title, setTitle] = useState('');
   const [cat, setCat] = useState<Cat>(initialCat);
   const [writer, setWriter] = useState('');
   const [content, setContent] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [errMsg, setErrMsg] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
-  // 베이스 URL (리라이트 쓰면 자동 프록시됨)
   const base =
     process.env.NEXT_PUBLIC_API_BASE ||
     (typeof window !== 'undefined' ? window.location.origin : '');
 
-  // 전송
+  useEffect(() => {
+    try {
+      const id = localStorage.getItem('memberId') || sessionStorage.getItem('memberId') || '';
+      const role = (localStorage.getItem('memberRole') || sessionStorage.getItem('memberRole') || '').toLowerCase();
+      if (id) setWriter(id);
+      setIsAdmin(role === 'admin');
+    } catch {}
+  }, []);
+
+  async function postWithFallback(fd: FormData): Promise<Response> {
+    const r1 = await fetch(new URL('/board/create', base), {
+      method: 'POST',
+      credentials: 'include',
+      headers: authHeaders(),
+      body: fd,
+    });
+    if (r1.ok || r1.status !== 404) return r1;
+
+    const json = JSON.parse((fd.get('json') as Blob) ? await (fd.get('json') as Blob).text() : '{}');
+    const r2 = await fetch(new URL('/board', base), {
+      method: 'POST',
+      credentials: 'include',
+      headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(json),
+    });
+    return r2;
+  }
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (submitting) return;
 
-    // 간단 검증
-    if (!title.trim() || !content.trim()) {
-      setErrMsg('제목과 내용을 입력해 주세요.');
+    // 관리자만 허용 (프론트에서 1차 차단)
+    if (!isAdmin) {
+      setErrMsg('FAQ 글은 관리자만 등록할 수 있습니다.');
+      alert('FAQ 글은 관리자만 등록할 수 있습니다.');
       return;
     }
 
-    setSubmitting(true);
+    if (!title?.trim() || !content?.trim()) {
+      setErrMsg('제목과 내용을 입력해주세요.');
+      return;
+    }
+
+    const hasToken = !!(localStorage.getItem('accessToken') || sessionStorage.getItem('accessToken'));
+    if (!hasToken) {
+      setErrMsg('로그인이 필요합니다. 관리자 계정으로 로그인 후 다시 시도하세요.');
+      alert('로그인이 필요합니다. 관리자 계정으로 로그인 후 다시 시도하세요.');
+      return;
+    }
+
     setErrMsg(null);
+    setSubmitting(true);
 
     try {
-      // ✅ 실제 등록 엔드포인트로 변경
-    const url = new URL('/board/create', base);
+      const writerToSend =
+        writer ||
+        (localStorage.getItem('memberId') || sessionStorage.getItem('memberId') || '');
 
-      // ✅ 서버 DTO에 맞춰 필드 정리
-      const payload = {
-        bTitle: title,
-        bContent: content,
-        bWriter: writer,
-        boardType: 'FAQ',      // enum 대문자
-        noticeFlag: false,
-        isSecret: false,
-        faqCategory: cat,      // DB 칼럼
-        images: [],            // 이미지 없으면 빈 배열
-      };
+      const fd = new FormData();
+      fd.append(
+        'json',
+        new Blob(
+          [
+            JSON.stringify({
+              bTitle: title,
+              bContent: content,
+              bWriter: writerToSend,
+              boardType: 'FAQ',
+              noticeFlag: false,
+              isSecret: false,
+              faqCategory: cat,
+              category: cat,
+              images: [],
+            }),
+          ],
+          { type: 'application/json' }
+        ),
+        'payload.json'
+      );
 
-      // 백엔드가 @RequestPart("json")로 받으므로 JSON을 Blob으로 감싸서 넣음
-const fd = new FormData();
-fd.append('json', new Blob([JSON.stringify(payload)], { type: 'application/json' }));
-
-    const resp = await fetch(url.toString(), {
-  method: 'POST',
-  // Authorization을 자동으로 붙이는 기존 util을 사용 (★ Content-Type 수동 지정 금지!)
-  headers: authHeaders(), 
-  body: fd,
-});
+      const resp = await postWithFallback(fd);
 
       if (!resp.ok) {
-        const text = await resp.text();
-        throw new Error(`등록 실패 (HTTP ${resp.status})\n${text.slice(0, 200)}`);
+        if (resp.status === 401) throw new Error('로그인이 필요합니다.');
+        if (resp.status === 403) throw new Error('FAQ 글은 관리자만 등록할 수 있습니다.');
+        const text = await resp.text().catch(() => '');
+        throw new Error(`작성 실패 (HTTP ${resp.status})${text ? `\n${text.slice(0,200)}`:''}`);
       }
 
-      // ✅ 성공 → 선택 카테고리 유지한 채 목록으로
-      router.replace(`/board/FAQ?category=${encodeURIComponent(cat)}`);
-    } catch (err: any) {
-      setErrMsg(err?.message || '등록 중 오류가 발생했습니다.');
+      alert('등록되었습니다.');
+      router.replace(`/board/FAQ?category=${encodeURIComponent(cat)}&page=1`);
+    } catch (e:any) {
+      setErrMsg(e?.message || '작성 처리 중 오류가 발생했습니다.');
+      alert(e?.message || '작성 처리 중 오류가 발생했습니다.');
     } finally {
       setSubmitting(false);
     }
@@ -116,7 +154,7 @@ fd.append('json', new Blob([JSON.stringify(payload)], { type: 'application/json'
             onChange={(e) => setTitle(e.target.value)}
             placeholder="제목을 입력하세요"
             required
-            style={{ height: 40, padding: '0 12px', border: '1px solid #ddd', borderRadius: 10 }}
+            style={{ height: 40, padding: '0 12px', border: '1px solid {#ddd}', borderRadius: 10 } as any}
           />
         </div>
 
@@ -164,12 +202,10 @@ fd.append('json', new Blob([JSON.stringify(payload)], { type: 'application/json'
           />
         </div>
 
-        {/* 에러 메시지 */}
         {errMsg && (
           <p style={{ color: '#c00', margin: '8px 0 0 120px', whiteSpace: 'pre-wrap' }}>{errMsg}</p>
         )}
 
-        {/* 버튼 영역 */}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
           <Link
             href={`/board/FAQ?category=${encodeURIComponent(cat)}`}

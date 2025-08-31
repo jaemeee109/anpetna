@@ -121,7 +121,7 @@ export default function BoardListPage({
     page,
     size: PAGE_SIZE,
     type: boardType, // 훅에서 boardType으로 매핑됨
-    keyword,
+    keyword: keyword || undefined, // 빈 문자열이면 전달하지 않도록 방어
   });
 
   // 디버그
@@ -131,39 +131,49 @@ export default function BoardListPage({
     console.log("[BoardList] error:", error);
   }
 
-  // ✅ 안전 매핑 (백엔드 응답 케이스 흡수)
-  const rawItems =
-    (data as any)?.dtoList ??
-    (data as any)?.page?.dtoList ??
-    (data as any)?.result?.dtoList ??
-    [];
+  // ====== 응답 포맷 편차 흡수 유틸 ======
+  const pickArray = (v: any): any[] => (Array.isArray(v) ? v : v === null ? [] : []);
+  const pickNumber = (v: any): number =>
+    typeof v === "number" && Number.isFinite(v) ? v : 0;
 
-  const safeTotal =
-    (data as any)?.total ??
-    (data as any)?.page?.total ??
-    (data as any)?.result?.total ??
-    0;
+  // ✅ 안전 매핑 (백엔드 응답 케이스 총망라: null → [] 처리)
+  const rawItems =
+    pickArray((data as any)?.dtoList) ||
+    pickArray((data as any)?.page?.dtoList) ||
+    pickArray((data as any)?.result?.dtoList) ||
+    pickArray((data as any)?.result?.page?.dtoList) ||
+    pickArray((data as any)?.list) ||
+    pickArray((data as any)?.content);
 
   // ✅ 프런트에서 타입 필터 (혹시 다른 타입이 섞여 들어올 경우 대비)
-  const safeItems = Array.isArray(rawItems)
-    ? rawItems.filter((it: any) => {
-        const t = (it.boardType ?? it.type ?? "").toUpperCase();
-        return !boardType || t === boardType;
-      })
-    : [];
+  const safeItems = rawItems.filter((it: any) => {
+    const t = (it?.boardType ?? it?.type ?? "").toUpperCase();
+    return !boardType || t === boardType;
+  });
+
+  // ✅ total 값도 관대하게 해석 (없거나 0이면 아이템 길이로 대체)
+  const reportedTotal =
+    pickNumber((data as any)?.total) ||
+    pickNumber((data as any)?.page?.total) ||
+    pickNumber((data as any)?.result?.total) ||
+    pickNumber((data as any)?.page?.totalElements) ||
+    pickNumber((data as any)?.result?.page?.total) ||
+    pickNumber((data as any)?.result?.page?.totalElements);
+
+  const safeTotal = reportedTotal > 0 ? reportedTotal : safeItems.length;
 
   // ✅ 공지(noticeFlag) 우선 정렬 + 공지는 번호를 '*' 로 가공 (UI 구조 변경 없음)
   const itemsSorted = [...safeItems]
     .sort((a: any, b: any) => {
-      const an = a.noticeFlag ? 1 : 0;
-      const bn = b.noticeFlag ? 1 : 0;
+      const an = a?.noticeFlag ? 1 : 0;
+      const bn = b?.noticeFlag ? 1 : 0;
       if (an !== bn) return bn - an; // 공지 먼저
-      // 나머지는 기존 최신순(추정) 유지: bno 내림차순
-      return (b.bno ?? 0) - (a.bno ?? 0);
+      // 나머지는 bno 내림차순(최신 추정)
+      return (b?.bno ?? 0) - (a?.bno ?? 0);
     })
     .map((it: any) => ({
       ...it,
-      bno: it.noticeFlag ? "*" : it.bno,
+      bno: it?.noticeFlag ? "*" : it?.bno,
     }));
 
   if (error) return <div className={WRAP}>에러가 발생했어요</div>;

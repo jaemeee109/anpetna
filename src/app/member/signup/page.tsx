@@ -151,7 +151,7 @@ export default function SignupPage() {
       // 래핑 DTO 동시 제공(모르는 키는 서버가 무시)
       const bodyJSON = JSON.stringify({ ...flat, memberDTO: { ...flat } });
 
-      // ▶ 1순위: 접두어 포함 (/anpetna/member/join)
+      // ▶ 1순위: 접두어 포함 (/member/join)
       const url1 = apiWithPrefix('/member/join');
       let resp = await fetch(url1, {
         method: 'POST',

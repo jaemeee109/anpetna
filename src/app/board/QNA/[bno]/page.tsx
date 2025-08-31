@@ -13,6 +13,21 @@ function pickStr(obj: any, keys: string[], fallback = '') {
   return fallback;
 }
 
+/* ★ 인증 헤더 헬퍼: local/sessionStorage의 accessToken을 Authorization으로 붙임 */
+function authHeaders(init?: Record<string, string>, jsonAccept = true): Record<string, string> {
+  const headers: Record<string, string> = { ...(init || {}) };
+  try {
+    const token =
+      (typeof window !== 'undefined' && (localStorage.getItem('accessToken') || sessionStorage.getItem('accessToken'))) ||
+      '';
+    if (token && !headers['Authorization']) headers['Authorization'] = `Bearer ${token}`;
+  } catch {
+    /* storage 접근 실패 무시 */
+  }
+  if (jsonAccept && !headers['Accept']) headers['Accept'] = 'application/json';
+  return headers;
+}
+
 type Post = {
   bno?: number;
   bTitle?: string; title?: string; btitle?: string;
@@ -54,13 +69,29 @@ export default function QnaDetailPage() {
     (async () => {
       try {
         setLoadingPost(true);
-        const resp = await fetch(new URL(`/anpetna/board/readOne/${bno}`, base), {
+        const url = new URL(`/board/readOne/${bno}`, base).toString();
+        const resp = await fetch(url, {
           credentials: 'include',
+          headers: authHeaders(), // ★ 인증 첨부
         });
+        if (!resp.ok) {
+          // 401/403 등 처리
+          const msg = `글을 불러오지 못했습니다. (HTTP ${resp.status})`;
+          if (resp.status === 401 || resp.status === 403) {
+            alert('로그인이 필요합니다.');
+          } else {
+            console.warn(msg);
+          }
+          if (alive) setPost(null);
+          return;
+        }
         const json = await resp.json();
         const raw: any = json?.result ?? json;
         if (!alive) return;
         setPost(raw);
+      } catch (e) {
+        console.warn(e);
+        if (alive) setPost(null);
       } finally {
         if (alive) setLoadingPost(false);
       }
@@ -72,10 +103,18 @@ export default function QnaDetailPage() {
   async function fetchComments() {
     setLoadingCmt(true);
     try {
-      const url = new URL('/anpetna/comment/read', base);
+      const url = new URL('/comment/read', base);
       url.search = new URLSearchParams({ bno: String(bno) }).toString();
 
-      const resp = await fetch(url.toString(), { credentials: 'include' });
+      const resp = await fetch(url.toString(), {
+        credentials: 'include',
+        headers: authHeaders(), // ★ 인증 첨부
+      });
+      if (!resp.ok) {
+        console.warn(`댓글을 불러오지 못했습니다. (HTTP ${resp.status})`);
+        setComments([]);
+        return;
+      }
       const json = await resp.json();
       const list =
         json?.result?.page?.dtoList ??
@@ -85,8 +124,10 @@ export default function QnaDetailPage() {
         json?.list ??
         json?.result ??
         [];
-
       setComments(Array.isArray(list) ? list : []);
+    } catch (e) {
+      console.warn(e);
+      setComments([]);
     } finally {
       setLoadingCmt(false);
     }
@@ -114,9 +155,10 @@ export default function QnaDetailPage() {
   async function handleDeletePost() {
     if (!post?.bno) return;
     if (!confirm('이 글을 삭제할까요?')) return;
-    const resp = await fetch(new URL(`/anpetna/board/delete/${post.bno}`, base), {
+    const resp = await fetch(new URL(`/board/delete/${post.bno}`, base), {
       method: 'POST',
       credentials: 'include',
+      headers: authHeaders(), // ★ 인증 첨부
     });
     if (resp.ok) {
       router.push('/board/QNA?view=mine');
@@ -133,10 +175,10 @@ export default function QnaDetailPage() {
 
     try {
       setSubmitting(true);
-      const resp = await fetch(new URL('/anpetna/comment/create', base), {
+      const resp = await fetch(new URL('/comment/create', base), {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders({ 'Content-Type': 'application/json' }), // ★ 인증 + JSON
         body: JSON.stringify({
           bno,
           cWriter, cwriter: cWriter, memberId: cWriter,
@@ -160,9 +202,10 @@ export default function QnaDetailPage() {
     if (!confirm('이 댓글을 삭제할까요?')) return;
 
     try {
-      const resp = await fetch(new URL(`/anpetna/comment/${cno}/delete`, base), {
+      const resp = await fetch(new URL(`/comment/${cno}/delete`, base), {
         method: 'POST',
         credentials: 'include',
+        headers: authHeaders(), // ★ 인증 첨부
       });
       if (!resp.ok) throw new Error(String(resp.status));
       await fetchComments();
