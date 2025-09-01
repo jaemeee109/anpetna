@@ -1,6 +1,5 @@
 package com.anpetna.item.controller;
 
-
 import com.anpetna.item.dto.ItemDTO;
 import com.anpetna.item.dto.deleteItem.DeleteItemReq;
 import com.anpetna.item.dto.deleteItem.DeleteItemRes;
@@ -16,53 +15,87 @@ import com.anpetna.item.service.ItemService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.data.domain.Page;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
+import java.util.List;
 
 @RestController
 @RequestMapping("/item")
 @Log4j2
 @RequiredArgsConstructor
 public class ItemController {
+    //  컨트롤러나 서비스 메서드 실행 전에 SpEL(Security Expression Language)로 권한 검증
 
     private final ItemService itemService;
 
-    @PostMapping
-    //@PreAuthorize("hasRole('USER')")
-    //  컨트롤러나 서비스 메서드 실행 전에 SpEL(Security Expression Language)로 권한 검증
-    public ResponseEntity<RegisterItemRes> registerItem(@RequestBody RegisterItemReq registerItemReq) {
-        var postResult = itemService.registerItem(registerItemReq);
-        return ResponseEntity.ok(postResult);
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<RegisterItemRes> registerItem(@RequestPart RegisterItemReq postReq, @RequestPart List<MultipartFile> files) throws IOException {
+        var postRes = itemService.registerItem(postReq, files);
+        return ResponseEntity.ok(postRes);
     }
 
-    @PutMapping
-    //@PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ModifyItemRes> updateItem(@RequestBody ModifyItemReq modifyItemReq) {
-        var putResult = itemService.modifyItem(modifyItemReq);
-        return ResponseEntity.ok(putResult);
+    //URL → 자원 식별, Body → 수정할 필드들로 역할을 분리
+    @PutMapping(value = "/{itemId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<ModifyItemRes> updateItem(@PathVariable Long itemId, @RequestPart ModifyItemReq putReq, @RequestPart List<MultipartFile> files) {
+        putReq.setItemId(itemId);
+        var putRes = itemService.modifyItem(putReq, files);
+        return ResponseEntity.ok(putRes);
     }
 
-    @DeleteMapping
-    //@PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<DeleteItemRes> deleteItem(@RequestBody DeleteItemReq deleteItemReq) {
-        var deleteResult = itemService.deleteItem(deleteItemReq);
-        return ResponseEntity.ok(deleteResult);
+    @DeleteMapping("/{itemId}")
+    public ResponseEntity<DeleteItemRes> deleteItem(@RequestBody Long itemId) {
+        DeleteItemReq deleteReq = new DeleteItemReq();
+        deleteReq.setItemId(itemId);
+        var deleteRes = itemService.deleteItem(deleteReq);
+        return ResponseEntity.ok(deleteRes);
     }
 
-
-    @GetMapping("/{ItemId}")
-    //@PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
-    public ResponseEntity<SearchOneItemRes> searchOneItem(@RequestBody SearchOneItemReq req) {
-        var getOneResult = itemService.getOneItem(req);
-        return ResponseEntity.ok(getOneResult);
+    @GetMapping(value = "/{itemId}", produces = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<SearchOneItemRes> searchOneItem(@PathVariable Long itemId) {
+        SearchOneItemReq getOneReq = new SearchOneItemReq();
+        getOneReq.setItemId(itemId);
+        var getOneRes = itemService.getOneItem(getOneReq);
+        return ResponseEntity.ok(getOneRes);
     }
 
-    @GetMapping("/{sortItem}")
-   // @PreAuthorize("hasAnyRole('USER','ADMIN')")
+    @GetMapping(value = "/{itemId}/images", produces = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<SearchOneItemRes> searchOneItemImages(@PathVariable Long itemId) {
+        SearchOneItemReq getOneReq = new SearchOneItemReq();
+        getOneReq.setItemId(itemId);
+        var getOneRes = itemService.getOneItem(getOneReq);
+        return ResponseEntity.ok(getOneRes);
+    }
+
+    @GetMapping
     public ResponseEntity<Page<ItemDTO>> searchAllItems(@RequestBody SearchAllItemsReq req) {
-        var getAllResult = itemService.searchItems(req);
+        var getAllResult = itemService.getAllItems(req);
         return ResponseEntity.ok(getAllResult);
     }
+    //클라이언트는 JSON 받아서 리스트 렌더링
+    //이미지 <img src="{thumbnailUrl}">로 lazy load 가능
+
+
+    //PathVariable : 자원을 식별할 때 적합 / RESTful 스타일에서 자주 씀.
+    //RequestParam : 검색, 필터링, 옵션 같은 부가 조건에 적합.
+
+    // (@RequestBody RegisterItemReq req)
+    // Content-Type: application/json
+    // 요청 바디 전체가 JSON이어야 함
+    // 파일 업로드 불가
+
+    // (@RequestParam("file") MultipartFile file)
+    // multipart/form-data에서 단일 필드 처리
+    // 단일 파일이나 간단한 문자열 처리 가능
+    // JSON과 함께 보내기 어렵다
+
+    // @RequestPart("item") RegisterItemReq req, @RequestPart(value="images", required=false) List<MultipartFile> files)
+    // multipart/form-data 처리용
+    // JSON 객체(item) + 파일(images) 동시 전송 가능
+    // Postman form-data에서 Text(JSON) + File 같이 보낼 수 있음
 
     //  @PreAuthorize("#id == principal.id")            // 요청 파라미터 id와 로그인 사용자 id 같을 때만 허용
     //  @PreAuthorize("isAuthenticated()")              // 로그인만 되어 있으면 허용
@@ -71,4 +104,6 @@ public class ItemController {
     //soldout처리
     //onsale여부
 
+    //@RequestPart를 쓰면 Postman에서 반드시 form-data로 보내야 하고,
+    //DTO는 JSON 문자열(Text), 파일은 File 타입으로 넣어야 매핑됩니다.
 }

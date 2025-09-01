@@ -2,14 +2,14 @@ package com.anpetna.item.dto.registerItem;
 
 import com.anpetna.image.dto.ImageListDTO;
 import com.anpetna.item.constant.ItemCategory;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 @Builder
 @Getter
 public class RegisterItemReq extends ImageListDTO {
-
-    //  8개
 
     private String itemName; // 상품명
 
@@ -22,7 +22,5 @@ public class RegisterItemReq extends ImageListDTO {
     private Integer itemSellStatus; // 상품 판매상태
 
     private ItemCategory itemCategory; // 상품 카테고리
-
-    //썸네일 어케하지
 
 }

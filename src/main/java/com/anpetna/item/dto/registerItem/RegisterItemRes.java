@@ -8,7 +8,7 @@ import lombok.ToString;
 @ToString
 @Setter
 @Getter
-public class RegisterItemRes extends ImageListDTO {
+public class RegisterItemRes {
 
     private Long itemId;
 
