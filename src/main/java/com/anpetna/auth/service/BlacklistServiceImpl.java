@@ -3,7 +3,7 @@ package com.anpetna.auth.service;
 import com.anpetna.auth.dto.TokenRequest;
 import com.anpetna.auth.repository.BlacklistedRepository;
 import com.anpetna.auth.util.TokenHash;
-import com.anpetna.config.JwtProvider;
+import com.anpetna.auth.config.JwtProvider;
 import com.anpetna.auth.domain.BlackListedEntity;
 import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;

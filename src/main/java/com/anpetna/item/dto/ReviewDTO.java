@@ -1,6 +1,6 @@
 package com.anpetna.item.dto;
 
-import com.anpetna.core.coreDto.ImageListDTO;
+import com.anpetna.image.dto.ImageListDTO;
 
 import java.time.LocalDateTime;
 

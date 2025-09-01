@@ -1,4 +1,4 @@
-package com.anpetna.core.coreDomain;
+package com.anpetna.image.domain;
 
 import com.anpetna.board.domain.BoardEntity;
 import com.anpetna.item.domain.ItemEntity;

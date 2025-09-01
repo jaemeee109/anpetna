@@ -1,4 +1,4 @@
-package com.anpetna.config;
+package com.anpetna.auth.config;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;

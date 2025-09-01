@@ -1,4 +1,4 @@
-package com.anpetna.core.coreService;
+package com.anpetna.image.service;
 
 import org.springframework.stereotype.Service;
 

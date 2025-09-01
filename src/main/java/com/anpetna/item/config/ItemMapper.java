@@ -1,8 +1,8 @@
 package com.anpetna.item.config;
 
-import com.anpetna.core.coreDomain.ImageEntity;
-import com.anpetna.core.coreDto.ImageDTO;
-import com.anpetna.core.coreDto.ImageListDTO;
+import com.anpetna.image.domain.ImageEntity;
+import com.anpetna.image.dto.ImageDTO;
+import com.anpetna.image.dto.ImageListDTO;
 import com.anpetna.item.domain.ItemEntity;
 import com.anpetna.item.dto.ItemDTO;
 import com.anpetna.item.dto.modifyItem.ModifyItemReq;

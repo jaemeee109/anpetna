@@ -9,7 +9,7 @@ import com.anpetna.board.dto.readOneBoard.ReadOneBoardReq;
 import com.anpetna.board.dto.readOneBoard.ReadOneBoardRes;
 import com.anpetna.board.dto.updateBoard.UpdateBoardReq;
 import com.anpetna.board.repository.BoardJpaRepository;
-import com.anpetna.core.coreDto.ImageDTO;
+import com.anpetna.image.dto.ImageDTO;
 import com.anpetna.core.coreDto.PageRequestDTO;
 import com.anpetna.core.coreDto.PageResponseDTO;
 import lombok.extern.log4j.Log4j2;

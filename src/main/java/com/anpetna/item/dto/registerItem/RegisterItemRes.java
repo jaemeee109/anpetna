@@ -1,6 +1,6 @@
 package com.anpetna.item.dto.registerItem;
 
-import com.anpetna.core.coreDto.ImageListDTO;
+import com.anpetna.image.dto.ImageListDTO;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;

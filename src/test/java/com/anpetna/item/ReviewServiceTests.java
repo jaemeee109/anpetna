@@ -1,6 +1,6 @@
 package com.anpetna.item;
 
-import com.anpetna.core.coreDto.ImageDTO;
+import com.anpetna.image.dto.ImageDTO;
 import com.anpetna.item.dto.deleteReview.DeleteReviewReq;
 import com.anpetna.item.dto.deleteReview.DeleteReviewRes;
 import com.anpetna.item.dto.modifyReview.ModifyReviewReq;

@@ -1,6 +1,6 @@
 package com.anpetna.order.service;
 
-import com.anpetna.core.coreDomain.ImageEntity;
+import com.anpetna.image.domain.ImageEntity;
 import com.anpetna.order.domain.OrderEntity;
 import com.anpetna.order.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;

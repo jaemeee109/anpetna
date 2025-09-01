@@ -1,4 +1,4 @@
-package com.anpetna.core.coreDto;
+package com.anpetna.image.dto;
 
 import lombok.Getter;
 import lombok.Setter;

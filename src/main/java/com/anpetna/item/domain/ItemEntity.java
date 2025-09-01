@@ -2,7 +2,7 @@ package com.anpetna.item.domain;
 
 
 import com.anpetna.core.coreDomain.BaseEntity;
-import com.anpetna.core.coreDomain.ImageEntity;
+import com.anpetna.image.domain.ImageEntity;
 import com.anpetna.item.constant.ItemCategory;
 import jakarta.persistence.*;
 import lombok.*;

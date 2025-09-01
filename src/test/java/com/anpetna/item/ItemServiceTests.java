@@ -1,6 +1,6 @@
 package com.anpetna.item;
 
-import com.anpetna.core.coreDto.ImageDTO;
+import com.anpetna.image.dto.ImageDTO;
 import com.anpetna.item.constant.ItemCategory;
 import com.anpetna.item.constant.ItemSellStatus;
 import com.anpetna.item.dto.ItemDTO;

@@ -1,6 +1,6 @@
 package com.anpetna.item;
 
-import com.anpetna.core.coreDomain.ImageEntity;
+import com.anpetna.image.domain.ImageEntity;
 import com.anpetna.item.constant.ItemCategory;
 import com.anpetna.item.domain.ItemEntity;
 import com.anpetna.item.repository.ItemRepository;

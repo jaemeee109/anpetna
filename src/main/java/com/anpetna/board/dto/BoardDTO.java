@@ -2,7 +2,7 @@ package com.anpetna.board.dto;
 
 import com.anpetna.board.domain.BoardEntity;
 import com.anpetna.board.constant.BoardType;
-import com.anpetna.core.coreDomain.ImageEntity;
+import com.anpetna.image.domain.ImageEntity;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

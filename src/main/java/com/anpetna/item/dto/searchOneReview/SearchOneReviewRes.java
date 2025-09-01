@@ -1,6 +1,6 @@
 package com.anpetna.item.dto.searchOneReview;
 
-import com.anpetna.core.coreDto.ImageListDTO;
+import com.anpetna.image.dto.ImageListDTO;
 import com.anpetna.item.dto.ItemDTO;
 
 import java.time.LocalDateTime;

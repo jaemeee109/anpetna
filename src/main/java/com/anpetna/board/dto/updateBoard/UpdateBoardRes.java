@@ -1,6 +1,6 @@
 package com.anpetna.board.dto.updateBoard;
 
-import com.anpetna.core.coreDto.ImageDTO;
+import com.anpetna.image.dto.ImageDTO;
 import lombok.*;
 
 import java.util.List;

@@ -1,4 +1,4 @@
-package com.anpetna.config;
+package com.anpetna.auth.config;
 
 import com.anpetna.auth.service.BlacklistServiceImpl;
 import com.anpetna.member.repository.MemberRepository;
@@ -6,7 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
-import jakarta.servlet.http.HttpServletResponse;                  // ★추가: 401/403 직접 전송용
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -20,35 +20,55 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+// CRUD 개발시 @Configuration, @RequiredArgsConstructor 만 활성화
 @Configuration
-@EnableWebSecurity
 @RequiredArgsConstructor
+@EnableWebSecurity
 @EnableMethodSecurity(prePostEnabled = true)                      // 메서드 단위 @PreAuthorize 등 사용
 public class SecurityConfig {
+
+    // CRUD 개발시 위에서부터 3개의 메서드만 활성화시킬 것
+    //dev=============================================================
+    // JWT, 세션, 인증 전부 OFF -> security 적용할 떄에는 해당메서드 주석처리
+    /* @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http
+                .csrf(csrf -> csrf.disable())                                        // CSRF 끄기 (Postman 테스트 시 필수)
+                .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())    // 모든 요청 허용
+                .formLogin(login -> login.disable())                            // 폼 로그인 끄기
+                .httpBasic(basic -> basic.disable());                            // Basic Auth 끄기
+        return http.build();
+    }*/
+
+    @Bean   // 스프링 기본 AuthenticationManager 노출
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration)
+            throws Exception {return authenticationConfiguration.getAuthenticationManager();}
+    @Bean // Bcrypt 사용
+    public PasswordEncoder passwordEncoder() {return new BCryptPasswordEncoder();}
+    //================================================================
 
     @Bean
     public SecurityFilterChain filterChain(
             HttpSecurity http,
             JwtProvider jwtProvider,                               // JWT 파서/검증기
             BlacklistServiceImpl blacklistService,                 // Access 블랙리스트 조회 서비스
-            CorsConfigurationSource corsConfigurationSource,        // CORS 설정 빈 (주입만 받음)
+            CorsConfigurationSource corsConfigurationSource,       // CORS 설정 빈 (주입만 받음)
             MemberRepository memberRepository) throws Exception {
         http
                 // ===== CORS / CSRF / 세션 전략 =====
-                .cors(c -> c.configurationSource(corsConfigurationSource)) // CORS 활성화 + 아래 Bean 적용
-                .csrf(csrf -> csrf.disable())                                // JWT 사용 → CSRF 비활성
+                .cors(c -> c.configurationSource(corsConfigurationSource))        // CORS 활성화 + 아래 Bean 적용
+                .csrf(csrf -> csrf.disable())                                     // JWT 사용 → CSRF 비활성
                 .formLogin(f -> f.disable())                                 // 폼 로그인 미사용
-                .httpBasic(b -> b.disable())                                 // 기본 인증 미사용
+                .httpBasic(b -> b.disable())                                  // 기본 인증 미사용
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // 세션 상태 없음
 
                 // ===== 인가 규칙 =====
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()  // ★추가: 프리플라이트 허용
+                        //브라우저에서 실제 요청 전에 보내는 프리플라이트 요청 -> 인증 없이 허용해주어야 브라우저에서 정상적으로 POST/PUT/DELETE 요청이 가능
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                        // --- 기존 허용 경로 유지 ---
-                        .requestMatchers("/jwt/**").permitAll()                  // 토큰 발급/재발급 엔드포인트
-                        //.requestMatchers("/", "/signup", "/api/v1/**").permitAll()        // 기존 공개 경로들
-
+                        // --- Auth ---
+                        .requestMatchers("/jwt/**").permitAll()
                         // --- Member ---
                         .requestMatchers("/member/login", "/member/join").permitAll()  // 새 프론트 경로 허용
                         .requestMatchers("/member/readOne","/member/readAll").hasRole("ADMIN")        // 관리자 전용
@@ -61,23 +81,22 @@ public class SecurityConfig {
 
                         // --- Item ---
                         .requestMatchers(HttpMethod.GET,"/item/**").hasAnyRole("ADMIN", "USER")
-                        .requestMatchers(HttpMethod.POST,"/item").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.PUT,"/item").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.DELETE,"/item").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST,"/item/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT,"/item/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE,"/item/**").hasRole("ADMIN")
                         // --- Review ---
                         .requestMatchers(HttpMethod.GET,"/review/**").hasAnyRole("ADMIN", "USER")
-                        .requestMatchers(HttpMethod.POST,"/review").hasRole("USER")
-                        .requestMatchers(HttpMethod.PUT,"/review").hasRole("USER")
-                        .requestMatchers(HttpMethod.DELETE,"/review").hasAnyRole("ADMIN", "USER")
+                        .requestMatchers(HttpMethod.POST,"/review/**").hasAnyRole("ADMIN", "USER")
+                        .requestMatchers(HttpMethod.PUT,"/review/**").hasRole("USER")
+                        .requestMatchers(HttpMethod.DELETE,"/review/**").hasAnyRole("ADMIN", "USER")
 
                         // --- Cart ---
-                        .requestMatchers("/cart/**").hasAnyRole("ADMIN", "USER")
+                        .requestMatchers("/cart/**").permitAll()
 
                         // --- Order ---
-                        .requestMatchers("/order/**").hasAnyRole("ADMIN", "USER")
+                        .requestMatchers("/order/**").permitAll()
 
                         .anyRequest().authenticated()
-
                 )
 
                 // ===== 예외 응답 통일 =====
@@ -89,41 +108,26 @@ public class SecurityConfig {
                 )
 
                 // ===== JWT 필터 =====
+                //JWT 검증 필터를 UsernamePasswordAuthenticationFilter 앞에 넣어서, 세션 없이 요청마다 토큰 인증 수행.
+                //blacklistService 활용해 강제 차단된 토큰 처리 가능
                 .addFilterBefore(
                         new JwtAuthenticationFilter(jwtProvider, blacklistService,memberRepository), // 커스텀 JWT 인증 필터
-                        UsernamePasswordAuthenticationFilter.class                  // UsernamePasswordAuthenticationFilter 앞에 둠
+                        UsernamePasswordAuthenticationFilter.class                                   // 위치 지정만, 폼 로그인은 사용 안함
                 );
-
         return http.build();
     }
 
-    @Bean
-    public AuthenticationManager authenticationManager(
-            AuthenticationConfiguration authenticationConfiguration
-    ) throws Exception {
-        return authenticationConfiguration.getAuthenticationManager();     // 스프링 기본 AuthenticationManager 노출
-    }
-
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();                                // Bcrypt 사용
-    }
-
-    /**
-     * Security가 참조할 CORS 설정(Origin/Headers/Methods).
-     * 프론트(React)와 연동할 도메인/포트만 명시하고, 자격증명(쿠키/인증헤더) 허용.
-     */
+    //Security가 참조할 CORS 설정(Origin/Headers/Methods).
+    //프론트(React)와 연동할 도메인/포트만 명시하고, 자격증명(쿠키/인증헤더) 허용.
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         var cfg = new org.springframework.web.cors.CorsConfiguration();
-
         // === Origin 허용 목록 ===
-        // 기존 IP 유지 + ★추가: localhost:3000 (개발 환경)
         cfg.setAllowedOrigins(java.util.List.of(
-                //"http://192.168.0.160:3000",
-                "http://localhost:8000"                                  // ★추가
+                "http://192.168.0.160:3000",
+                "http://localhost:3000",
+                "http://localhost:8000"
         ));
-
         // === 허용 메서드 ===
         cfg.setAllowedMethods(java.util.List.of(
                 "GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"
@@ -140,7 +144,7 @@ public class SecurityConfig {
         // === 노출(Exposed) 헤더 ===
         // 브라우저에서 읽을 수 있게 허용할 응답 헤더들
         cfg.setExposedHeaders(java.util.List.of(
-                "Authorization"                                           // ★추가: 토큰을 응답헤더로 내려줄 때 프론트에서 읽기 가능
+                "Authorization"                                           // 토큰을 응답헤더로 내려줄 때 프론트에서 읽기 가능
         ));
 
         var source = new UrlBasedCorsConfigurationSource();
