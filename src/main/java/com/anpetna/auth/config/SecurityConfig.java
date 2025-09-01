@@ -70,9 +70,9 @@ public class SecurityConfig {
                         // --- Auth ---
                         .requestMatchers("/jwt/**").permitAll()
                         // --- Member ---
-                        .requestMatchers("/member/login", "/member/join").permitAll()  // 새 프론트 경로 허용
-                        .requestMatchers("/member/readOne","/member/readAll").hasRole("ADMIN")        // 관리자 전용
-                        .requestMatchers("/member/my_page/","member/modify").hasAnyRole("USER") // 로그인 유저 전용
+                        .requestMatchers("/member/login", "/member/join").permitAll()
+                        .requestMatchers("/member/readOne","/member/readAll").hasRole("ADMIN")
+                        .requestMatchers("/member/my_page/","member/modify").hasAnyRole("USER")
 
                         // --- Board ---
                         .requestMatchers("/board/**").hasAnyRole("ADMIN", "USER")

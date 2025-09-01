@@ -28,7 +28,7 @@ import java.util.ArrayList;
 @Slf4j
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
-    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 전달사항 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 전달사항 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //return : return 없으면 아래 JWT 검증 로직까지 계속 실행되어 불필요하게 예외가 발생할 수 있음
     //다음 필터로 넘어가는 부분, 예외처리 부분에 로그처리 다 했습니다.
     //Deprecated 래퍼내의 메서드들 리펙토링 진행했습니다.

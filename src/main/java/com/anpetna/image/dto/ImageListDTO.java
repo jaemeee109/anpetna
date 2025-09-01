@@ -1,6 +1,8 @@
 package com.anpetna.image.dto;
 
+
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 
@@ -17,4 +19,5 @@ public class ImageListDTO {
     public void addImage(ImageDTO imageDTO) {
         images.add(imageDTO);
     }
+
 }

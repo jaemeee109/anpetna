@@ -1,15 +1,18 @@
 package com.anpetna.image.domain;
 
+
 import com.anpetna.board.domain.BoardEntity;
+import com.anpetna.image.constant.ImageUsage;
 import com.anpetna.item.domain.ItemEntity;
 import com.anpetna.item.domain.ReviewEntity;
 import com.anpetna.member.domain.MemberEntity;
-
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+
+import java.util.UUID;
 
 @Entity
 @Table(name = "anpetna_image")
@@ -19,17 +22,32 @@ import lombok.Setter;
 public class ImageEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "image_uuid")
-    private Long  uuid;
+    private UUID uuid;
 
-    @Column(name = "image_fileName", nullable = false)
-    private String fileName;
+    @Column(name = "image_ext")
+    private String ext;
 
-    @Column(name = "image_url", nullable = false, length = 500)
+    @Column(name = "image_originalName", nullable = false)
+    private String originalName;
+
+    @Column(name = "image_fileName")
+    private String fileName = "a";
+
+    @Column(name = "image_path")
+    private String path;
+
+    @Column(name = "image_url")
     private String url;
 
-    @Column(name = "image_ord", nullable = false)
+    @Column(name = "image_usage")
+    @Enumerated(EnumType.STRING)
+    private ImageUsage usage;
+
+    @Column(name = "image_contentType")
+    private String contentType;
+
+    @Column(name = "image_ord")
     private Integer sortOrder = 0;
 
     // 부모들 (nullable)
@@ -116,7 +134,7 @@ public class ImageEntity {
         img.setFileName(fileName);
         img.setUrl(url);
         img.setSortOrder(order == null ? 0 : order);
-/*        img.attachToItem(i);*/
+        img.attachToItem(i);
         return img;
     }
     public static ImageEntity forReview(String fileName, String url, ReviewEntity r, Integer order) {
