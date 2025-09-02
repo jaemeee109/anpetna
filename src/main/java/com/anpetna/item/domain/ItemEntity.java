@@ -1,9 +1,10 @@
 package com.anpetna.item.domain;
 
 
-import com.anpetna.core.coreDomain.BaseEntity;
 import com.anpetna.image.domain.ImageEntity;
+import com.anpetna.core.coreDomain.BaseEntity;
 import com.anpetna.item.constant.ItemCategory;
+import com.anpetna.item.constant.ItemSellStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -38,15 +39,16 @@ public class ItemEntity extends BaseEntity {
     @Column(name="item_detail", nullable=false, length = 2000)
     private String itemDetail; // 상품 상세설명
 
-    @Column(name="item_sellStatus")
-    private Integer itemSellStatus; // 상품 판매상태 (1은 판매중, 0은 품절)
-
-    @Column(name="item_saleStatus", nullable=false)
-    private int itemSaleStatus; // 상품 세일상태
-
     @Column(name="item_Category")
     @Enumerated(EnumType.STRING)  // DB에 enum의 이름(문자열)으로 저장 (숫자로 저장하는 ORDINAL보다 안전).
     private ItemCategory itemCategory; // 상품 카테고리
+
+    @Column(name="item_sellStatus")
+    @Enumerated(EnumType.STRING)
+    private ItemSellStatus itemSellStatus; // 상품 판매상태 (1은 판매중, 0은 품절)
+
+    @Column(name="item_saleStatus")
+    private int itemSaleStatus; // 상품 세일상태
 
     @Builder.Default
     @OneToMany(mappedBy = "item", cascade = CascadeType.ALL, orphanRemoval = true)

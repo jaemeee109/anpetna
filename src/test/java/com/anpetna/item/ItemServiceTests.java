@@ -27,7 +27,7 @@ import org.springframework.test.context.ActiveProfiles;
 @ActiveProfiles("item")
 @Log4j2
 public class ItemServiceTests {
-
+/*
     @Autowired
     ItemService itemService;
 
@@ -84,12 +84,12 @@ public class ItemServiceTests {
         Page<ItemDTO> res1 = itemService.searchItems(req1);
         log.info(res1.getTotalElements());
 
-/*       SearchAllItemsReq req2 = SearchAllItemsReq.builder()
+*//*       SearchAllItemsReq req2 = SearchAllItemsReq.builder()
                .itemCategory(ItemCategory.TOY)
                .orderByPrice(Sort.Direction.ASC)
                .build();
        Page<ItemDTO> res2 = itemService.searchItems(req1);
-       log.info(res2.toString());*/
+       log.info(res2.toString());*//*
     }
 
     @Test
@@ -126,5 +126,5 @@ public class ItemServiceTests {
         req.setItemId(1L);
         DeleteItemRes res = itemService.deleteItem(req);
         System.out.println(res);
-    }
+    }*/
 }

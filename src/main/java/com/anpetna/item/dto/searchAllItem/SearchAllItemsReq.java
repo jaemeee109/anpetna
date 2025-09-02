@@ -1,17 +1,9 @@
 package com.anpetna.item.dto.searchAllItem;
 
 import com.anpetna.item.constant.ItemCategory;
-import com.anpetna.item.constant.ItemSellStatus;
-import groovyjarjarantlr4.v4.runtime.misc.NotNull;
 import lombok.Builder;
 import lombok.Getter;
-import org.hibernate.query.SortDirection;
 import org.springframework.data.domain.Sort;
-
-import java.time.LocalDate;
-import org.springframework.data.domain.Sort;
-
-import java.time.LocalDate;
 
 @Builder
 @Getter

@@ -17,9 +17,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class ReviewMapper {
 
-
    private final ModelMapper modelMapper;
-    //  필드를 final로 꼭 해야하는가
 
    public TypeMap<RegisterReviewReq, ReviewEntity> cReviewMapReq() {
        TypeMap<RegisterReviewReq, ReviewEntity> typeMap = modelMapper.createTypeMap(RegisterReviewReq.class, ReviewEntity.class);

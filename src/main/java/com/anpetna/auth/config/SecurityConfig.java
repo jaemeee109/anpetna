@@ -30,7 +30,7 @@ public class SecurityConfig {
     // CRUD 개발시 위에서부터 3개의 메서드만 활성화시킬 것
     //dev=============================================================
     // JWT, 세션, 인증 전부 OFF -> security 적용할 떄에는 해당메서드 주석처리
-    /* @Bean
+     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())                                        // CSRF 끄기 (Postman 테스트 시 필수)
@@ -38,7 +38,7 @@ public class SecurityConfig {
                 .formLogin(login -> login.disable())                            // 폼 로그인 끄기
                 .httpBasic(basic -> basic.disable());                            // Basic Auth 끄기
         return http.build();
-    }*/
+    }
 
     @Bean   // 스프링 기본 AuthenticationManager 노출
     public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration)
@@ -46,7 +46,7 @@ public class SecurityConfig {
     @Bean // Bcrypt 사용
     public PasswordEncoder passwordEncoder() {return new BCryptPasswordEncoder();}
     //================================================================
-
+/*
     @Bean
     public SecurityFilterChain filterChain(
             HttpSecurity http,
@@ -150,5 +150,5 @@ public class SecurityConfig {
         var source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", cfg);                     // 모든 경로에 위 CORS 설정 적용
         return source;
-    }
+    }*/
 }

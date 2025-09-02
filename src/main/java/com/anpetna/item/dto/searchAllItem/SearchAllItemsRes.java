@@ -1,21 +1,19 @@
-package com.anpetna.item.dto.searchOneItem;
+package com.anpetna.item.dto.searchAllItem;
 
 import com.anpetna.item.constant.ItemCategory;
 import com.anpetna.item.constant.ItemSellStatus;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
-import lombok.ToString;
+import lombok.*;
+import org.springframework.data.domain.Sort;
 
 import java.util.ArrayList;
 import java.util.List;
 
-
+@Builder
 @Getter
 @Setter
 @NoArgsConstructor
-@ToString
-public class SearchOneItemRes {
+@AllArgsConstructor
+public class SearchAllItemsRes {
 
     private Long itemId; // 상품코드
 
@@ -31,10 +29,6 @@ public class SearchOneItemRes {
 
     private ItemCategory itemCategory; // 상품 카테고리
 
-    private List<String> imageUrl = new ArrayList<>();
-
-    public void addImageUrl(String imageUrl) {
-        this.imageUrl.add(imageUrl);
-    }
+    private String thumbnailUrl;
 
 }
