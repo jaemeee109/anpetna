@@ -9,7 +9,7 @@ import lombok.*;
 // DB 테이블과 1:1로 매핑되는 "엔티티"
 // 한 줄(레코드)이 "주문 내의 개별 품목(라인 아이템)"을 의미
 @Entity                                // JPA에게 "이 클래스를 테이블과 매핑해!" 라고 알려줌
-@Table(name = "anpetna_order_item")    // 실제 DB 테이블 이름 지정
+@Table(name = "anpetna_order")    // 실제 DB 테이블 이름 지정
 @Data                                  // Lombok: getter/setter/toString/equals/hashCode 자동 생성
 @Setter
 @NoArgsConstructor                     // 기본 생성자 자동 생성 (JPA가 프록시 만들 때 필요)

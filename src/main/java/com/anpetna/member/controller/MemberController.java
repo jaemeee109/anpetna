@@ -13,12 +13,14 @@ import com.anpetna.member.dto.readMemberOne.ReadMemberOneReq;
 import com.anpetna.member.dto.readMemberOne.ReadMemberOneRes;
 import com.anpetna.member.service.MemberService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -29,29 +31,51 @@ public class MemberController {
 
     private final MemberService memberService;
 
-    //등록
-    @PostMapping("/join")
-    public ApiResult<JoinMemberRes> join(@RequestBody JoinMemberReq joinMemberReq) throws MemberService.MemberIdExistException {
-
-        var join = memberService.join(joinMemberReq);
-        return new ApiResult<>(join);
-    }
+//    //등록
+//    @PostMapping(value = "/join", consumes = "application/json", produces = "application/json")
+//    public ApiResult<JoinMemberRes> join(@RequestBody JoinMemberReq joinMemberReq) throws MemberService.MemberIdExistException {
+//
+//        var join = memberService.join(joinMemberReq);
+//        return new ApiResult<>(join);
+//    }
 //=============================================
 //    프론트에서 받아온 정보(요청DTO/Req)를 컨트롤러에서 서비스로 넘겨줌
 //    서비스에서 DB에 저장(아이디는 중복이 되지 않게 검사필요)
 //=========-===========
 
+    // 등록 (멀티파트: 프로필 파일 포함)
+    @PostMapping(value="/join", consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces="application/json")
+    public ApiResult<JoinMemberRes> joinMultipart(
+            @RequestPart("json") JoinMemberReq body,                                  // 회원정보
+            @RequestPart(value = "profileFile", required = false) MultipartFile file  // 프로필 1장(선택)
+    ) throws MemberService.MemberIdExistException {
 
-    //수정
-    @PostMapping("/modify")
-    @ResponseBody
-    @Transactional
+        var join = memberService.join(body, file); // ← 파일O 버전 호출
+        return new ApiResult<>(join);
+    }
+
+
+    @PostMapping(value="/modify", consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces="application/json")
     public ApiResult<ModifyMemberRes> modify(
-            @RequestBody ModifyMemberReq modifyMemberReq) throws MemberService.MemberIdExistException {
-
-        var modify = memberService.modify(modifyMemberReq);
+            @RequestPart("json") ModifyMemberReq body,
+            @RequestPart(value="profileFile", required=false) MultipartFile profileFile,
+            @RequestPart(value="removeProfile", required=false) Boolean removeProfile)
+            throws MemberService.MemberIdExistException {
+        var modify = memberService.modify(body, profileFile, removeProfile);
         return new ApiResult<>(modify);
     }
+
+
+//    //수정
+//    @PostMapping(value ="/modify", consumes = "application/json", produces = "application/json")
+//    @ResponseBody
+//    @Transactional
+//    public ApiResult<ModifyMemberRes> modify(
+//            @RequestBody ModifyMemberReq modifyMemberReq) throws MemberService.MemberIdExistException {
+//
+//        var modify = memberService.modify(modifyMemberReq);
+//        return new ApiResult<>(modify);
+//    }
 //===================================
 //    프론트에서 수정해야 할 정보를 받아 비번,주소,이메일,반려동물유무,번호등 변경사항을 컨트롤러가 서비스로 넘겨주고
 //    서비스에서 기타로 적는 창을 제외한 모든 건 null값이 들어갈 수 없게 하고 DB에 저장 저장된 정보들을 프론트에서 다시 확인 할 수 있게

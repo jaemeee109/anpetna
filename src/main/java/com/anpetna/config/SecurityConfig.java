@@ -42,33 +42,35 @@ public class SecurityConfig {
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // 세션 상태 없음
 
                 // ===== 인가 규칙 =====
+                .securityMatcher("/**")
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()  // ★추가: 프리플라이트 허용
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                        // --- 기존 허용 경로 유지 ---
-                        .requestMatchers("/jwt/**").permitAll()                  // 토큰 발급/재발급 엔드포인트
-                        //.requestMatchers("/", "/signup", "/api/v1/**").permitAll()        // 기존 공개 경로들
+                        // --- Auth/JWT ---
+                        .requestMatchers("/jwt/**").permitAll()
 
-                        // --- Member ---
-                        .requestMatchers("/member/login", "/member/join").permitAll()  // 새 프론트 경로 허용
-                        .requestMatchers("/member/readOne","/member/readAll").hasRole("ADMIN")        // 관리자 전용
-                        .requestMatchers("/member/my_page/","member/modify").hasAnyRole("USER") // 로그인 유저 전용
+                        // --- Member (join/login 먼저 열기!) ---
+                        .requestMatchers("/member/login", "/member/join").permitAll()
+                        .requestMatchers("/member/readOne", "/member/readAll").hasRole("ADMIN")
+                        .requestMatchers("/member/my_page/**", "/member/modify").hasAnyRole("USER")  // ✅ 슬래시 대신 /**
 
                         // --- Board ---
                         .requestMatchers("/board/**").hasAnyRole("ADMIN", "USER")
+
                         // --- Comment ---
                         .requestMatchers("/comment/**").hasAnyRole("ADMIN", "USER")
 
                         // --- Item ---
-                        .requestMatchers(HttpMethod.GET,"/item/**").hasAnyRole("ADMIN", "USER")
-                        .requestMatchers(HttpMethod.POST,"/item").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.PUT,"/item").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.DELETE,"/item").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/item/**").hasAnyRole("ADMIN", "USER")
+                        .requestMatchers(HttpMethod.POST, "/item").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/item").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/item").hasRole("ADMIN")
+
                         // --- Review ---
-                        .requestMatchers(HttpMethod.GET,"/review/**").hasAnyRole("ADMIN", "USER")
-                        .requestMatchers(HttpMethod.POST,"/review").hasRole("USER")
-                        .requestMatchers(HttpMethod.PUT,"/review").hasRole("USER")
-                        .requestMatchers(HttpMethod.DELETE,"/review").hasAnyRole("ADMIN", "USER")
+                        .requestMatchers(HttpMethod.GET, "/review/**").hasAnyRole("ADMIN", "USER")
+                        .requestMatchers(HttpMethod.POST, "/review").hasRole("USER")
+                        .requestMatchers(HttpMethod.PUT, "/review").hasRole("USER")
+                        .requestMatchers(HttpMethod.DELETE, "/review").hasAnyRole("ADMIN", "USER")
 
                         // --- Cart ---
                         .requestMatchers("/cart/**").hasAnyRole("ADMIN", "USER")
@@ -76,9 +78,12 @@ public class SecurityConfig {
                         // --- Order ---
                         .requestMatchers("/order/**").hasAnyRole("ADMIN", "USER")
 
-                        .anyRequest().authenticated()
+                        .requestMatchers("/member/login", "/member/join",
+                                "/anpetna/member/login", "/anpetna/member/join").permitAll()
 
+                        .anyRequest().authenticated()
                 )
+
 
                 // ===== 예외 응답 통일 =====
                 .exceptionHandling(e -> e
@@ -121,7 +126,7 @@ public class SecurityConfig {
         // 기존 IP 유지 + ★추가: localhost:3000 (개발 환경)
         cfg.setAllowedOrigins(java.util.List.of(
                 //"http://192.168.0.160:3000",
-                "http://localhost:8000"                                  // ★추가
+                "http://localhost:3000", "http://localhost:8000"          // ★추가
         ));
 
         // === 허용 메서드 ===

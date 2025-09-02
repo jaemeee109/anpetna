@@ -9,6 +9,8 @@ import com.anpetna.auth.util.TokenHash;
 import com.anpetna.config.JwtProvider;
 import com.anpetna.member.domain.MemberEntity;
 import com.anpetna.member.repository.MemberRepository;
+import io.jsonwebtoken.Claims;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -31,22 +33,23 @@ public class JwtServiceImpl implements JwtService {
     private final BlacklistServiceImpl blacklistService;
 
     @Override
-    public TokenResponse login(LoginMemberReq loginMemberReq) {
+    @Transactional
+    public TokenResponse login(LoginMemberReq loginMemberReq){
 
         // 1) 사용자 식별자로 토큰 레코드 조회
         MemberEntity member = memberRepository.findByMemberId(loginMemberReq.getMemberId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
+                .orElseThrow(()-> new ResponseStatusException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
 
 // 2) 비밀번호 검증
 //    - passwordEncoder.matches(rawPassword, encodedPassword)
 //    - 요청으로 들어온 평문 비밀번호와 DB에 저장된 암호문을 비교
-        if (!passwordEncoder.matches(loginMemberReq.getMemberPw(), member.getMemberPw())) {
+        if (!passwordEncoder.matches(loginMemberReq.getMemberPw(),member.getMemberPw())){
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "비밀번호가 일치하지 않습니다");
         }
 
-        TokenEntity tokenEntity = TokenEntity.builder()
-                .memberId(member.getMemberId())
-                .build();
+        final String memberId = member.getMemberId();
+        // 2) 기존 활성 리프레시 전부 무효화(멱등, 영향 행 0이어도 예외X)
+        // log.debug("revoke-all-active refresh count={}", revoked);
 
         // 2) 비밀번호 검증
         //    - passwordEncoder.matches(rawPassword, encodedPassword)
@@ -55,56 +58,94 @@ public class JwtServiceImpl implements JwtService {
         // 3) JWT 발급 (subject = 사용자 id)
         //    - AccessToken: 짧은 수명, 요청 인증에 사용
         //    - RefreshToken: 긴 수명, 재발급 용도
-        String accessToken = jwtProvider.createAccessToken(tokenEntity.getMemberId());
-        String refreshToken = jwtProvider.createRefreshToken(tokenEntity.getMemberId());
-        LocalDateTime expiredAt = LocalDateTime.now().plusMinutes(15);
+        String accessToken = jwtProvider.createAccessToken(memberId);
+        String refreshToken = jwtProvider.createRefreshToken(memberId);
 
-        // 4) RefreshToken 저장
-        //    - 평문 저장은 위험하므로 해시(sha256)로 변환해 저장 (유출 피해 최소화)
-        tokenEntity.setRefreshToken(tokenHash.sha256(refreshToken));
-        tokenRepository.save(tokenEntity);
+        // 4) 리프레시 만료시각 추출(권장) 또는 정책대로 계산
+        Instant refreshExp = jwtProvider.getRefreshExpiration(refreshToken);
 
-        // 5) 클라이언트에 새 토큰 반환
-        return new TokenResponse(accessToken, refreshToken);
+        // 5) 리프레시 해시 저장용(평문 금지)
+        String refreshHash = tokenHash.sha256(refreshToken);
+
+        // 6) UPSERT: 있으면 update(revokedAt=null로 재활성), 없으면 insert
+        int updated = tokenRepository.upsertRefreshForMember(memberId, refreshHash, refreshExp);
+        if (updated == 0) {
+            // 행이 없던 경우만 새로 생성
+            TokenEntity tokenEntity = TokenEntity.builder()
+                    .memberId(memberId)
+                    .refreshToken(refreshHash) // 해시값 저장
+                    .expiresAt(refreshExp)
+                    .revokedAt(null)
+                    .build();
+            tokenRepository.save(tokenEntity);
+        }
+
+        String role = Optional.ofNullable(member.getMemberRole())
+                .map(Object::toString)      // Enum -> "ADMIN"
+                .map(s -> s.startsWith("ROLE_") ? s.substring(5) : s)
+                .map(String::toUpperCase)
+                .orElse("USER");
+
+        // 7) 응답
+        return TokenResponse.builder()
+                .accessToken(accessToken)
+                .refreshToken(refreshToken)
+                .memberRole(role)
+                .build();
     }
 
     @Override
     public TokenResponse refresh(TokenRequest tokenRequest) {
 
-        //클라이언트가 보낸 refreshToken의 유효성 검사
-        if (!jwtProvider.validateToken(tokenRequest.getRefreshToken())) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "무효한 토큰입니다");
+        // (A) 클라에서 받은 리프레시 평문 → 해시 계산
+        String hash = tokenHash.sha256(tokenRequest.getRefreshToken());
+        Instant now = Instant.now();
+        // (B) DB에서 유효한 리프레시 찾기: 해시 일치 + 미회수 + 미만료
+        TokenEntity tokenEntity = tokenRepository
+                .findFirstByRefreshTokenAndRevokedAtIsNullAndExpiresAtAfter(hash, now)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "invalid refresh"));
+        // (C) JWT 자체의 서명/만료/subject도 검증 (권장)
+        Claims claims = jwtProvider.parseClaims(tokenRequest.getRefreshToken()); // 만료여도 e.getClaims() 사용 가능 구현이면 점검
+        String memberId = claims.getSubject();
+        // subject-DB 일치성(선택, 보안 강화)
+        if (!memberId.equals(tokenEntity.getMemberId())) {
+            // 토큰-DB 불일치 → 즉시 차단
+            tokenEntity.setRevokedAt(now);
+            tokenRepository.save(tokenEntity);
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "mismatched subject");
         }
-
-        //refreshToken의 subject(사용자 식별자)를 추출
-        String id = jwtProvider.getUsername(tokenRequest.getRefreshToken());
-
-        //DB에서 해당 사용자의 토큰 레코드 조회
-        TokenEntity tokenEntity = tokenRepository.findByTokenMemberId(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
-
-//요청으로 받은 refreshToken을 sha256으로 해싱
-//평문 토큰을 DB에 보관하지 않기 위해 해시로 비교 (유출 대비)
-        String reqRefreshToken = tokenHash.sha256(tokenRequest.getRefreshToken()); //요청받은 refresh토큰을 hash로 변환
-
-
-//DB에 저장된 해시값과 비교 (불일치 시 위조/재사용/오류로 간주)
-        if (!reqRefreshToken.equals(tokenEntity.getRefreshToken())) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "발급받은 토큰이 맞지 않습니다");
-        }
+        // (D) 회전(rotate): 기존 리프레시 무효화
+        tokenEntity.setRevokedAt(now);
+        tokenRepository.save(tokenEntity);
 
 //새로운 Access/Refresh 토큰 생성 (토큰 로테이션
         String newAccessToken = jwtProvider.createAccessToken(tokenEntity.getMemberId());
         String newRefreshToken = jwtProvider.createRefreshToken(tokenEntity.getMemberId());
 
-//새 refresh 토큰은 DB에 '해시'로 저장 (평문 저장 금지)
+// 새 refresh claims에서 exp 꺼내서 expiresAt 반영
+        Instant newRefreshExp = jwtProvider.getRefreshExpiration(newRefreshToken);
+
+// 같은 row에 새 해시로 교체 + 만료시각 갱신 + 철회 null로
         tokenEntity.setRefreshToken(tokenHash.sha256(newRefreshToken));
+        tokenEntity.setExpiresAt(newRefreshExp);
+        tokenEntity.setRevokedAt(null);
         tokenRepository.save(tokenEntity);
+
+        String role = memberRepository.findByMemberId(memberId)
+                .map(MemberEntity::getMemberRole)
+                .map(Object::toString)
+                .map(s -> s.startsWith("ROLE_") ? s.substring(5) : s)
+                .map(String::toUpperCase)
+                .orElse("USER");
 
 //클라이언트에는 평문 새 토큰들을 반환
 //AccessToken: 즉시 사용
 //RefreshToken: 다음 갱신 때 클라이언트가 다시 제출
-        return new TokenResponse(newAccessToken, newRefreshToken);
+        return TokenResponse.builder()
+                .accessToken(newAccessToken)
+                .refreshToken(newRefreshToken)
+                .memberRole(role)
+                .build();
     }
 
     @Override
@@ -150,7 +191,6 @@ public class JwtServiceImpl implements JwtService {
                 blacklistService.addToBlacklist(tokenRequest);
             }
 
-            // 멱등성: 이미 회수/블랙리스트여도 예외 없이 위 흐름을 통과하도록 설계하는 게 보통 안전합니다.
             // 멱등성: 이미 회수/블랙리스트여도 예외 없이 위 흐름을 통과하도록 설계하는 게 보통 안전합니다.
         }
     }

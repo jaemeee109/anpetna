@@ -21,5 +21,33 @@ public interface TokenRepository extends JpaRepository<TokenEntity, Long> {
             "where t.memberId = :memberId and t.revokedAt is null")
     void revokeByMemberId(@Param("memberId") String memberId);
 
-    Optional<TokenEntity> findFirstByRefreshTokenAndRevokedAtIsNullAndExpiresAtAfter(String refreshToken, Instant revokedAt);
+    @Modifying
+    @Transactional
+    @Query("""
+        update TokenEntity t
+           set t.revokedAt = :now
+         where t.memberId = :memberId
+           and t.revokedAt is null
+           and t.expiresAt > :now
+    """)
+    int revokeAllActiveByMemberId(@Param("memberId") String memberId,
+                                  @Param("now") Instant now);
+
+    Optional<TokenEntity> findFirstByRefreshTokenAndRevokedAtIsNullAndExpiresAtAfter(
+            String refreshToken, Instant now);
+
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Transactional
+    @Query("""
+  update TokenEntity t
+     set t.refreshToken = :refresh,
+         t.expiresAt   = :expiresAt,
+         t.revokedAt   = null
+   where t.memberId    = :memberId
+""")
+    int upsertRefreshForMember(@Param("memberId") String memberId,
+                               @Param("refresh") String refresh,
+                               @Param("expiresAt") Instant expiresAt);
+
 }

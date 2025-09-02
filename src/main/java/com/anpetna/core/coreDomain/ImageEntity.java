@@ -116,7 +116,7 @@ public class ImageEntity {
         img.setFileName(fileName);
         img.setUrl(url);
         img.setSortOrder(order == null ? 0 : order);
-/*        img.attachToItem(i);*/
+        img.attachToItem(i);
         return img;
     }
     public static ImageEntity forReview(String fileName, String url, ReviewEntity r, Integer order) {
