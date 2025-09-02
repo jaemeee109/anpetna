@@ -1,5 +1,6 @@
 package com.anpetna.item.config;
 
+import com.anpetna.core.coreDto.PageResponseDTO;
 import com.anpetna.image.domain.ImageEntity;
 import com.anpetna.image.dto.ImageDTO;
 import com.anpetna.image.dto.ImageListDTO;
@@ -12,6 +13,7 @@ import com.anpetna.item.dto.searchOneItem.SearchOneItemRes;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
 import org.modelmapper.TypeMap;
+import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -53,6 +55,10 @@ public class ItemMapper {
             return des;
         });
         return typeMap;
+    }
+
+    public TypeMap<Page<SearchAllItemsRes>, PageResponseDTO<SearchAllItemsRes>> pageToDto(){
+
     }
 
     public <S extends ImageListDTO> TypeMap imageToEntity(TypeMap<S, ItemEntity> typeMap) {
