@@ -3,7 +3,6 @@ package com.anpetna.item.service;
 import com.anpetna.image.service.ImageService;
 import com.anpetna.item.config.ItemMapper;
 import com.anpetna.item.domain.ItemEntity;
-import com.anpetna.item.dto.ItemDTO;
 import com.anpetna.item.dto.deleteItem.DeleteItemReq;
 import com.anpetna.item.dto.deleteItem.DeleteItemRes;
 import com.anpetna.item.dto.modifyItem.ModifyItemReq;
@@ -83,14 +82,20 @@ public class ItemServiceImpl implements ItemService {
     public SearchOneItemRes getOneItem(SearchOneItemReq req) {
         Optional<ItemEntity> found = itemRepository.findById(req.getItemId());
         ItemEntity res = found.orElseThrow(() -> new EntityNotFoundException("Item not found with id: " + req.getItemId()));
-        return itemMapper.r1ItemMapRes().map(res);
+        return itemMapper.rOneItemMapRes().map(res);
     }
 
     @Override
     public Page<SearchAllItemsRes> getAllItems(SearchAllItemsReq req){
         Pageable pageable = PageRequest.of(req.getPage(), req.getSize());
         Page<ItemEntity> searchAll = itemRepository.orderBy(pageable, req);
-        Page<SearchAllItemsRes> res = searchAll.map(itemEntity -> modelMapper.map(itemEntity, SearchAllItemsRes.class));
+        Page<SearchAllItemsRes> res = searchAll.map(itemEntity ->
+        {
+            SearchAllItemsRes resEach = modelMapper.map(itemEntity, SearchAllItemsRes.class);
+            String entityUrl = itemEntity.getImages().get(0).getUrl();
+            resEach.setThumbnailUrl(entityUrl);
+            return resEach;
+        });
         return res;
     }
 

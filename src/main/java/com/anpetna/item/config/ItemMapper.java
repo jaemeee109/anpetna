@@ -7,6 +7,7 @@ import com.anpetna.item.domain.ItemEntity;
 import com.anpetna.item.dto.ItemDTO;
 import com.anpetna.item.dto.modifyItem.ModifyItemReq;
 import com.anpetna.item.dto.registerItem.RegisterItemReq;
+import com.anpetna.item.dto.searchAllItem.SearchAllItemsRes;
 import com.anpetna.item.dto.searchOneItem.SearchOneItemRes;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
@@ -36,7 +37,7 @@ public class ItemMapper {
         return imageToEntity(typeMap);
     }
 
-    public TypeMap<ItemEntity, SearchOneItemRes> r1ItemMapRes() {
+    public TypeMap<ItemEntity, SearchOneItemRes> rOneItemMapRes() {
         TypeMap<ItemEntity, SearchOneItemRes> typeMap = modelMapper.getTypeMap(ItemEntity.class, SearchOneItemRes.class);
         if (typeMap == null) {
             typeMap = modelMapper.createTypeMap(ItemEntity.class, SearchOneItemRes.class);
@@ -52,14 +53,6 @@ public class ItemMapper {
             return des;
         });
         return typeMap;
-    }
-
-    public TypeMap<ItemEntity, ItemDTO> rItemMapRes() {
-        TypeMap<ItemEntity, ItemDTO> typeMap = modelMapper.getTypeMap(ItemEntity.class, ItemDTO.class);
-        if (typeMap == null) {
-            typeMap = modelMapper.createTypeMap(ItemEntity.class, ItemDTO.class);
-        }
-        return imageToDTO(typeMap);
     }
 
     public <S extends ImageListDTO> TypeMap imageToEntity(TypeMap<S, ItemEntity> typeMap) {
@@ -81,20 +74,4 @@ public class ItemMapper {
         return typeMap;
     }
 
-    public <S extends ImageListDTO> TypeMap imageToDTO(TypeMap<ItemEntity, S> typeMap) {
-        typeMap.setPostConverter(ctx -> {
-            var src = ctx.getSource();
-            var des = ctx.getDestination();
-
-            des.getImages().clear();
-
-            try {
-                src.getImages().forEach(imgEntity -> des.addImage(modelMapper.map(imgEntity, ImageDTO.class)));
-            } catch (NullPointerException e) {
-                System.out.println("이미지를 입력하지 않음");
-            }
-            return des;
-        });
-        return typeMap;
-    }
 }

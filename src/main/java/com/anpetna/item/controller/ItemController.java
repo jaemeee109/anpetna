@@ -34,14 +34,16 @@ public class ItemController {
     //  컨트롤러나 서비스 메서드 실행 전에 SpEL(Security Expression Language)로 권한 검증
 
     //=============================점검 요소================================
-    // item C R1 U D 완 / RALL 미완
+    // item C R1 U D RALL 완
+    // 페이지네이션 검토
+    // 정렬 조건 검토
     // 이미지 수정시 삭제와 입력의 과정
     // 불필요한 어노테이션 정리
     // 프론트에서 구현시 주의사항 정리 및 전달
     // CONTENTTYPE 점검
-    // json만 /json & file
+    // json만 /json & file -> 상품에는 필요없으나 리뷰는 선택 가능하도록
     // 삭제한 상품에 대한 응답처리
-    // image 종류별 구분
+    // image 종류별 구분 (thumbnail은 완)
     //=====================================================================
 
     private final ItemService itemService;
@@ -77,7 +79,7 @@ public class ItemController {
         return ResponseEntity.ok(getOneRes);
     }
 
-    @GetMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @GetMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Page<SearchAllItemsRes>> searchAllItems(@RequestBody SearchAllItemsReq getReq) {
         var getAllResult = itemService.getAllItems(getReq);
         return ResponseEntity.ok(getAllResult);
@@ -86,7 +88,7 @@ public class ItemController {
     //클라이언트는 JSON 받아서 리스트 렌더링
     //이미지 <img src="{thumbnailUrl}">로 lazy load 가능
 
-
+//============================================ 이론 정리 ==========================================
     //PathVariable : 자원을 식별할 때 적합 / RESTful 스타일에서 자주 씀.
     //RequestParam : 검색, 필터링, 옵션 같은 부가 조건에 적합.
 
@@ -114,4 +116,6 @@ public class ItemController {
 
     //@RequestPart를 쓰면 Postman에서 반드시 form-data로 보내야 하고,
     //DTO는 JSON 문자열(Text), 파일은 File 타입으로 넣어야 매핑됩니다.
+//============================================ 이론 정리 ==========================================
+
 }

@@ -2,10 +2,7 @@ package com.anpetna.item.dto.searchAllItem;
 
 import com.anpetna.item.constant.ItemCategory;
 import com.anpetna.item.constant.ItemSellStatus;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import org.springframework.data.domain.Sort;
 
 import java.util.ArrayList;
@@ -13,6 +10,7 @@ import java.util.List;
 
 @Builder
 @Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 public class SearchAllItemsRes {
