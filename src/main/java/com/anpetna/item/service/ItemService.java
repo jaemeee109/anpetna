@@ -8,6 +8,7 @@ import com.anpetna.item.dto.modifyItem.ModifyItemRes;
 import com.anpetna.item.dto.registerItem.RegisterItemReq;
 import com.anpetna.item.dto.registerItem.RegisterItemRes;
 import com.anpetna.item.dto.searchAllItem.SearchAllItemsReq;
+import com.anpetna.item.dto.searchAllItem.SearchAllItemsRes;
 import com.anpetna.item.dto.searchOneItem.SearchOneItemReq;
 import com.anpetna.item.dto.searchOneItem.SearchOneItemRes;
 import org.springframework.data.domain.Page;
@@ -26,7 +27,7 @@ public interface ItemService {
 
     DeleteItemRes deleteItem(DeleteItemReq req);
 
-    Page<ItemDTO> getAllItems(SearchAllItemsReq req);
+    Page<SearchAllItemsRes> getAllItems(SearchAllItemsReq req);
 
     SearchOneItemRes getOneItem(SearchOneItemReq req);
 }

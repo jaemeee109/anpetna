@@ -1,9 +1,10 @@
 package com.anpetna.item.dto.deleteItem;
 
-import com.anpetna.item.dto.registerItem.RegisterItemRes;
 import lombok.Builder;
+import lombok.Getter;
 
 @Builder
+@Getter
 public class DeleteItemRes {
 
     //  UI(관리자 페이지)

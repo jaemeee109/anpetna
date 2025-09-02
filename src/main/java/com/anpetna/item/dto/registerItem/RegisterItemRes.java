@@ -1,9 +1,10 @@
 package com.anpetna.item.dto.registerItem;
 
-import com.anpetna.image.dto.ImageListDTO;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
+
+import java.time.LocalDateTime;
 
 @ToString
 @Setter
@@ -15,6 +16,8 @@ public class RegisterItemRes {
     private String itemName; // 상품명
 
     private int itemPrice;
+
+    private LocalDateTime createDate;
 
     private String res;
 

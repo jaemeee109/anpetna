@@ -2,21 +2,28 @@ package com.anpetna.item.dto.searchAllItem;
 
 import com.anpetna.item.constant.ItemCategory;
 import com.anpetna.item.constant.ItemSellStatus;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import org.springframework.data.domain.Sort;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @Builder
 @Getter
+@NoArgsConstructor
+@AllArgsConstructor
 public class SearchAllItemsRes {
 
     private Long itemId; // 상품코드
 
     private String itemName; // 상품명
 
-    private int itemPrice; // 가격
+    private Integer itemPrice; // 가격
 
-    private int itemStock; // 재고수량
+    private Integer itemStock; // 재고수량
 
     private String itemDetail; // 상품 상세설명
 

@@ -9,9 +9,11 @@ import com.anpetna.item.dto.registerItem.RegisterItemReq;
 import com.anpetna.item.dto.registerItem.RegisterItemRes;
 
 import com.anpetna.item.dto.searchAllItem.SearchAllItemsReq;
+import com.anpetna.item.dto.searchAllItem.SearchAllItemsRes;
 import com.anpetna.item.dto.searchOneItem.SearchOneItemReq;
 import com.anpetna.item.dto.searchOneItem.SearchOneItemRes;
 import com.anpetna.item.service.ItemService;
+import jakarta.annotation.Nullable;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.data.domain.Page;
@@ -21,6 +23,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 @RestController
@@ -30,10 +33,21 @@ import java.util.List;
 public class ItemController {
     //  컨트롤러나 서비스 메서드 실행 전에 SpEL(Security Expression Language)로 권한 검증
 
+    //=============================점검 요소================================
+    // item C R1 U D 완 / RALL 미완
+    // 이미지 수정시 삭제와 입력의 과정
+    // 불필요한 어노테이션 정리
+    // 프론트에서 구현시 주의사항 정리 및 전달
+    // CONTENTTYPE 점검
+    // json만 /json & file
+    // 삭제한 상품에 대한 응답처리
+    // image 종류별 구분
+    //=====================================================================
+
     private final ItemService itemService;
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<RegisterItemRes> registerItem(@RequestPart RegisterItemReq postReq, @RequestPart List<MultipartFile> files) throws IOException {
+    public ResponseEntity<RegisterItemRes> registerItem(@RequestPart RegisterItemReq postReq, @RequestPart List<MultipartFile> files ) throws IOException {
         var postRes = itemService.registerItem(postReq, files);
         return ResponseEntity.ok(postRes);
     }
@@ -47,22 +61,15 @@ public class ItemController {
     }
 
     @DeleteMapping("/{itemId}")
-    public ResponseEntity<DeleteItemRes> deleteItem(@RequestBody Long itemId) {
-        DeleteItemReq deleteReq = new DeleteItemReq();
-        deleteReq.setItemId(itemId);
+    public ResponseEntity<DeleteItemRes> deleteItem(@PathVariable Long itemId) {
+        DeleteItemReq deleteReq = DeleteItemReq.builder()
+                .itemId(itemId)
+                .build();
         var deleteRes = itemService.deleteItem(deleteReq);
         return ResponseEntity.ok(deleteRes);
     }
 
-    @GetMapping(value = "/{itemId}", produces = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<SearchOneItemRes> searchOneItem(@PathVariable Long itemId) {
-        SearchOneItemReq getOneReq = new SearchOneItemReq();
-        getOneReq.setItemId(itemId);
-        var getOneRes = itemService.getOneItem(getOneReq);
-        return ResponseEntity.ok(getOneRes);
-    }
-
-    @GetMapping(value = "/{itemId}/images", produces = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @GetMapping(value = "/{itemId}")
     public ResponseEntity<SearchOneItemRes> searchOneItemImages(@PathVariable Long itemId) {
         SearchOneItemReq getOneReq = new SearchOneItemReq();
         getOneReq.setItemId(itemId);
@@ -70,11 +77,12 @@ public class ItemController {
         return ResponseEntity.ok(getOneRes);
     }
 
-    @GetMapping
-    public ResponseEntity<Page<ItemDTO>> searchAllItems(@RequestBody SearchAllItemsReq req) {
-        var getAllResult = itemService.getAllItems(req);
+    @GetMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<Page<SearchAllItemsRes>> searchAllItems(@RequestBody SearchAllItemsReq getReq) {
+        var getAllResult = itemService.getAllItems(getReq);
         return ResponseEntity.ok(getAllResult);
     }
+
     //클라이언트는 JSON 받아서 리스트 렌더링
     //이미지 <img src="{thumbnailUrl}">로 lazy load 가능
 

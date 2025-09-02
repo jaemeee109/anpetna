@@ -24,7 +24,6 @@ public class ImageDTO {
 
     private String contentType;  // MIME 타입 (image/png 등)
 
-    private String path;         // 서버 저장 경로
     private String url;          // 접근 가능한 URL(실제 서비스에서는 CDN/S3 기반 URL 매핑)
 
     @Builder.Default
@@ -41,9 +40,8 @@ public class ImageDTO {
         this.contentType = "image/" + ext.substring(ext.lastIndexOf(".") + 1);
     }
 
-    public ImageDTO from(String path, String url) {
-        this.url = url;
-        this.path = path;
+    public ImageDTO setUrl(String urlBase) {
+        this.url = urlBase;
         return this;
     }
 

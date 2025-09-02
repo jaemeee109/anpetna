@@ -5,11 +5,13 @@ import com.anpetna.item.constant.ItemCategory;
 import com.anpetna.item.constant.ItemSellStatus;
 import lombok.Builder;
 import lombok.Getter;
+import lombok.Setter;
 
 @Builder
 @Getter
 public class ModifyItemReq extends ImageListDTO {
 
+    @Setter
     private Long itemId;
 
     private String itemName; // 상품명
@@ -20,12 +22,8 @@ public class ModifyItemReq extends ImageListDTO {
 
     private String itemDetail; // 상품 상세설명
 
-    private Integer itemSellStatus; // 상품 판매상태
+    private ItemSellStatus itemSellStatus; // 상품 판매상태
 
     private ItemCategory itemCategory; // 상품 카테고리
-
-    public void setItemId(Long itemId) {
-        this.itemId = itemId;
-    }
 
 }

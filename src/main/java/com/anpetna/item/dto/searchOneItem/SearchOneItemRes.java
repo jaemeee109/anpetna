@@ -1,6 +1,5 @@
 package com.anpetna.item.dto.searchOneItem;
 
-import com.anpetna.image.dto.ImageListDTO;
 import com.anpetna.item.constant.ItemCategory;
 import com.anpetna.item.constant.ItemSellStatus;
 import lombok.Getter;
@@ -8,13 +7,15 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 
+import java.util.ArrayList;
+import java.util.List;
 
 
 @Getter
 @Setter
 @NoArgsConstructor
 @ToString
-public class SearchOneItemRes extends ImageListDTO {
+public class SearchOneItemRes {
 
     private Long itemId; // 상품코드
 
@@ -29,5 +30,11 @@ public class SearchOneItemRes extends ImageListDTO {
     private ItemSellStatus itemSellStatus; // 상품 판매상태
 
     private ItemCategory itemCategory; // 상품 카테고리
+
+    private List<String> imageUrl = new ArrayList<>();
+
+    public void addImageUrl(String imageUrl) {
+        this.imageUrl.add(imageUrl);
+    }
 
 }

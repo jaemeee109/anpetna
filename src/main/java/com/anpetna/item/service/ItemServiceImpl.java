@@ -11,6 +11,7 @@ import com.anpetna.item.dto.modifyItem.ModifyItemRes;
 import com.anpetna.item.dto.registerItem.RegisterItemReq;
 import com.anpetna.item.dto.registerItem.RegisterItemRes;
 import com.anpetna.item.dto.searchAllItem.SearchAllItemsReq;
+import com.anpetna.item.dto.searchAllItem.SearchAllItemsRes;
 import com.anpetna.item.dto.searchOneItem.SearchOneItemReq;
 import com.anpetna.item.dto.searchOneItem.SearchOneItemRes;
 import com.anpetna.item.repository.ItemRepository;
@@ -38,13 +39,15 @@ public class ItemServiceImpl implements ItemService {
     @Override
     @Transactional
     public RegisterItemRes registerItem(RegisterItemReq req, List<MultipartFile> files) {
+        if (files == null || files.isEmpty()) {
         files.forEach(file -> {
-            try {
-                req.addImage(imageService.uploadImage(file));
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-        });
+                try {
+                    req.addImage(imageService.uploadImage(file));
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            });
+        }
         ItemEntity item = itemMapper.cItemMapReq().map(req);
         ItemEntity savedItem = itemRepository.save(item);
         RegisterItemRes res = modelMapper.map(savedItem, RegisterItemRes.class);
@@ -54,6 +57,13 @@ public class ItemServiceImpl implements ItemService {
 
     @Override
     public ModifyItemRes modifyItem(ModifyItemReq req, List<MultipartFile> files) {
+        files.forEach(file -> {
+            try {
+                req.addImage(imageService.uploadImage(file));
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        });
         ItemEntity foundModified = itemMapper.uItemMapReq().map(req);
         ItemEntity saved = itemRepository.save(foundModified);
         ModifyItemRes res = modelMapper.map(saved, ModifyItemRes.class);
@@ -65,7 +75,6 @@ public class ItemServiceImpl implements ItemService {
         itemRepository.deleteById(req.getItemId());
         DeleteItemRes res = DeleteItemRes.builder()
                 .itemId(req.getItemId())
-                .itemName(req.getItemName())
                 .build();
         return res.deleted();
     }
@@ -78,10 +87,10 @@ public class ItemServiceImpl implements ItemService {
     }
 
     @Override
-    public Page<ItemDTO> getAllItems(SearchAllItemsReq req){
+    public Page<SearchAllItemsRes> getAllItems(SearchAllItemsReq req){
         Pageable pageable = PageRequest.of(req.getPage(), req.getSize());
         Page<ItemEntity> searchAll = itemRepository.orderBy(pageable, req);
-        Page<ItemDTO> res = searchAll.map(itemEntity -> modelMapper.map(itemEntity, ItemDTO.class));
+        Page<SearchAllItemsRes> res = searchAll.map(itemEntity -> modelMapper.map(itemEntity, SearchAllItemsRes.class));
         return res;
     }
 

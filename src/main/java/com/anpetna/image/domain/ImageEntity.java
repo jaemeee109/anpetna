@@ -34,9 +34,6 @@ public class ImageEntity {
     @Column(name = "image_fileName")
     private String fileName = "a";
 
-    @Column(name = "image_path")
-    private String path;
-
     @Column(name = "image_url")
     private String url;
 
