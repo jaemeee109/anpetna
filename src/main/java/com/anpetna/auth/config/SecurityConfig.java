@@ -63,32 +63,39 @@ public class SecurityConfig {
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // 세션 상태 없음
 
                 // ===== 인가 규칙 =====
+                .securityMatcher("/**")
                 .authorizeHttpRequests(auth -> auth
                         //브라우저에서 실제 요청 전에 보내는 프리플라이트 요청 -> 인증 없이 허용해주어야 브라우저에서 정상적으로 POST/PUT/DELETE 요청이 가능
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                        // --- Auth ---
+                        // --- Auth/JWT ---
                         .requestMatchers("/jwt/**").permitAll()
-                        // --- Member ---
+
+                        // --- Member (join/login 먼저 열기!) ---
                         .requestMatchers("/member/login", "/member/join").permitAll()
-                        .requestMatchers("/member/readOne","/member/readAll").hasRole("ADMIN")
-                        .requestMatchers("/member/my_page/","member/modify").hasAnyRole("USER")
+                        .requestMatchers("/member/readOne", "/member/readAll").hasRole("ADMIN")
+                        .requestMatchers("/member/my_page/**", "/member/modify").hasAnyRole("USER")  // ✅ 슬래시 대신 /**
+
 
                         // --- Board ---
                         .requestMatchers("/board/**").hasAnyRole("ADMIN", "USER")
+
                         // --- Comment ---
                         .requestMatchers("/comment/**").hasAnyRole("ADMIN", "USER")
 
                         // --- Item ---
-                        .requestMatchers(HttpMethod.GET,"/item/**").hasAnyRole("ADMIN", "USER")
-                        .requestMatchers(HttpMethod.POST,"/item/**").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.PUT,"/item/**").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.DELETE,"/item/**").hasRole("ADMIN")
+
+                        .requestMatchers(HttpMethod.GET, "/item/**").hasAnyRole("ADMIN", "USER")
+                        .requestMatchers(HttpMethod.POST, "/item").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/item").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/item").hasRole("ADMIN")
+
                         // --- Review ---
-                        .requestMatchers(HttpMethod.GET,"/review/**").hasAnyRole("ADMIN", "USER")
-                        .requestMatchers(HttpMethod.POST,"/review/**").hasAnyRole("ADMIN", "USER")
-                        .requestMatchers(HttpMethod.PUT,"/review/**").hasRole("USER")
-                        .requestMatchers(HttpMethod.DELETE,"/review/**").hasAnyRole("ADMIN", "USER")
+                        .requestMatchers(HttpMethod.GET, "/review/**").hasAnyRole("ADMIN", "USER")
+                        .requestMatchers(HttpMethod.POST, "/review").hasRole("USER")
+                        .requestMatchers(HttpMethod.PUT, "/review").hasRole("USER")
+                        .requestMatchers(HttpMethod.DELETE, "/review").hasAnyRole("ADMIN", "USER")
+
 
                         // --- Cart ---
                         .requestMatchers("/cart/**").permitAll()
@@ -98,6 +105,7 @@ public class SecurityConfig {
 
                         .anyRequest().authenticated()
                 )
+
 
                 // ===== 예외 응답 통일 =====
                 .exceptionHandling(e -> e
