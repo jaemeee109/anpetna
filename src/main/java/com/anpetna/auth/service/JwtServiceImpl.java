@@ -62,11 +62,7 @@ public class JwtServiceImpl implements JwtService {
         String refreshToken = jwtProvider.createRefreshToken(memberId);
 
         // 4) 리프레시 만료시각 추출(권장) 또는 정책대로 계산
-<<<<<<< HEAD
-        Instant refreshExp = jwtProvider.parseClaims(refreshToken).getExpiration().toInstant();
-=======
         Instant refreshExp = jwtProvider.getRefreshExpiration(refreshToken);
->>>>>>> origin/Feature/Member
 
         // 5) 리프레시 해시 저장용(평문 금지)
         String refreshHash = tokenHash.sha256(refreshToken);
