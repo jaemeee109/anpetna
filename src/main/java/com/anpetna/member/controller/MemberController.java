@@ -11,6 +11,7 @@ import com.anpetna.member.dto.readMemberAll.ReadMemberAllRes;
 import com.anpetna.member.dto.readMemberOne.ReadMemberOneReq;
 import com.anpetna.member.dto.readMemberOne.ReadMemberOneRes;
 import com.anpetna.member.service.MemberService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -38,11 +39,34 @@ public class MemberController {
 //    서비스에서 DB에 저장(아이디는 중복이 되지 않게 검사필요)
 //=========-===========
 
+    @PostMapping(
+            value = "/join",
+            consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE
+    )
+    public ApiResult<JoinMemberRes> joinJson(
+            @RequestBody @Valid JoinMemberReq body
+    ) throws MemberService.MemberIdExistException {
+        var join = memberService.join(body, null); // 파일 없이 처리
+        return new ApiResult<>(join);
+    }
 
-    //수정
-    @PostMapping("/modify")
-    @ResponseBody
-    @Transactional
+    @PostMapping(
+            value = "/join",
+            consumes = MediaType.MULTIPART_FORM_DATA_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE
+    )
+    public ApiResult<JoinMemberRes> joinMultipart(
+            @RequestPart("json") JoinMemberReq body,
+            @RequestPart(value = "profileFile", required = false) MultipartFile file
+    ) throws MemberService.MemberIdExistException {
+        var join = memberService.join(body, file); // 파일 O 처리
+        return new ApiResult<>(join);
+    }
+
+
+
+    @PostMapping(value="/modify", consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces="application/json")
     public ApiResult<ModifyMemberRes> modify(
             @RequestBody ModifyMemberReq modifyMemberReq) throws MemberService.MemberIdExistException {
 
