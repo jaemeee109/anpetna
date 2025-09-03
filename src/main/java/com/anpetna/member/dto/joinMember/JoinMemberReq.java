@@ -34,6 +34,6 @@ public class JoinMemberReq {
 
     private List memberFileImage;//프로필 사진 이름
 
-    private String etc;
+    private String memberEtc;
 
 }

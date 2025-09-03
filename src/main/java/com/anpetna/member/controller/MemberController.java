@@ -12,6 +12,7 @@ import com.anpetna.member.dto.readMemberAll.ReadMemberAllRes;
 import com.anpetna.member.dto.readMemberOne.ReadMemberOneReq;
 import com.anpetna.member.dto.readMemberOne.ReadMemberOneRes;
 import com.anpetna.member.service.MemberService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -43,16 +44,31 @@ public class MemberController {
 //    서비스에서 DB에 저장(아이디는 중복이 되지 않게 검사필요)
 //=========-===========
 
-    // 등록 (멀티파트: 프로필 파일 포함)
-    @PostMapping(value="/join", consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces="application/json")
-    public ApiResult<JoinMemberRes> joinMultipart(
-            @RequestPart("json") JoinMemberReq body,                                  // 회원정보
-            @RequestPart(value = "profileFile", required = false) MultipartFile file  // 프로필 1장(선택)
+    @PostMapping(
+            value = "/join",
+            consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE
+    )
+    public ApiResult<JoinMemberRes> joinJson(
+            @RequestBody @Valid JoinMemberReq body
     ) throws MemberService.MemberIdExistException {
-
-        var join = memberService.join(body, file); // ← 파일O 버전 호출
+        var join = memberService.join(body, null); // 파일 없이 처리
         return new ApiResult<>(join);
     }
+
+    @PostMapping(
+            value = "/join",
+            consumes = MediaType.MULTIPART_FORM_DATA_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE
+    )
+    public ApiResult<JoinMemberRes> joinMultipart(
+            @RequestPart("json") JoinMemberReq body,
+            @RequestPart(value = "profileFile", required = false) MultipartFile file
+    ) throws MemberService.MemberIdExistException {
+        var join = memberService.join(body, file); // 파일 O 처리
+        return new ApiResult<>(join);
+    }
+
 
 
     @PostMapping(value="/modify", consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces="application/json")
