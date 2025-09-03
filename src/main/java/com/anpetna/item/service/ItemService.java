@@ -1,5 +1,6 @@
 package com.anpetna.item.service;
 
+import com.anpetna.core.coreDto.PageResponseDTO;
 import com.anpetna.item.dto.ItemDTO;
 import com.anpetna.item.dto.deleteItem.DeleteItemReq;
 import com.anpetna.item.dto.deleteItem.DeleteItemRes;
@@ -27,7 +28,7 @@ public interface ItemService {
 
     DeleteItemRes deleteItem(DeleteItemReq req);
 
-    Page<SearchAllItemsRes> getAllItems(SearchAllItemsReq req);
+    PageResponseDTO<SearchAllItemsRes> getAllItems(SearchAllItemsReq req);
 
     SearchOneItemRes getOneItem(SearchOneItemReq req);
 }
