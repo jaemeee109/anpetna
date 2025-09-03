@@ -12,14 +12,15 @@ public class WebConfig implements WebMvcConfigurer {
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/**")
-                //.allowedOrigins("http://192.168.0.160:3000") // 프론트 주소
-                .allowedOrigins("http://localhost:8000") // 프론트 주소
+                .allowedOrigins("http://localhost:3000")
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS")
                 .allowedHeaders("*")
                 .allowCredentials(true);
     }
+    //즉 백엔드 기준으로 “이 출처에서 오는 요청만 받겠다” 라는 화이트리스트를 적는 자리
+    //CORS는 “브라우저가 API 호출할 때 요청을 보내는 출처(origin)”를 체크하니까, 프론트 주소를 정확히 써줘야만 통신이 허용
+    //allowedOrigins는 여러 번 호출해도 덮어쓰기라서 마지막 것만 유효 -> 여러 개 origin을 한 번에 지정하기
 
-    // 25.08.27 보드이미지 업로드 관련 추가해놓음 혹시몰라서 주석처리해둠
     @Value("${app.upload.dir}")
     private String uploadDir;
 

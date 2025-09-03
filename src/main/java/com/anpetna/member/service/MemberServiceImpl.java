@@ -1,7 +1,7 @@
 package com.anpetna.member.service;
 
-import com.anpetna.core.coreDomain.ImageEntity;
-import com.anpetna.core.coreRepository.ImageRepository;
+
+import com.anpetna.image.domain.ImageEntity;
 import com.anpetna.item.repository.ItemRepository;
 import com.anpetna.member.constant.MemberRole;
 import com.anpetna.member.domain.MemberEntity;
