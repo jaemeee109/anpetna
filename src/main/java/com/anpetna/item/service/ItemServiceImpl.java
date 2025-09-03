@@ -1,6 +1,5 @@
 package com.anpetna.item.service;
 
-import com.anpetna.core.coreDto.PageResponseDTO;
 import com.anpetna.image.service.ImageService;
 import com.anpetna.item.config.ItemMapper;
 import com.anpetna.item.domain.ItemEntity;
@@ -87,7 +86,7 @@ public class ItemServiceImpl implements ItemService {
     }
 
     @Override
-    public PageResponseDTO<SearchAllItemsRes> getAllItems(SearchAllItemsReq req){
+    public Page<SearchAllItemsRes> getAllItems(SearchAllItemsReq req){
         Pageable pageable = PageRequest.of(req.getPage(), req.getSize());
         Page<ItemEntity> searchAll = itemRepository.orderBy(pageable, req);
         Page<SearchAllItemsRes> res = searchAll.map(itemEntity ->
@@ -97,12 +96,12 @@ public class ItemServiceImpl implements ItemService {
             resEach.setThumbnailUrl(entityUrl);
             return resEach;
         });
-        PageResponseDTO<SearchAllItemsRes> res1 = new PageResponseDTO<>(res);
-        return res1;
+        return res;
     }
 
     // --- 상품 등록 ---
     // 파일 업로드 + DB 저장 전체를 하나의 트랜잭션으로
+
 
     //Spring @Transactional에서 트랜잭션 롤백 기본 조건:
     //RuntimeException 또는 Error 발생 시 자동 롤백

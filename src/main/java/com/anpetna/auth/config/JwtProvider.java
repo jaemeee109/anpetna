@@ -135,20 +135,10 @@ public class JwtProvider {
     // Subject/Expiration 유틸
     // =========================================================
 
-    // (필요시 파서에서 쓰도록) Refresh Key 접근 헬퍼
-    public Key getRefreshKeyForParsing() {
-        return refreshKey();
-    }
-
     /** 인증용 subject 추출 — Access 키로만 파싱(Refresh 허용 X). 만료면 예외 → 401 처리 */
     public String getUsernameForAccess(String token) {
         return Jwts.parserBuilder().setSigningKey(accessKey()).build()
                 .parseClaimsJws(token).getBody().getSubject();
-    }
-
-    public String getUsernameFromRefresh(String refreshToken) {
-        return Jwts.parserBuilder().setSigningKey(refreshKey()).build()
-                .parseClaimsJws(refreshToken).getBody().getSubject();
     }
 
     /** 범용 subject 추출 — Access 실패 시 Refresh로도 시도(로깅/감사/블랙리스트 용) */

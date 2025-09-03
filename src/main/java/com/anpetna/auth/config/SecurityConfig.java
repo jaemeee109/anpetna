@@ -30,7 +30,7 @@ public class SecurityConfig {
     // CRUD 개발시 위에서부터 3개의 메서드만 활성화시킬 것
     //dev=============================================================
     // JWT, 세션, 인증 전부 OFF -> security 적용할 떄에는 해당메서드 주석처리
-   @Bean
+     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())                                        // CSRF 끄기 (Postman 테스트 시 필수)
@@ -47,7 +47,6 @@ public class SecurityConfig {
     public PasswordEncoder passwordEncoder() {return new BCryptPasswordEncoder();}
     //================================================================
 /*
-
     @Bean
     public SecurityFilterChain filterChain(
             HttpSecurity http,
@@ -64,39 +63,32 @@ public class SecurityConfig {
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // 세션 상태 없음
 
                 // ===== 인가 규칙 =====
-                .securityMatcher("/**")
                 .authorizeHttpRequests(auth -> auth
                         //브라우저에서 실제 요청 전에 보내는 프리플라이트 요청 -> 인증 없이 허용해주어야 브라우저에서 정상적으로 POST/PUT/DELETE 요청이 가능
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                        // --- Auth/JWT ---
+                        // --- Auth ---
                         .requestMatchers("/jwt/**").permitAll()
-
-                        // --- Member (join/login 먼저 열기!) ---
+                        // --- Member ---
                         .requestMatchers("/member/login", "/member/join").permitAll()
-                        .requestMatchers("/member/readOne", "/member/readAll").hasRole("ADMIN")
-                        .requestMatchers("/member/my_page/**", "/member/modify").hasAnyRole("USER")  // ✅ 슬래시 대신 /**
-
+                        .requestMatchers("/member/readOne","/member/readAll").hasRole("ADMIN")
+                        .requestMatchers("/member/my_page/","member/modify").hasAnyRole("USER")
 
                         // --- Board ---
                         .requestMatchers("/board/**").hasAnyRole("ADMIN", "USER")
-
                         // --- Comment ---
                         .requestMatchers("/comment/**").hasAnyRole("ADMIN", "USER")
 
                         // --- Item ---
-
-                        .requestMatchers(HttpMethod.GET, "/item/**").hasAnyRole("ADMIN", "USER")
-                        .requestMatchers(HttpMethod.POST, "/item").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.PUT, "/item").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.DELETE, "/item").hasRole("ADMIN")
-
+                        .requestMatchers(HttpMethod.GET,"/item/**").hasAnyRole("ADMIN", "USER")
+                        .requestMatchers(HttpMethod.POST,"/item/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT,"/item/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE,"/item/**").hasRole("ADMIN")
                         // --- Review ---
-                        .requestMatchers(HttpMethod.GET, "/review/**").hasAnyRole("ADMIN", "USER")
-                        .requestMatchers(HttpMethod.POST, "/review").hasRole("USER")
-                        .requestMatchers(HttpMethod.PUT, "/review").hasRole("USER")
-                        .requestMatchers(HttpMethod.DELETE, "/review").hasAnyRole("ADMIN", "USER")
-
+                        .requestMatchers(HttpMethod.GET,"/review/**").hasAnyRole("ADMIN", "USER")
+                        .requestMatchers(HttpMethod.POST,"/review/**").hasAnyRole("ADMIN", "USER")
+                        .requestMatchers(HttpMethod.PUT,"/review/**").hasRole("USER")
+                        .requestMatchers(HttpMethod.DELETE,"/review/**").hasAnyRole("ADMIN", "USER")
 
                         // --- Cart ---
                         .requestMatchers("/cart/**").permitAll()
@@ -106,7 +98,6 @@ public class SecurityConfig {
 
                         .anyRequest().authenticated()
                 )
-
 
                 // ===== 예외 응답 통일 =====
                 .exceptionHandling(e -> e
@@ -132,10 +123,10 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         var cfg = new org.springframework.web.cors.CorsConfiguration();
         // === Origin 허용 목록 ===
-        // CorsConfiguration을 직접 써서 리스트로 지정하는 방식
-        // setAllowedOrigins는 여러 개 origin을 한 번에 넣을 수 있으니 다 허용
         cfg.setAllowedOrigins(java.util.List.of(
-                "http://localhost:3000"
+                "http://192.168.0.160:3000",
+                "http://localhost:3000",
+                "http://localhost:8000"
         ));
         // === 허용 메서드 ===
         cfg.setAllowedMethods(java.util.List.of(
@@ -159,6 +150,5 @@ public class SecurityConfig {
         var source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", cfg);                     // 모든 경로에 위 CORS 설정 적용
         return source;
-    }
-*/
+    }*/
 }
