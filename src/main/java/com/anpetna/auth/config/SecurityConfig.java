@@ -81,7 +81,10 @@ public class SecurityConfig {
 
 
                         // --- Board ---
-                        .requestMatchers("/board/**").hasAnyRole("ADMIN", "USER")
+                        .requestMatchers(HttpMethod.GET, "/board/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/board").hasAnyRole("ADMIN", "USER")
+                        .requestMatchers(HttpMethod.PUT, "/board").hasAnyRole("ADMIN", "USER")
+                        .requestMatchers(HttpMethod.DELETE, "/board").hasAnyRole("ADMIN", "USER")
 
                         // --- Comment ---
                         .requestMatchers("/comment/**").hasAnyRole("ADMIN", "USER")
@@ -137,7 +140,8 @@ public class SecurityConfig {
         // CorsConfiguration을 직접 써서 리스트로 지정하는 방식
         // setAllowedOrigins는 여러 개 origin을 한 번에 넣을 수 있으니 다 허용
         cfg.setAllowedOrigins(java.util.List.of(
-                "http://localhost:3000"
+                "http://localhost:3000",
+                "http://192.168.0.160:3000"
         ));
         // === 허용 메서드 ===
         cfg.setAllowedMethods(java.util.List.of(
