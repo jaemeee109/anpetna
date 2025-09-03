@@ -19,10 +19,14 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 
 @RequiredArgsConstructor
 @Slf4j
@@ -110,8 +114,20 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     response.sendError(HttpServletResponse.SC_FORBIDDEN, "User is blacklisted");  // 🔴➡️
                     return;
                 }
-                Authentication auth = jwtProvider.getAuthentication(access);
-                SecurityContextHolder.getContext().setAuthentication(auth);
+                // 5) SecurityContext에 인증 주입 — DB 기반 권한 부여
+                Collection<? extends GrantedAuthority> authorities = List.of(
+                        new SimpleGrantedAuthority(
+                                status.name().startsWith("ROLE_") ? status.name() : "ROLE_" + status.name()
+                        )
+                );
+                UserDetails user = User.withUsername(memberId)
+                        .password("") // 사용 안함
+                        .authorities(authorities)
+                        .build();
+
+                Authentication authentication =
+                        new UsernamePasswordAuthenticationToken(user, "", authorities);
+                SecurityContextHolder.getContext().setAuthentication(authentication);
                 //end~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
             }

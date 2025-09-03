@@ -2,14 +2,12 @@ package com.anpetna.member.dto.modifyMember;
 
 import com.anpetna.member.constant.MemberRole;
 import com.anpetna.member.dto.MemberDTO;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.util.List;
 
 @Getter
+@Setter
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
