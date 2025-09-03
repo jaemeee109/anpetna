@@ -1,5 +1,7 @@
 package com.anpetna.auth.config;
 
+import com.anpetna.member.constant.MemberRole;
+import com.anpetna.member.repository.MemberRepository;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
@@ -163,11 +165,11 @@ public class JwtProvider {
         return c.getExpiration().toInstant();
     }
 
-    // =========================================================
-    // Authentication (SecurityContext용) — Access 전용
-    // =========================================================
-
-    /** Access 토큰으로만 Authentication 생성 — 리소스 접근 인증에 사용 */
+//    // =========================================================
+//    // Authentication (SecurityContext용) — Access 전용
+//    // =========================================================
+//
+//    /** Access 토큰으로만 Authentication 생성 — 리소스 접근 인증에 사용 */
     public Authentication getAuthentication(String accessToken) {
         var claims = Jwts.parserBuilder().setSigningKey(accessKey()).build()
                 .parseClaimsJws(accessToken).getBody();
