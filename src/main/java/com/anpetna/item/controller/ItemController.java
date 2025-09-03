@@ -1,5 +1,6 @@
 package com.anpetna.item.controller;
 
+import com.anpetna.core.coreDto.PageResponseDTO;
 import com.anpetna.item.dto.ItemDTO;
 import com.anpetna.item.dto.deleteItem.DeleteItemReq;
 import com.anpetna.item.dto.deleteItem.DeleteItemRes;
@@ -35,7 +36,6 @@ public class ItemController {
 
     //=============================점검 요소================================
     // item C R1 U D RALL 완
-    // 페이지네이션 검토
     // 정렬 조건 검토
     // 이미지 수정시 삭제와 입력의 과정
     // 불필요한 어노테이션 정리
@@ -80,7 +80,7 @@ public class ItemController {
     }
 
     @GetMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<Page<SearchAllItemsRes>> searchAllItems(@RequestBody SearchAllItemsReq getReq) {
+    public ResponseEntity<PageResponseDTO<SearchAllItemsRes>> searchAllItems(@RequestBody SearchAllItemsReq getReq) {
         var getAllResult = itemService.getAllItems(getReq);
         return ResponseEntity.ok(getAllResult);
     }
