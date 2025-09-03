@@ -78,13 +78,12 @@ public class SecurityConfig {
                         .requestMatchers("/member/login", "/member/join").permitAll()
                         .requestMatchers("/member/readOne", "/member/readAll").hasRole("ADMIN")
                         .requestMatchers("/member/my_page/**", "/member/modify").hasAnyRole("USER")  // ✅ 슬래시 대신 /**
-
-
+                        
                         // --- Board ---
-                        .requestMatchers(HttpMethod.GET, "/board/**").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/board").hasAnyRole("ADMIN", "USER")
-                        .requestMatchers(HttpMethod.PUT, "/board").hasAnyRole("ADMIN", "USER")
-                        .requestMatchers(HttpMethod.DELETE, "/board").hasAnyRole("ADMIN", "USER")
+                        .requestMatchers(HttpMethod.GET,     "/board", "/board/**").permitAll() // 목록/상세 열람 모두 허용
+                        .requestMatchers(HttpMethod.POST,    "/board", "/board/**").hasAnyRole("ADMIN","USER")
+                        .requestMatchers(HttpMethod.PUT,     "/board", "/board/**").hasAnyRole("ADMIN","USER")
+                        .requestMatchers(HttpMethod.DELETE,  "/board", "/board/**").hasAnyRole("ADMIN","USER")
 
                         // --- Comment ---
                         .requestMatchers("/comment/**").hasAnyRole("ADMIN", "USER")
