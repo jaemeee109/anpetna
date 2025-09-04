@@ -29,9 +29,8 @@ public class SecurityConfig {
 
     // CRUD 개발시 위에서부터 3개의 메서드만 활성화시킬 것
     //dev=============================================================
-/*
     // JWT, 세션, 인증 전부 OFF -> security 적용할 떄에는 해당메서드 주석처리
-   @Bean
+/*   @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())                                        // CSRF 끄기 (Postman 테스트 시 필수)
@@ -39,8 +38,7 @@ public class SecurityConfig {
                 .formLogin(login -> login.disable())                            // 폼 로그인 끄기
                 .httpBasic(basic -> basic.disable());                            // Basic Auth 끄기
         return http.build();
-    }
-*/
+    }*/
 
     @Bean   // 스프링 기본 AuthenticationManager 노출
     public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration)
@@ -139,8 +137,7 @@ public class SecurityConfig {
         // CorsConfiguration을 직접 써서 리스트로 지정하는 방식
         // setAllowedOrigins는 여러 개 origin을 한 번에 넣을 수 있으니 다 허용
         cfg.setAllowedOrigins(java.util.List.of(
-                "http://localhost:3000",
-                "http://192.168.0.160:3000"
+                "http://localhost:3000"
         ));
         // === 허용 메서드 ===
         cfg.setAllowedMethods(java.util.List.of(
