@@ -90,16 +90,16 @@ public class SecurityConfig {
 
                         // --- Item ---
 
-                        .requestMatchers(HttpMethod.GET, "/item/**").hasAnyRole("ADMIN", "USER")
-                        .requestMatchers(HttpMethod.POST, "/item").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.PUT, "/item").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.DELETE, "/item").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/item", "/item/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/item", "/item/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/item", "/item/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/item", "/item/**").hasRole("ADMIN")
 
                         // --- Review ---
-                        .requestMatchers(HttpMethod.GET, "/review/**").hasAnyRole("ADMIN", "USER")
-                        .requestMatchers(HttpMethod.POST, "/review").hasRole("USER")
-                        .requestMatchers(HttpMethod.PUT, "/review").hasRole("USER")
-                        .requestMatchers(HttpMethod.DELETE, "/review").hasAnyRole("ADMIN", "USER")
+                        .requestMatchers(HttpMethod.GET,"/review", "/review/**").hasAnyRole("ADMIN", "USER")
+                        .requestMatchers(HttpMethod.POST, "/review", "/review/**").hasRole("USER")
+                        .requestMatchers(HttpMethod.PUT, "/review", "/review/**").hasRole("USER")
+                        .requestMatchers(HttpMethod.DELETE, "/review", "/review/**").hasAnyRole("ADMIN", "USER")
 
 
                         // --- Cart ---
@@ -167,3 +167,13 @@ public class SecurityConfig {
     }
 
 }
+//==================이론=======================
+//.anyRequest().authenticated()
+//의미: 나머지 모든 요청은 로그인되어 있어야 함
+//URL 전체가 아니라, 이전에 걸린 requestMatchers 외 모든 요청에 대해 적용
+//익명 사용자는 403
+
+//.securityMatcher("/**")
+//의미: SecurityFilterChain이 적용될 요청 범위를 지정
+//단순히 “필터가 동작할 범위”를 정하는 거지, 권한 체크가 아님
+/// login, /public/**도 포함되면, 필터 체인 자체가 거기까지 적용됨 → permitAll을 따로 걸어줘야 함

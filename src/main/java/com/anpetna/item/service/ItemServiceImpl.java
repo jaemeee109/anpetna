@@ -15,6 +15,7 @@ import com.anpetna.item.dto.searchAllItem.SearchAllItemsRes;
 import com.anpetna.item.dto.searchOneItem.SearchOneItemReq;
 import com.anpetna.item.dto.searchOneItem.SearchOneItemRes;
 import com.anpetna.item.repository.ItemRepository;
+import groovy.util.logging.Log4j2;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +30,7 @@ import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
+@Log4j2
 public class ItemServiceImpl implements ItemService {
 
     private final ImageService imageService;
@@ -49,6 +51,7 @@ public class ItemServiceImpl implements ItemService {
             });
         }
         ItemEntity item = itemMapper.cItemMapReq().map(req);
+
         ItemEntity savedItem = itemRepository.save(item);
         RegisterItemRes res = modelMapper.map(savedItem, RegisterItemRes.class);
         return  res.registered();

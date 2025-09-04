@@ -1,21 +1,20 @@
 package com.anpetna.item.config;
 
 import com.anpetna.image.domain.ImageEntity;
-import com.anpetna.image.dto.ImageDTO;
 import com.anpetna.image.dto.ImageListDTO;
 import com.anpetna.item.domain.ItemEntity;
-import com.anpetna.item.dto.ItemDTO;
 import com.anpetna.item.dto.modifyItem.ModifyItemReq;
 import com.anpetna.item.dto.registerItem.RegisterItemReq;
-import com.anpetna.item.dto.searchAllItem.SearchAllItemsRes;
 import com.anpetna.item.dto.searchOneItem.SearchOneItemRes;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.log4j.Log4j2;
 import org.modelmapper.ModelMapper;
 import org.modelmapper.TypeMap;
 import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
+@Log4j2
 public class ItemMapper {
 
     private final ModelMapper modelMapper;
@@ -61,11 +60,10 @@ public class ItemMapper {
             var des = ctx.getDestination();
             if (src.getImages() != null) {
                 des.getImages().clear();
-
                 try {
                     src.getImages().forEach(imgDTO -> des.addImage(modelMapper.map(imgDTO, ImageEntity.class)));
                 } catch (NullPointerException e) {
-                    System.out.println("이미지를 입력하지 않음");
+                    log.info("이미지를 입력하지 않음");
                 }
                 return des;
             }

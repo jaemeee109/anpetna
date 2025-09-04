@@ -1,5 +1,6 @@
 package com.anpetna.item.controller;
 
+import com.anpetna.ApiResult;
 import com.anpetna.core.coreDto.PageResponseDTO;
 import com.anpetna.item.dto.ItemDTO;
 import com.anpetna.item.dto.deleteItem.DeleteItemReq;
@@ -49,26 +50,26 @@ public class ItemController {
     private final ItemService itemService;
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<RegisterItemRes> registerItem(@RequestPart RegisterItemReq postReq, @RequestPart List<MultipartFile> files ) throws IOException {
+    public ApiResult<RegisterItemRes> registerItem(@RequestPart RegisterItemReq postReq, @RequestPart List<MultipartFile> files ) throws IOException {
         var postRes = itemService.registerItem(postReq, files);
-        return ResponseEntity.ok(postRes);
+        return new ApiResult<>(postRes);
     }
 
     //URL → 자원 식별, Body → 수정할 필드들로 역할을 분리
     @PutMapping(value = "/{itemId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<ModifyItemRes> updateItem(@PathVariable Long itemId, @RequestPart ModifyItemReq putReq, @RequestPart List<MultipartFile> files) {
+    public ApiResult<ModifyItemRes> updateItem(@PathVariable Long itemId, @RequestPart ModifyItemReq putReq, @RequestPart List<MultipartFile> files) {
         putReq.setItemId(itemId);
         var putRes = itemService.modifyItem(putReq, files);
-        return ResponseEntity.ok(putRes);
+        return new ApiResult<>(putRes);
     }
 
     @DeleteMapping("/{itemId}")
-    public ResponseEntity<DeleteItemRes> deleteItem(@PathVariable Long itemId) {
+    public ApiResult<DeleteItemRes> deleteItem(@PathVariable Long itemId) {
         DeleteItemReq deleteReq = DeleteItemReq.builder()
                 .itemId(itemId)
                 .build();
         var deleteRes = itemService.deleteItem(deleteReq);
-        return ResponseEntity.ok(deleteRes);
+        return new ApiResult<>(deleteRes);
     }
 
     @GetMapping(value = "/{itemId}")
