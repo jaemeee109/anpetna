@@ -1,6 +1,6 @@
 package com.anpetna.auth;
 
-import com.anpetna.config.JwtProvider;
+import com.anpetna.auth.config.JwtProvider;
 import com.anpetna.member.domain.MemberEntity;
 import com.anpetna.auth.dto.LoginMemberReq;
 import com.anpetna.auth.dto.TokenResponse;

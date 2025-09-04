@@ -1,6 +1,6 @@
 package com.anpetna.board.dto.readOneBoard;
 
-import com.anpetna.coreDto.ImageDTO;
+import com.anpetna.image.dto.ImageDTO;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -17,6 +17,7 @@ import java.util.List;
 public class ReadOneBoardReq {
 
     private Long bno;
+    private String memberId;
     private List<ImageDTO> images;
 
 }

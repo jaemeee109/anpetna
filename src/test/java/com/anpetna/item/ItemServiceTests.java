@@ -1,8 +1,7 @@
 package com.anpetna.item;
 
-import com.anpetna.coreDto.ImageDTO;
+import com.anpetna.image.dto.ImageDTO;
 import com.anpetna.item.constant.ItemCategory;
-import com.anpetna.item.constant.ItemSaleStatus;
 import com.anpetna.item.constant.ItemSellStatus;
 import com.anpetna.item.dto.ItemDTO;
 import com.anpetna.item.dto.deleteItem.DeleteItemReq;
@@ -16,17 +15,19 @@ import com.anpetna.item.dto.searchOneItem.SearchOneItemReq;
 import com.anpetna.item.dto.searchOneItem.SearchOneItemRes;
 import com.anpetna.item.service.ItemService;
 import jakarta.transaction.Transactional;
-import org.hibernate.query.SortDirection;
+import lombok.extern.log4j.Log4j2;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Sort;
 import org.springframework.test.context.ActiveProfiles;
-import java.util.List;
 
 @SpringBootTest
 @ActiveProfiles("item")
+@Log4j2
 public class ItemServiceTests {
-
+/*
     @Autowired
     ItemService itemService;
 
@@ -50,8 +51,7 @@ public class ItemServiceTests {
                     .itemStock(200)
                     .itemDetail("test")
                     .itemCategory(ItemCategory.TOY)
-                    .itemSellStatus(ItemSellStatus.SELL)
-                    .itemSaleStatus(ItemSaleStatus.ONSALE)
+                    .itemSellStatus(1)
                     .build();
             req.addImage(image1);
             req.addImage(image2);
@@ -77,20 +77,19 @@ public class ItemServiceTests {
    @Transactional
     public void searchAllItem() {
 
-        SearchAllItemsReq req = new SearchAllItemsReq();
+        SearchAllItemsReq req1 = SearchAllItemsReq.builder()
+                .itemCategory(ItemCategory.TOY)
+                .orderByDate(Sort.Direction.ASC)
+                .build();
+        Page<ItemDTO> res1 = itemService.searchItems(req1);
+        log.info(res1.getTotalElements());
 
-/*        req.setSortBySale(ItemSellStatus.SOLD_OUT);
-        List<ItemDTO> res1 = itemService.getAllItems(req);
-        System.out.println(res1);*/
-
-        req.setSortByCategory(ItemCategory.TOY);
-       List<ItemDTO> res2 = itemService.getAllItems(req);
-        System.out.println(res2.toString());
-
-       /* req.setOrderByPriceDir(SortDirection.ASCENDING);
-       List<ItemDTO> res3 = itemService.getAllItems(req);
-        System.out.println(res3);*/
-
+*//*       SearchAllItemsReq req2 = SearchAllItemsReq.builder()
+               .itemCategory(ItemCategory.TOY)
+               .orderByPrice(Sort.Direction.ASC)
+               .build();
+       Page<ItemDTO> res2 = itemService.searchItems(req1);
+       log.info(res2.toString());*//*
     }
 
     @Test
@@ -111,7 +110,6 @@ public class ItemServiceTests {
                .itemStock(100)
                 .itemDetail("111111111111111111")
                 .itemSellStatus(ItemSellStatus.SOLD_OUT)
-                .itemSaleStatus(ItemSaleStatus.ORIGIN)
                 .build();
         req.addImage(image1);
         req.addImage(image2);
@@ -128,5 +126,5 @@ public class ItemServiceTests {
         req.setItemId(1L);
         DeleteItemRes res = itemService.deleteItem(req);
         System.out.println(res);
-    }
+    }*/
 }

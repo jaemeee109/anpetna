@@ -1,7 +1,6 @@
 package com.anpetna.board.dto.createBoard;
 
-import com.anpetna.board.domain.BoardEntity;
-import com.anpetna.coreDto.ImageDTO;
+import com.anpetna.image.dto.ImageDTO;
 import lombok.*;
 
 import java.util.List;

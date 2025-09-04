@@ -1,11 +1,10 @@
 package com.anpetna.order.service;
 
-import com.anpetna.coreDomain.ImageEntity;
+import com.anpetna.image.domain.ImageEntity;
 import com.anpetna.order.domain.OrderEntity;
 import com.anpetna.order.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
 
-import org.hibernate.query.Order;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 

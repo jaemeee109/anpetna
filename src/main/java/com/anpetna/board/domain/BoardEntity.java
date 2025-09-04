@@ -1,8 +1,8 @@
 package com.anpetna.board.domain;
 
 import com.anpetna.board.constant.BoardType;
-import com.anpetna.coreDomain.BaseEntity;
-import com.anpetna.coreDomain.ImageEntity;
+import com.anpetna.core.coreDomain.BaseEntity;
+import com.anpetna.image.domain.ImageEntity;
 import jakarta.persistence.*;
 import lombok.*;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
@@ -70,9 +70,9 @@ public class BoardEntity extends BaseEntity {
 
 
     public void addImage(ImageEntity image) {
-        images.add(image);
-        image.setBoard(this); // ImageEntity에 setBoard(…) 존재해야 함
-    }
+            images.add(image);
+            image.setBoard(this); // ImageEntity에 setBoard(…) 존재해야 함
+        }
 
     public void removeImage(ImageEntity image) {
         images.remove(image);

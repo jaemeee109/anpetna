@@ -17,12 +17,13 @@ public interface BoardJpaRepository extends JpaRepository<BoardEntity, Long>, Bo
 
     Page<BoardEntity> findAll(Pageable pageable);
     // 페이징 + 전체 게시글 조회
+    
     @Query("""
       select b
       from BoardEntity b
       where (:boardType is null or :boardType = '' or upper(b.boardType) = upper(:boardType))
       order by b.noticeFlag desc, b.createDate desc
-    """)
+    """) // 고정글 상단 고정 용
     Page<BoardEntity> findByBoardTypeSafe(
             @Param("boardType") String boardType,
             Pageable pageable

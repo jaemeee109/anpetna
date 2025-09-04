@@ -1,7 +1,7 @@
 package com.anpetna.board.dto.createBoard;
 
 import com.anpetna.board.constant.BoardType;
-import com.anpetna.coreDto.ImageDTO;
+import com.anpetna.image.dto.ImageDTO;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.NotBlank;

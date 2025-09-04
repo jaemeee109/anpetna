@@ -18,13 +18,13 @@ public class BlackListedEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long blackNo;
 
-    @Column(name = "access_token")
+    @Column(name = "access_token", nullable = false)
     private String accessTokenHash; // 해싱된 access토큰
 
 //    @Column(name = "refresh_token")
 //    private String refreshTokenHash; // 해싱된 refresh토큰
 
-    @Column(name = "access_expiresAt")
+    @Column(name = "access_expiresAt",nullable = false)
     private Instant expiresAt;      // 만료시간
 
 }

@@ -1,6 +1,6 @@
 package com.anpetna.item.dto.modifyReview;
 
-import com.anpetna.coreDto.ImageListDTO;
+import com.anpetna.image.dto.ImageListDTO;
 import com.anpetna.item.dto.ItemDTO;
 import lombok.Builder;
 import lombok.Getter;

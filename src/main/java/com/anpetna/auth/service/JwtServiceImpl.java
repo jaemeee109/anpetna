@@ -1,12 +1,13 @@
 package com.anpetna.auth.service;
 
+import com.anpetna.auth.config.JwtProvider;
 import com.anpetna.auth.domain.TokenEntity;
 import com.anpetna.auth.dto.LoginMemberReq;
 import com.anpetna.auth.dto.TokenRequest;
 import com.anpetna.auth.dto.TokenResponse;
 import com.anpetna.auth.repository.TokenRepository;
 import com.anpetna.auth.util.TokenHash;
-import com.anpetna.config.JwtProvider;
+
 import com.anpetna.member.domain.MemberEntity;
 import com.anpetna.member.repository.MemberRepository;
 import io.jsonwebtoken.Claims;
@@ -61,7 +62,7 @@ public class JwtServiceImpl implements JwtService {
         String refreshToken = jwtProvider.createRefreshToken(memberId);
 
         // 4) 리프레시 만료시각 추출(권장) 또는 정책대로 계산
-        Instant refreshExp = jwtProvider.parseClaims(refreshToken).getExpiration().toInstant();
+        Instant refreshExp = jwtProvider.getRefreshExpiration(refreshToken);
 
         // 5) 리프레시 해시 저장용(평문 금지)
         String refreshHash = tokenHash.sha256(refreshToken);
@@ -79,8 +80,18 @@ public class JwtServiceImpl implements JwtService {
             tokenRepository.save(tokenEntity);
         }
 
+        String role = Optional.ofNullable(member.getMemberRole())
+                .map(Object::toString)      // Enum -> "ADMIN"
+                .map(s -> s.startsWith("ROLE_") ? s.substring(5) : s)
+                .map(String::toUpperCase)
+                .orElse("USER");
+
         // 7) 응답
-        return new TokenResponse(accessToken, refreshToken);
+        return TokenResponse.builder()
+                .accessToken(accessToken)
+                .refreshToken(refreshToken)
+                .memberRole(role)
+                .build();
     }
 
 
@@ -108,42 +119,34 @@ public class JwtServiceImpl implements JwtService {
         tokenEntity.setRevokedAt(now);
         tokenRepository.save(tokenEntity);
 
-
-//        //클라이언트가 보낸 refreshToken의 유효성 검사
-//        if(!jwtProvider.validateToken(tokenRequest.getRefreshToken())){
-//            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "무효한 토큰입니다");
-//        }
-//
-//        //refreshToken의 subject(사용자 식별자)를 추출
-//        String id = jwtProvider.getUsername(tokenRequest.getRefreshToken());
-//
-//        //DB에서 해당 사용자의 토큰 레코드 조회
-//        TokenEntity tokenEntity = tokenRepository.findByTokenMemberId(id)
-//                .orElseThrow(()-> new ResponseStatusException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
-//
-////요청으로 받은 refreshToken을 sha256으로 해싱
-////평문 토큰을 DB에 보관하지 않기 위해 해시로 비교 (유출 대비)
-//        String reqRefreshToken = tokenHash.sha256(tokenRequest.getRefreshToken()); //요청받은 refresh토큰을 hash로 변환
-//
-//
-//
-////DB에 저장된 해시값과 비교 (불일치 시 위조/재사용/오류로 간주)
-//        if (!reqRefreshToken.equals(tokenEntity.getRefreshToken())){
-//            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "발급받은 토큰이 맞지 않습니다");
-//        }
-
 //새로운 Access/Refresh 토큰 생성 (토큰 로테이션
         String newAccessToken = jwtProvider.createAccessToken(tokenEntity.getMemberId());
         String newRefreshToken = jwtProvider.createRefreshToken(tokenEntity.getMemberId());
 
-//새 refresh 토큰은 DB에 '해시'로 저장 (평문 저장 금지)
+// 새 refresh claims에서 exp 꺼내서 expiresAt 반영
+        Instant newRefreshExp = jwtProvider.getRefreshExpiration(newRefreshToken);
+
+// 같은 row에 새 해시로 교체 + 만료시각 갱신 + 철회 null로
         tokenEntity.setRefreshToken(tokenHash.sha256(newRefreshToken));
+        tokenEntity.setExpiresAt(newRefreshExp);
+        tokenEntity.setRevokedAt(null);
         tokenRepository.save(tokenEntity);
+
+        String role = memberRepository.findByMemberId(memberId)
+                .map(MemberEntity::getMemberRole)
+                .map(Object::toString)
+                .map(s -> s.startsWith("ROLE_") ? s.substring(5) : s)
+                .map(String::toUpperCase)
+                .orElse("USER");
 
 //클라이언트에는 평문 새 토큰들을 반환
 //AccessToken: 즉시 사용
 //RefreshToken: 다음 갱신 때 클라이언트가 다시 제출
-        return new TokenResponse(newAccessToken, newRefreshToken);
+        return TokenResponse.builder()
+                .accessToken(newAccessToken)
+                .refreshToken(newRefreshToken)
+                .memberRole(role)
+                .build();
     }
 
     @Override

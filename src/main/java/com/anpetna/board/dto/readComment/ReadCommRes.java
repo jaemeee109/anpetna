@@ -1,7 +1,7 @@
 package com.anpetna.board.dto.readComment;
 
 import com.anpetna.board.dto.CommentDTO;
-import com.anpetna.coreDto.PageResponseDTO;
+import com.anpetna.core.coreDto.PageResponseDTO;
 import lombok.*;
 
 @Getter

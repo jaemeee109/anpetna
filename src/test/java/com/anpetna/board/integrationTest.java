@@ -1,39 +1,7 @@
 package com.anpetna.board;
 
-import com.anpetna.board.constant.BoardType;
-import com.anpetna.board.dto.BoardDTO;
-import com.anpetna.board.dto.createBoard.CreateBoardReq;
-import com.anpetna.board.dto.createComment.CreateCommReq;
-import com.anpetna.board.dto.deleteBoard.DeleteBoardReq;
-import com.anpetna.board.dto.deleteComment.DeleteCommReq;
-import com.anpetna.board.dto.readComment.ReadCommReq;
-import com.anpetna.board.dto.readComment.ReadCommRes;
-import com.anpetna.board.dto.readOneBoard.ReadOneBoardReq;
-import com.anpetna.board.dto.updateBoard.UpdateBoardReq;
-import com.anpetna.board.dto.updateComment.UpdateCommReq;
-import com.anpetna.board.repository.BoardJpaRepository;
-import com.anpetna.board.repository.CommentJpaRepository;
-import com.anpetna.board.service.BoardService;
-import com.anpetna.board.service.CommentService;
-import com.anpetna.coreDto.PageRequestDTO;
-import com.anpetna.coreDto.PageResponseDTO;
-import com.anpetna.member.constant.MemberRole;
-import com.anpetna.member.domain.MemberEntity;
-import com.anpetna.member.dto.joinMember.JoinMemberReq;
-import com.anpetna.member.repository.MemberRepository;
-import com.anpetna.member.service.MemberService;
 import lombok.extern.log4j.Log4j2;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.junit.jupiter.api.DisplayName;
-
-import java.util.List;
-import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

@@ -13,7 +13,7 @@ import com.anpetna.board.dto.updateComment.UpdateCommReq;
 import com.anpetna.board.dto.updateComment.UpdateCommRes;
 import com.anpetna.board.repository.BoardJpaRepository;
 import com.anpetna.board.repository.CommentJpaRepository;
-import com.anpetna.coreDto.PageResponseDTO;
+import com.anpetna.core.coreDto.PageResponseDTO;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;

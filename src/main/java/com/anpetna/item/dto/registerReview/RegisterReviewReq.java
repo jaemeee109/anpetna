@@ -1,6 +1,6 @@
 package com.anpetna.item.dto.registerReview;
 
-import com.anpetna.coreDto.ImageListDTO;
+import com.anpetna.image.dto.ImageListDTO;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.ToString;

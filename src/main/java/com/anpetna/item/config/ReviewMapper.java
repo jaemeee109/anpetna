@@ -1,32 +1,23 @@
 package com.anpetna.item.config;
 
-import com.anpetna.coreDomain.ImageEntity;
-import com.anpetna.coreDto.ImageDTO;
-import com.anpetna.coreDto.ImageListDTO;
-import com.anpetna.item.domain.ItemEntity;
+import com.anpetna.image.domain.ImageEntity;
+import com.anpetna.image.dto.ImageDTO;
+import com.anpetna.image.dto.ImageListDTO;
 import com.anpetna.item.domain.ReviewEntity;
 import com.anpetna.item.dto.ReviewDTO;
 import com.anpetna.item.dto.modifyReview.ModifyReviewReq;
 import com.anpetna.item.dto.registerReview.RegisterReviewReq;
 import com.anpetna.item.dto.searchOneReview.SearchOneReviewRes;
-import jakarta.annotation.PostConstruct;
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.log4j.Log4j2;
-import org.modelmapper.Converter;
 import org.modelmapper.ModelMapper;
 import org.modelmapper.TypeMap;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Bean;
 import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
 public class ReviewMapper {
 
-
    private final ModelMapper modelMapper;
-    //  필드를 final로 꼭 해야하는가
 
    public TypeMap<RegisterReviewReq, ReviewEntity> cReviewMapReq() {
        TypeMap<RegisterReviewReq, ReviewEntity> typeMap = modelMapper.createTypeMap(RegisterReviewReq.class, ReviewEntity.class);

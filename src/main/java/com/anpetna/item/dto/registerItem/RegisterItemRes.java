@@ -1,20 +1,23 @@
 package com.anpetna.item.dto.registerItem;
 
-import com.anpetna.coreDto.ImageListDTO;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
 
+import java.time.LocalDateTime;
+
 @ToString
 @Setter
 @Getter
-public class RegisterItemRes extends ImageListDTO {
+public class RegisterItemRes {
 
     private Long itemId;
 
     private String itemName; // 상품명
 
     private int itemPrice;
+
+    private LocalDateTime createDate;
 
     private String res;
 
