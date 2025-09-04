@@ -19,7 +19,7 @@ type Row = {
   bWriter?: string; writer?: string; bwriter?: string;
   createDate?: string; createdAt?: string; regDate?: string;
 
-  category?: string; bCategory?: string; faqCategory?: string; cat?: string; group?: string; section?: string; type2?: string;
+  bCategory?: string; category?: string; cat?: string; group?: string; section?: string; type2?: string;
 
   // 서버마다 다른 보드 타입 키들
   boardType?: string; type?: string; bType?: string; board?: string; type1?: string;
@@ -169,7 +169,7 @@ function pickCategory(r: Row): string {
   const raw =
     r.category ??
     r.bCategory ??
-    r.faqCategory ??
+    r.category ??
     r.section ??
     r.group ??
     r.cat ??

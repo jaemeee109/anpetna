@@ -1,5 +1,5 @@
-// features/member/utils/memberRole.ts
-import { readMemberOne } from '@/features/member/data/member.api';
+// 역할 캐시 유틸: ADMIN이면 강화 기록, USER/미확정이면 기존값 보존(강등 금지)
+import { readMemberOne, readMemberMe } from '@/features/member/data/member.api';
 
 function normalizeRole(r: any): 'USER' | 'ADMIN' | 'BLACKLIST' {
   const v = (r ?? '').toString().trim().toUpperCase();
@@ -8,48 +8,53 @@ function normalizeRole(r: any): 'USER' | 'ADMIN' | 'BLACKLIST' {
   return 'USER';
 }
 
-// 응답 객체에서 role 필드 베스트 에포트로 뽑기
 function pickRoleFrom(anyData: any): any {
   const d = anyData ?? {};
   return (
-    d.memberRole ?? d.role ?? d?.dto?.memberRole ?? d?.result?.memberRole ??
-    d?.memberDTO?.memberRole ?? d?.data?.memberRole ?? d?.data?.role
+    d.memberRole ??
+    d.role ??
+    d?.dto?.memberRole ??
+    d?.result?.memberRole ??
+    d?.memberDTO?.memberRole ??
+    d?.data?.memberRole ??
+    d?.data?.role
   );
 }
 
-async function tryFetchRole(memberId: string): Promise<'USER'|'ADMIN'|'BLACKLIST'|null> {
+async function tryFetchRole(memberId?: string): Promise<'USER' | 'ADMIN' | 'BLACKLIST' | null> {
   try {
-    const me = await readMemberOne(memberId);
-    // 콘솔 확인용 로그 (필요 없으면 지워도 무방)
-    console.log('[cacheMemberRole] readMemberOne:', me);
-
+    const me = memberId && memberId.trim()
+      ? await readMemberOne(memberId)
+      : await readMemberMe(); // id 없으면 /member/me 사용
     const raw = pickRoleFrom(me);
     if (raw == null) return null;
     return normalizeRole(raw);
   } catch (e) {
-    console.warn('[cacheMemberRole] readMemberOne failed:', e);
+    console.warn('[cacheMemberRole] readMember failed:', e);
     return null;
   }
 }
 
-export async function cacheMemberRole(memberId: string) {
+export async function cacheMemberRole(memberId?: string) {
   // 1차 시도
   let norm = await tryFetchRole(memberId);
 
-  // 토큰/쿠키 전파 타이밍 문제 대비 300ms 후 재시도
+  // 네트워크/쿠키 지연 가드 한 번 더
   if (!norm) {
-    await new Promise(r => setTimeout(r, 300));
+    await new Promise((r) => setTimeout(r, 200));
     norm = await tryFetchRole(memberId);
   }
 
-  if (norm) {
-    const code = norm === 'ADMIN' ? '1' : norm === 'BLACKLIST' ? '2' : '0';
-    localStorage.setItem('memberRole', code);
-    localStorage.setItem('memberRoleName', norm);
+  if (norm === 'ADMIN') {
+    // ✅ 관리자 확정 → 강화 기록
+    localStorage.setItem('memberRole', 'ADMIN');
     window.dispatchEvent(new Event('auth-changed'));
-    console.log('[cacheMemberRole] set:', { code, norm });
+    console.log('[cacheMemberRole] set ADMIN');
+  } else if (norm === 'BLACKLIST') {
+    console.log('[cacheMemberRole] BLACKLIST detected (no local write by default)');
   } else {
-    // ❗ 중요: 실패 시 기존 값을 보존하고 경고만 출력 (0으로 덮어쓰지 않음)
-    console.warn('[cacheMemberRole] role not determined, keeping previous memberRole =', localStorage.getItem('memberRole'));
+    // ❗ USER/미확정: 기존값 유지 (강등 금지)
+    const prev = localStorage.getItem('memberRole') ?? '(unset)';
+    console.warn('[cacheMemberRole] role not determined or USER, keeping previous memberRole =', prev);
   }
 }

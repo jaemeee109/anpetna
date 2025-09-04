@@ -122,7 +122,7 @@ export default function Header() {
     return () => document.removeEventListener('click', onDocClick);
   }, []);
 
-  // 1차: 로컬에서 인증/ADMIN 판정
+  // 1차: 로컬에서 인증/ADMIN 판정 + memberRole 기본값 보장
   function evaluateAuthFromLocal() {
     const anyAuth = hasAnyLocalAuth();
     if (!anyAuth) {
@@ -132,57 +132,79 @@ export default function Header() {
     }
     setAuthed(true);
 
-    // JWT 최우선
     const raw = getTokenFromStorage();
     const isAdminByJwt = payloadHasAdmin(raw ? decodeJwt(raw) : null);
 
-    // 저장된 memberRole(ADMIN만 신뢰)
+    // 저장된 memberRole (ADMIN만 신뢰)
     const stored = (typeof window !== 'undefined' && localStorage.getItem('memberRole')) || '';
-    const isAdminStored = stored?.toUpperCase() === 'ADMIN' || stored?.toUpperCase() === 'ROLE_ADMIN';
+    const up = String(stored || '').toUpperCase();
+    const isAdminStored = up === 'ADMIN' || up === 'ROLE_ADMIN';
 
+    // 로컬 표시 보장: 토큰만 있고 저장이 없으면 USER로 임시 표기
+    if (!stored && raw) {
+      try {
+        localStorage.setItem('memberRole', isAdminByJwt ? 'ADMIN' : 'USER');
+      } catch {}
+    }
     setAdmin(!!(isAdminByJwt || isAdminStored));
   }
 
-  // 2차: 서버에서 보강 (ADMIN만 기록, USER는 기록하지 않음)
+  // 2차: 서버에서 역할 확정 (ADMIN/BLACKLIST/USER 중 하나를 memberRole로 고정 저장)
   async function verifyRoleFromServerIfNeeded() {
     if (!hasAnyLocalAuth()) return;
 
-    // 이미 ADMIN이면 끝
+    // 이미 ADMIN이면 서버 확인 생략 가능
     const raw = getTokenFromStorage();
     const isAdminByJwt = payloadHasAdmin(raw ? decodeJwt(raw) : null);
     const stored = (typeof window !== 'undefined' && localStorage.getItem('memberRole')) || '';
-    const isAdminStored = stored?.toUpperCase() === 'ADMIN' || stored?.toUpperCase() === 'ROLE_ADMIN';
+    const up = String(stored || '').toUpperCase();
+    const isAdminStored = up === 'ADMIN' || up === 'ROLE_ADMIN';
     if (isAdminByJwt || isAdminStored) {
       setAdmin(true); setAuthed(true);
       return;
     }
 
-    // 서버 조회
     const base =
       process.env.NEXT_PUBLIC_API_BASE ||
       (typeof window !== 'undefined'
         ? window.location.origin.replace(':3000', ':8000')
         : '');
-    const candidates = ['/member/me', '/member/me', '/jwt/me', '/auth/me'];
+    const candidates = ['/member/me', '/jwt/me', '/auth/me'];
 
     for (const p of candidates) {
       try {
         const r = await fetch(new URL(p, base), { credentials: 'include', headers: authHeaders() });
+        if (r.status === 401 || r.status === 403) {
+          // 인증 아님
+          localStorage.removeItem('memberRole');
+          setAdmin(false); setAuthed(false);
+          return;
+        }
         if (!r.ok) continue;
         const data = await r.json().catch(() => ({}));
         const rawRole = data?.memberRole ?? data?.role ?? data?.roles ?? data?.authorities ?? '';
-        const up = (Array.isArray(rawRole) ? rawRole.join(',') : String(rawRole)).toUpperCase();
-        if (up.includes('ROLE_ADMIN') || up.includes('ADMIN')) {
-          localStorage.setItem('memberRole', 'ADMIN');
-          setAdmin(true); setAuthed(true);
-          return;
-        }
-      } catch {}
+        const roleStr = (Array.isArray(rawRole) ? rawRole.join(',') : String(rawRole)).toUpperCase();
+
+        let norm: 'ADMIN' | 'BLACKLIST' | 'USER' = 'USER';
+        if (roleStr.includes('BLACKLIST')) norm = 'BLACKLIST';
+        if (roleStr.includes('ADMIN') || roleStr.includes('ROLE_ADMIN')) norm = 'ADMIN';
+
+        try { localStorage.setItem('memberRole', norm); } catch {}
+        setAdmin(norm === 'ADMIN'); setAuthed(true);
+        return;
+      } catch {
+        // 다음 후보로
+      }
     }
 
-    // ADMIN 못찾음: 기록하지 않음(=USER 저장 금지)
-    localStorage.removeItem('memberRole');
-    setAdmin(false); setAuthed(true);
+    // 서버에서 못 알아냈으면 USER로 유지 (토큰이 있다면)
+    if (raw) {
+      try { localStorage.setItem('memberRole', 'USER'); } catch {}
+      setAdmin(false); setAuthed(true);
+    } else {
+      localStorage.removeItem('memberRole');
+      setAdmin(false); setAuthed(false);
+    }
   }
 
   useEffect(() => {

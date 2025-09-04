@@ -107,7 +107,6 @@ export default function FAQNewPage() {
               boardType: 'FAQ',
               noticeFlag: false,
               isSecret: false,
-              faqCategory: cat,
               category: cat,
               images: [],
             }),

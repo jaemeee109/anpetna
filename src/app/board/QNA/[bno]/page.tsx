@@ -21,9 +21,7 @@ function authHeaders(init?: Record<string, string>, jsonAccept = true): Record<s
       (typeof window !== 'undefined' && (localStorage.getItem('accessToken') || sessionStorage.getItem('accessToken'))) ||
       '';
     if (token && !headers['Authorization']) headers['Authorization'] = `Bearer ${token}`;
-  } catch {
-    /* storage 접근 실패 무시 */
-  }
+  } catch {}
   if (jsonAccept && !headers['Accept']) headers['Accept'] = 'application/json';
   return headers;
 }
@@ -34,7 +32,7 @@ type Post = {
   bContent?: string; content?: string; bcontent?: string;
   bWriter?: string; writer?: string; bwriter?: string; memberId?: string; writerId?: string;
   createDate?: string; regDate?: string; createdAt?: string;
-  qnaCategory?: string; faqCategory?: string; category?: string;
+  qnaCategory?: string;  category?: string;
 };
 
 type Cmt = {
@@ -63,7 +61,7 @@ export default function QnaDetailPage() {
     process.env.NEXT_PUBLIC_API_BASE ||
     (typeof window !== 'undefined' ? window.location.origin : '');
 
-  // 글 상세
+
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -72,10 +70,9 @@ export default function QnaDetailPage() {
         const url = new URL(`/board/readOne/${bno}`, base).toString();
         const resp = await fetch(url, {
           credentials: 'include',
-          headers: authHeaders(), // ★ 인증 첨부
+          headers: authHeaders(), // ★ 여기
         });
         if (!resp.ok) {
-          // 401/403 등 처리
           const msg = `글을 불러오지 못했습니다. (HTTP ${resp.status})`;
           if (resp.status === 401 || resp.status === 403) {
             alert('로그인이 필요합니다.');
@@ -142,7 +139,7 @@ export default function QnaDetailPage() {
     [post],
   );
   const createdAt = useMemo(() => pickStr(post, ['createDate', 'createdAt', 'regDate'], ''), [post]);
-  const category = useMemo(() => pickStr(post, ['qnaCategory', 'faqCategory', 'category'], 'QNA'), [post]);
+  const category = useMemo(() => pickStr(post, ['qnaCategory',  'category'], 'QNA'), [post]);
 
   function fmt(ts?: string) {
     if (!ts) return '';

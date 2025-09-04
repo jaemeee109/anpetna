@@ -25,7 +25,7 @@ export type CreateBoardReq = {
   boardType: BoardType;
   noticeFlag?: boolean;
   isSecret?: boolean;
-  faqCategory?: string;
+  category?: string;
   imageUrls?: string[];
 };
 

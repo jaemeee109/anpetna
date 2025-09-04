@@ -1,4 +1,4 @@
-// app/member/login/page.tsx
+// src/app/member/login/page.tsx
 'use client';
 
 import { useState, FormEvent } from 'react';
@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { login } from '@/features/member/data/member.api';
 import PawIcon from '@/components/icons/Paw';
 
-/* ---- JWT payload 디코드(서명검증X) & 역할 추출 ---- */
+/* ---------- 역할 판별 유틸(로직만 추가, UI 비변경) ---------- */
 type JwtPayload = {
   role?: string | string[];
   roles?: string[];
@@ -26,21 +26,30 @@ function decodeJwt(token?: string): JwtPayload | null {
       decodeURIComponent(escape(atob(payload.replace(/-/g, '+').replace(/_/g, '/'))))
     );
     return json;
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
-function payloadHasAdmin(p: JwtPayload | null): boolean {
-  if (!p) return false;
-  const picks: string[] = [];
-  const push = (v?: string | string[]) => {
-    if (!v) return;
-    if (Array.isArray(v)) picks.push(...v);
-    else picks.push(v);
-  };
-  push(p.role); push(p.roles); push(p.authorities); push(p.auth); push(p.memberRole);
-  const up = picks.map(s => String(s).toUpperCase());
-  return up.some(s => s.includes('ROLE_ADMIN') || s === 'ADMIN');
+function toUpperArray(v: unknown): string[] {
+  if (!v) return [];
+  if (Array.isArray(v)) return v.map((x) => String(x).toUpperCase());
+  return String(v).toUpperCase().split(',').map((x) => x.trim()).filter(Boolean);
+}
+function pickRoleFromBag(bag: string[]): 'ADMIN' | 'BLACKLIST' | 'USER' | null {
+  // 우선순위: ADMIN > BLACKLIST > USER
+  if (bag.some((s) => s.includes('ROLE_ADMIN') || s === 'ADMIN')) return 'ADMIN';
+  if (bag.some((s) => s.includes('BLACKLIST') || s === 'ROLE_BLACKLIST')) return 'BLACKLIST';
+  if (bag.length > 0) return 'USER';
+  return null;
+}
+function roleFromJwt(tok?: string): 'ADMIN' | 'BLACKLIST' | 'USER' | null {
+  const p = decodeJwt(tok);
+  if (!p) return null;
+  const bag: string[] = [];
+  bag.push(...toUpperArray(p.role));
+  bag.push(...toUpperArray(p.roles));
+  bag.push(...toUpperArray(p.authorities));
+  bag.push(...toUpperArray(p.auth));
+  bag.push(...toUpperArray(p.memberRole));
+  return pickRoleFromBag(bag);
 }
 function getCookie(name: string) {
   if (typeof document === 'undefined') return null;
@@ -51,64 +60,59 @@ function getCookie(name: string) {
 function authHeaders(): Record<string, string> {
   const tok =
     (typeof window !== 'undefined' && (localStorage.getItem('accessToken') || sessionStorage.getItem('accessToken'))) ||
-    getCookie('Authorization') ||
-    '';
+    getCookie('Authorization') || '';
   if (!tok) return {};
   return { Authorization: tok.startsWith('Bearer ') ? tok : `Bearer ${tok}` };
 }
+/** 서버에서 최종 역할 확인 (ADMIN/BLACKLIST/USER) */
+async function roleFromServer(memberId: string): Promise<'ADMIN' | 'BLACKLIST' | 'USER' | null> {
+  const base =
+    process.env.NEXT_PUBLIC_API_BASE ||
+    (typeof window !== 'undefined' ? window.location.origin.replace(':3000', ':8000') : '');
 
+  const pick = (data: any): 'ADMIN' | 'BLACKLIST' | 'USER' | null => {
+    const bag: string[] = [];
+    bag.push(...toUpperArray(data?.memberRole));
+    bag.push(...toUpperArray(data?.role));
+    bag.push(...toUpperArray(data?.roles));
+    bag.push(...toUpperArray(data?.authorities));
+    const rid = Number(data?.roleId);
+    if (rid === 1) return 'ADMIN';
+    return pickRoleFromBag(bag);
+  };
+
+  try {
+    const r = await fetch(new URL('/member/me', base), { credentials: 'include', headers: authHeaders() });
+    if (r.ok) {
+      const data = await r.json().catch(() => ({}));
+      const role = pick(data);
+      if (role) return role;
+    }
+  } catch {}
+
+  try {
+    if (memberId) {
+      const r2 = await fetch(new URL(`/member/readOne/${encodeURIComponent(memberId)}`, base), {
+        credentials: 'include', headers: authHeaders(),
+      });
+      if (r2.ok) {
+        const data = await r2.json().catch(() => ({}));
+        const role = pick(data);
+        if (role) return role;
+      }
+    }
+  } catch {}
+
+  return null;
+}
+
+/* ------------------------- 페이지 ------------------------- */
 export default function LoginPage() {
   const router = useRouter();
   const [memberId, setId] = useState('');
   const [memberPw, setPw] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-
-  /** 서버에서 ADMIN 확인: ADMIN이면 저장, 아니면 지움(=USER로 저장 금지) */
-  async function stampAdminFromServer(id: string) {
-    const base =
-      process.env.NEXT_PUBLIC_API_BASE ||
-      (typeof window !== 'undefined'
-        ? window.location.origin.replace(':3000', ':8000')
-        : '');
-
-    // 1) /member/me
-    try {
-      const r = await fetch(new URL('/member/me', base), { credentials: 'include', headers: authHeaders() });
-      if (r.ok) {
-        const data = await r.json().catch(() => ({}));
-        const raw = data?.memberRole ?? data?.role ?? data?.roles ?? data?.authorities ?? '';
-        const up = (Array.isArray(raw) ? raw.join(',') : String(raw)).toUpperCase();
-        if (up.includes('ROLE_ADMIN') || up.includes('ADMIN')) {
-          localStorage.setItem('memberRole', 'ADMIN');
-          return true;
-        }
-      }
-    } catch {}
-
-    // 2) /member/readOne/{id}
-    try {
-      if (id) {
-        const r2 = await fetch(new URL(`/member/readOne/${encodeURIComponent(id)}`, base), {
-          credentials: 'include',
-          headers: authHeaders(),
-        });
-        if (r2.ok) {
-          const data = await r2.json().catch(() => ({}));
-          const raw = data?.memberRole ?? data?.role ?? data?.roles ?? data?.authorities ?? '';
-          const up = (Array.isArray(raw) ? raw.join(',') : String(raw)).toUpperCase();
-          if (up.includes('ROLE_ADMIN') || up.includes('ADMIN')) {
-            localStorage.setItem('memberRole', 'ADMIN');
-            return true;
-          }
-        }
-      }
-    } catch {}
-
-    // ADMIN 아님/모름 → key 제거(=USER로 저장하지 않음)
-    localStorage.removeItem('memberRole');
-    return false;
-  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -117,33 +121,43 @@ export default function LoginPage() {
     setErr(null);
 
     try {
-      // 1) 로그인 (토큰/세션 쿠키 세팅)
-      await login({ memberId, memberPw });
+      // 1) 로그인 (토큰/쿠키 세팅은 member.api가 수행)
+      const data = await login({ memberId, memberPw });
 
-      // 2) 로그인한 아이디 저장(호환)
+      // 2) dev 확인용 ID 저장
       if (typeof window !== 'undefined') {
         localStorage.setItem('memberId', memberId);
         localStorage.setItem('loginId', memberId);
       }
 
-      // 3) 토큰에서 ADMIN 판정 → 실패 시 서버에서 보강
-      let stamped = false;
-      try {
-        const tok =
-          (typeof window !== 'undefined' && (localStorage.getItem('accessToken') || sessionStorage.getItem('accessToken'))) ||
-          getCookie('Authorization') || '';
-        const payload = decodeJwt(tok);
-        if (payload && payloadHasAdmin(payload)) {
-          localStorage.setItem('memberRole', 'ADMIN');
-          stamped = true;
-        }
-      } catch {}
+      // 3) 역할 판별: JWT → 응답 → 서버 조회 → 없으면 USER
+      const tok =
+        (typeof window !== 'undefined' && (localStorage.getItem('accessToken') || sessionStorage.getItem('accessToken'))) ||
+        getCookie('Authorization') || '';
+      let role: 'ADMIN' | 'BLACKLIST' | 'USER' | null = roleFromJwt(tok);
 
-      if (!stamped) {
-        await stampAdminFromServer(memberId);
+      if (!role) {
+        const r: any = (data as any)?.result ?? (data as any);
+        const bag: string[] = [];
+        bag.push(...toUpperArray(r?.memberRole));
+        bag.push(...toUpperArray(r?.role));
+        bag.push(...toUpperArray(r?.roles));
+        bag.push(...toUpperArray(r?.authorities));
+        if (Number(r?.roleId) === 1) role = 'ADMIN';
+        else role = pickRoleFromBag(bag);
       }
 
-      // 4) 알림 & 이동
+      if (!role) {
+        const fromServer = await roleFromServer(memberId);
+        if (fromServer) role = fromServer;
+      }
+
+      if (!role) role = 'USER';
+
+      // 4) dev Application에서 보이도록 항상 저장
+      localStorage.setItem('memberRole', role);
+
+      // 5) 헤더 즉시 반영
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new Event('auth-changed'));
       }
@@ -155,6 +169,7 @@ export default function LoginPage() {
     }
   }
 
+  /* ---------------- UI: 원본 그대로 ---------------- */
   return (
     <main className="mx-auto max-w-[500px] px-4 py-8 text-center">
       <h1 className="text-2xl font-semibold mb-4">

@@ -13,7 +13,7 @@ type ReadOne = {
   bTitle?: string; btitle?: string;
   bContent?: string; bcontent?: string;
   bWriter?: string; bwriter?: string;
-  faqCategory?: string; category?: string; bCategory?: string; type2?: string; group?: string; section?: string; cat?: string;
+  category?: string; bCategory?: string; type2?: string; group?: string; section?: string; cat?: string;
 
   // 서버마다 다른 보드 타입 키들
   boardType?: string; type?: string; bType?: string; board?: string; type1?: string;
@@ -120,7 +120,7 @@ export default function FAQEditPage() {
         setContent(r.bContent ?? r.bcontent ?? '');
         setCat(
           normalizeToCat(
-            r.faqCategory ?? r.category ?? r.bCategory ?? r.type2 ?? r.group ?? r.section ?? r.cat
+            r.category ?? r.bCategory ?? r.type2 ?? r.group ?? r.section ?? r.cat
           )
         );
       } catch (e: any) {
@@ -152,7 +152,6 @@ export default function FAQEditPage() {
         bContent: content,
         bWriter: writer,
         boardType: 'FAQ', // 확실히 FAQ로 고정
-        faqCategory: cat,
         category: cat,
         bCategory: cat,
         images: []

@@ -1,4 +1,6 @@
-"use client";
+// src/app/board/[type]/[bno]/page.tsx
+'use client';
+
 import { use } from "react";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
@@ -29,10 +31,17 @@ function absUrl(p?: string) {
   return `${API_BASE}/${p}`;
 }
 
-/** ✅ 이미지 요청을 프록시로 보냄(Authorization 헤더를 붙여줌) */
+/** 프록시로 보내면서 로컬 토큰을 ?t= 로 붙여줌 (이미지 X박스/401 회피) */
 function proxiedFileUrl(p?: string) {
   const absolute = absUrl(p);
-  return absolute ? `/api/file?u=${encodeURIComponent(absolute)}` : "";
+  if (!absolute) return "";
+  let u = `/api/file?u=${encodeURIComponent(absolute)}`;
+  try {
+    const t =
+      typeof window !== "undefined" ? localStorage.getItem("accessToken") || "" : "";
+    if (t) u += `&t=${encodeURIComponent(t)}`;
+  } catch {}
+  return u;
 }
 
 export default function BoardDetailPage({
@@ -106,7 +115,7 @@ export default function BoardDetailPage({
     (board as any).blikeCount ??
     0;
 
-  /** ✅ 첨부 이미지: 프록시 URL 사용 */
+  /** 첨부 이미지: 프록시 URL 사용(+토큰) */
   const images: any[] = Array.isArray((board as any).images)
     ? (board as any).images
     : [];
@@ -138,13 +147,14 @@ export default function BoardDetailPage({
 
         {iAmWriter && (
           <>
-            <button
-              type="button"
-              onClick={() => router.push(`/board/${type}/${bno}/edit`)}
+            {/* ⬇️ 수정: 버튼 → 순수 <a href> (항상 이동 보장, UI 그대로) */}
+            <a
+              href={`/board/${type}/${bno}/edit`}
               className="btn-3d btn-white"
+              onClick={(e) => e.stopPropagation()}
             >
               수정
-            </button>
+            </a>
             <button
               type="button"
               className="btn-3d btn-white"
@@ -173,22 +183,21 @@ export default function BoardDetailPage({
         </article>
       </div>
 
-      {/* ✅ 첨부 이미지 (프록시 경유) */}
-     {/* 첨부 이미지 (있을 때만) */}
-{displayImages.length > 0 && (
-  <div className="mt-6 flex flex-wrap justify-center gap-4">
-    {displayImages.map((img) => (
-      <div key={img.key} className="p-1">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={img.src}
-          alt={img.alt}
-          className="max-w-[300px] h-auto object-contain mx-auto"
-        />
-      </div>
-    ))}
-  </div>
-)}
+      {/* 첨부 이미지 (있을 때만) */}
+      {displayImages.length > 0 && (
+        <div className="mt-6 flex flex-wrap justify-center gap-4">
+          {displayImages.map((img) => (
+            <div key={img.key} className="p-1">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={img.src}
+                alt={img.alt}
+                className="max-w-[300px] h-auto object-contain mx-auto"
+              />
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* 좋아요 */}
       <div className="flex justify-center mt-[40px] mb-[64px]">

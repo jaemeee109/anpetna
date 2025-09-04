@@ -166,14 +166,13 @@ async function fetchRoleFromServer(
     '/member/info',
     '/auth/me',
     '/api/auth/me',
-    '/anpetna/jwt/info',
-    '/anpetna/member/info',
-    '/anpetna/auth/me',
+    '/jwt/info',
+    '/member/info',
+    '/auth/me',
   ];
 
   const byId = [
     memberId ? `/member/read/${memberId}` : '',
-    memberId ? `/anpetna/member/read/${memberId}` : '',
   ].filter(Boolean);
 
   for (const base of bases) {

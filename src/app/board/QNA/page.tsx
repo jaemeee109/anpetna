@@ -1,3 +1,4 @@
+// src/app/board/QNA/page.tsx
 'use client';
 
 import { useEffect, useState, FormEvent } from 'react';
@@ -16,7 +17,7 @@ type Row = {
   bContent?: string; content?: string; bcontent?: string;
   bWriter?: string; writer?: string; memberId?: string;
   createDate?: string; createdAt?: string; regDate?: string;
-  qnaCategory?: string; category?: string; faqCategory?: string;
+  qnaCategory?: string; category?: string; 
   bCategory?: string; cat?: string; group?: string; section?: string; type2?: string; qCategory?: string;
   commentsCount?: number; commentCount?: number; replyCount?: number;
 };
@@ -131,8 +132,15 @@ export default function QnaPage() {
           json?.list ??
           [];
 
+        // ★★★ 추가: 혹시 서버가 잘못 내려줘도 클라이언트에서 최종적으로 "내 글만" 남긴다.
+        const me = String(memberId || '').trim().toLowerCase();
+        const onlyMine = (Array.isArray(raw) ? raw : []).filter((r: Row) => {
+          const w = String(r.bWriter ?? r.writer ?? r.memberId ?? '').trim().toLowerCase();
+          return me && w === me;
+        });
+
         if (!alive) return;
-        setList(Array.isArray(raw) ? raw : []);
+        setList(onlyMine);
       } catch (e) {
         console.error(e);
         if (alive) setList([]);
@@ -208,7 +216,7 @@ export default function QnaPage() {
           boardType: 'QNA',
           noticeFlag: false,
           isSecret: false,
-          qnaCategory: cat, faqCategory: cat, category: cat, bCategory: cat, qCategory: cat, cat,
+          qnaCategory: cat, category: cat,  bCategory: cat, qCategory: cat, cat,
         })], { type: 'application/json' }),
         'payload.json'
       );
@@ -247,7 +255,7 @@ export default function QnaPage() {
   function getCat(r: Row): Cat {
     const raw =
       r.qnaCategory ??
-      r.faqCategory ??
+      r.category ??
       r.category ??
       r.bCategory ??
       r.qCategory ??
