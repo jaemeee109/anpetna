@@ -118,7 +118,7 @@ public class MemberServiceImpl implements MemberService {
 
         MemberEntity member = modelMapper.map(joinMemberReq, MemberEntity.class);
         member.setMemberPw(passwordEncoder.encode(joinMemberReq.getMemberPw()));
-        member.setMemberRole(MemberRole.USER);
+        member.setMemberRole(joinMemberReq.getMemberRole());
 
         MemberEntity saved = memberRepository.save(member);
 

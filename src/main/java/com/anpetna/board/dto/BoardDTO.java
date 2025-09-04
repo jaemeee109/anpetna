@@ -31,7 +31,7 @@ public class BoardDTO {
     private LocalDateTime latestDate;
 
     // ★ 추가
-    private String faqCategory;
+    private String category;
 
     // 이미지 URL 리스트
     private List<String> imageUrls;
@@ -47,7 +47,7 @@ public class BoardDTO {
         this.boardType = entity.getBoardType();
         this.noticeFlag = entity.getNoticeFlag();
         this.isSecret = entity.getIsSecret();
-        this.faqCategory = entity.getFaqCategory(); // ★ 추가
+        this.category = entity.getCategory(); // ★ 추가
         this.createDate = entity.getCreateDate();
         this.latestDate = entity.getLatestDate();
 

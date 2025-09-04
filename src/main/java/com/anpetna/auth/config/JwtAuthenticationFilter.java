@@ -112,7 +112,32 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 }
                 Authentication auth = jwtProvider.getAuthentication(access);
                 SecurityContextHolder.getContext().setAuthentication(auth);
+
+                // =====================[ 추가 시작 ]=====================
+                // DB의 member_role 기준으로 권한을 부여(ROLE_USER / ROLE_ADMIN)하여 컨텍스트를 덮어씁니다.
+                // ※ jwtProvider.getAuthentication(access) 내 권한 세팅이 불분명/간소한 경우를 대비한 안정장치.
+                var authorities = new java.util.ArrayList<GrantedAuthority>();
+                authorities.add(new SimpleGrantedAuthority(status.authority())); // e.g. ROLE_ADMIN or ROLE_USER
+
+                var principal = org.springframework.security.core.userdetails.User
+                        .withUsername(memberId)
+                        .password("")                   // 비밀번호 검증 안함
+                        .authorities(authorities)       // ★ 여기서 최종 권한 주입
+                        .accountExpired(false)
+                        .accountLocked(false)
+                        .credentialsExpired(false)
+                        .disabled(false)
+                        .build();
+
+                var authDb = new UsernamePasswordAuthenticationToken(principal, null, authorities);
+                authDb.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+
+                // ★ 컨텍스트 덮어쓰기: 토큰에 들어있던 권한 대신 DB에 저장된 최신 권한 사용
+                SecurityContextHolder.getContext().setAuthentication(authDb);
+                // ======================[ 추가 끝 ]======================
+
                 //end~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 
             }
             chain.doFilter(request, response);

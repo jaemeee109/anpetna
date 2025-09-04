@@ -29,9 +29,9 @@ public interface BoardJpaRepository extends JpaRepository<BoardEntity, Long>, Bo
             Pageable pageable
     );
 
-    Page<BoardEntity> findByBoardTypeAndFaqCategory(BoardType type, String faqCategory, Pageable pageable); // ★ ADD
+    Page<BoardEntity> findByBoardTypeAndCategory(BoardType type, String category, Pageable pageable); // ★ ADD
     //★ 추가
 
-    Page<BoardEntity> findByBoardTypeAndFaqCategoryContainingIgnoreCase(BoardType type, String faqCategory, Pageable pageable);
+    Page<BoardEntity> findByBoardTypeAndCategoryContainingIgnoreCase(BoardType type, String category, Pageable pageable);
     //★ 추가, 부분검색 대소문자 무시
 }
