@@ -20,6 +20,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.validation.annotation.Validated;
@@ -37,8 +38,12 @@ import java.util.UUID;
 public class BoardController {
 
     private final BoardService boardService;
-// ===========================================================
+
+    // ===========================================================
     /* 게시글 등록 (multipart: json + files[]) */
+    @PreAuthorize("@boardGuard.canCreate("
+            + "(#body.boardType != null ? #body.boardType.name() : null), "
+            + "authentication)")
     @PostMapping(value = "/create", consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = "application/json")
     public ApiResult<CreateBoardRes> createBoard(
             @AuthenticationPrincipal UserDetails user,
@@ -50,8 +55,10 @@ public class BoardController {
         log.info("[POST]/create by={}, images={}", memberId, files == null ? 0 : files.size());
         return new ApiResult<>(boardService.createBoard(body, files, memberId));
     }
-// ===========================================================
+
+    // ===========================================================
     /* 게시글 목록 + 페이징 + (선택)검색 */
+    @PreAuthorize("@boardGuard.canList(#boardType, authentication)")
     @GetMapping(value = "/readAll", produces = "application/json")
     public ApiResult<PageResponseDTO<BoardDTO>> readAllBoard(
             @RequestParam(value = "page", defaultValue = "1") int page,
@@ -87,8 +94,10 @@ public class BoardController {
             return new ApiResult<>(boardService.readAllBoard(pageRequest));
         }
     }
-// ===========================================================
+
+    // ===========================================================
     /* 게시글 상세 (회원 전용으로 강제하려면 아래 가드 유지) + (옵션) 좋아요 증가 */
+    @PreAuthorize("@boardGuard.canReadOne(#bno, authentication)")
     @GetMapping(value = "/readOne/{bno}", produces = "application/json")
     public ApiResult<ReadOneBoardRes> readOneBoard(
             @AuthenticationPrincipal UserDetails user, // 회원 전용이면 필요
@@ -110,8 +119,10 @@ public class BoardController {
                 ReadOneBoardReq.builder().bno(bno).build()
         ));
     }
-// ===========================================================
+
+    // ===========================================================
     /* 게시글 수정 (multipart: json + addFiles[] + deleteUuids + orders) */
+    @PreAuthorize("@boardGuard.canUpdate(#bno, authentication)")
     @PostMapping(value = "/update/{bno}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = "application/json")
     public ApiResult<UpdateBoardRes> updateBoard(
             @AuthenticationPrincipal UserDetails user,
@@ -130,8 +141,10 @@ public class BoardController {
                 orders == null ? 0 : orders.size());
         return new ApiResult<>(boardService.updateBoard(body, addFiles, deleteUuids, orders, user.getUsername()));
     }
-// ===========================================================
+
+    // ===========================================================
     /* 게시글 삭제 */
+    @PreAuthorize("@boardGuard.canDelete(#bno, authentication)")
     @PostMapping(value = "/delete/{bno}", produces = "application/json")
     public ApiResult<DeleteBoardRes> deleteBoard(
             @AuthenticationPrincipal UserDetails user,
@@ -144,7 +157,8 @@ public class BoardController {
                 user.getUsername()
         ));
     }
-// ===========================================================
+
+    // ===========================================================
     /* 좋아요 1 증가 (별도 엔드포인트) */
     @PostMapping(value = "/like/{bno}", produces = "application/json")
     public ApiResult<UpdateBoardRes> likeBoard(
@@ -163,4 +177,4 @@ public class BoardController {
 //나머지 엔드포인트는 회원 필수이므로 @AuthenticationPrincipal로 UserDetails를 받고, user == null이면 AccessDeniedException으로 막습니다.
 
 //응답 형태(ApiResult<...>)와 경로(/board/**)는 기존 그대로라 프론트 변경 불필요입니다.
-//// ===========================================================
+/// / ===========================================================

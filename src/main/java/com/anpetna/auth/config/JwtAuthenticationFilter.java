@@ -129,6 +129,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         new UsernamePasswordAuthenticationToken(user, "", authorities);
                 SecurityContextHolder.getContext().setAuthentication(authentication);
                 //end~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                /*.accountExpired(false)
+                        .accountLocked(false)
+                        .credentialsExpired(false)
+                        .disabled(false)
+                        .build();
+
+                var authDb = new UsernamePasswordAuthenticationToken(principal, null, authorities);
+                authDb.setDetails(new WebAuthenticationDetailsSource().buildDetails(request)); */
 
             }
             chain.doFilter(request, response);

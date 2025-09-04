@@ -42,9 +42,14 @@ public class SecurityConfig {
 
     @Bean   // 스프링 기본 AuthenticationManager 노출
     public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration)
-            throws Exception {return authenticationConfiguration.getAuthenticationManager();}
+            throws Exception {
+        return authenticationConfiguration.getAuthenticationManager();
+    }
+
     @Bean // Bcrypt 사용
-    public PasswordEncoder passwordEncoder() {return new BCryptPasswordEncoder();}
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
     //================================================================
 
 
@@ -80,16 +85,18 @@ public class SecurityConfig {
 
                         // --- Board ---
                         .requestMatchers(HttpMethod.GET, "/board/readAll").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/board/readOne/").hasAnyRole("ADMIN", "USER")
-                        .requestMatchers(HttpMethod.POST, "/board").hasAnyRole("ADMIN", "USER")
-                        .requestMatchers(HttpMethod.PUT, "/board").hasAnyRole("ADMIN", "USER")
-                        .requestMatchers(HttpMethod.DELETE, "/board").hasAnyRole("ADMIN", "USER")
+                        .requestMatchers(HttpMethod.GET, "/board/readOne/**").permitAll() // QNA 예외는 Guard 에서 처리
+                        .requestMatchers(HttpMethod.POST, "/board/create").hasAnyRole("ADMIN", "USER")
+                        .requestMatchers(HttpMethod.POST, "/board/update/**").hasAnyRole("ADMIN", "USER")
+                        .requestMatchers(HttpMethod.POST, "/board/delete/**").hasAnyRole("ADMIN", "USER")
+                        .requestMatchers(HttpMethod.POST, "/board/like/**").hasAnyRole("ADMIN", "USER")
+                        // 여기서 GET 은 전부 permitAll 로 두고, QNA 의 로그인 필요/본인 제한은 Guard 에서 검사합니다.
+                        // 이러면 리스트/상세에도 세밀한 제약(로그인 필요, 본인만 등)을 줄 수 있어요.
 
                         // --- Comment ---
                         .requestMatchers("/comment/**").hasAnyRole("ADMIN", "USER")
 
                         // --- Item ---
-
                         .requestMatchers(HttpMethod.GET, "/item/**").hasAnyRole("ADMIN", "USER")
                         .requestMatchers(HttpMethod.POST, "/item").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/item").hasRole("ADMIN")
@@ -124,7 +131,7 @@ public class SecurityConfig {
                 //JWT 검증 필터를 UsernamePasswordAuthenticationFilter 앞에 넣어서, 세션 없이 요청마다 토큰 인증 수행.
                 //blacklistService 활용해 강제 차단된 토큰 처리 가능
                 .addFilterBefore(
-                        new JwtAuthenticationFilter(jwtProvider, blacklistService,memberRepository), // 커스텀 JWT 인증 필터
+                        new JwtAuthenticationFilter(jwtProvider, blacklistService, memberRepository), // 커스텀 JWT 인증 필터
                         UsernamePasswordAuthenticationFilter.class                                   // 위치 지정만, 폼 로그인은 사용 안함
                 );
         return http.build();

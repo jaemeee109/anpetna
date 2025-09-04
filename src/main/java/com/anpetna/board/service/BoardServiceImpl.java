@@ -29,6 +29,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+// 관리자 판별용 import 추가
+import org.springframework.security.core.Authentication;      // <- ADMIN 판별용
+import org.springframework.security.core.GrantedAuthority;   // <- ADMIN 판별용
+import org.springframework.security.core.context.SecurityContextHolder; // <- ADMIN 판별용
+
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -43,6 +48,7 @@ public class BoardServiceImpl implements BoardService {
 
     private final BoardJpaRepository boardJpaRepository;
 
+    /* ======================= 파일 저장 유틸 ======================= */
     @Value("${app.upload.dir}")
     private String uploadDir;
 
@@ -62,7 +68,6 @@ public class BoardServiceImpl implements BoardService {
         log.info("[upload] dir={}, urlBase={}", uploadDir, uploadUrlBase);
     }
 
-    /* ======================= 파일 저장 유틸 ======================= */
     private void saveImages(BoardEntity board, List<MultipartFile> files, int appendFrom) {
         if (files == null || files.isEmpty()) return;
 
@@ -107,6 +112,25 @@ public class BoardServiceImpl implements BoardService {
         }
     }
 
+    /* ==================== 관리자 판별용 메서드 추가 ==================== */
+    // ★★★ 공통 유틸: 관리자 여부 판별
+    private boolean isAdmin() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null) return false;
+        for (GrantedAuthority ga : auth.getAuthorities()) {
+            if ("ROLE_ADMIN".equals(ga.getAuthority())) return true; // <- 시큐리티 ROLE 접두사 기준
+        }
+        return false;
+    }
+
+    // ★★★ 공통 유틸: "관리자는 통과, 아니면 본인만" 강제
+    private void requireOwnerOrAdmin(String ownerMemberId, String actorMemberId, String actionName) {
+        // 로그인 여부는 각 메서드 초반에서 이미 검증
+        if (isAdmin()) return; // <- 관리자면 무조건 OK
+        if (!Objects.equals(ownerMemberId, actorMemberId)) {
+            throw new AccessDeniedException("권한 없음: " + actionName + " 은/는 본인만 가능합니다.");
+        }
+    }
 
     /* ============================ 생성 ============================ */
     @Override
@@ -125,7 +149,7 @@ public class BoardServiceImpl implements BoardService {
                 .isSecret(Boolean.TRUE.equals(req.getIsSecret()))
                 .bViewCount(req.getBViewCount() == null ? 0 : req.getBViewCount())
                 .bLikeCount(req.getBLikeCount() == null ? 0 : req.getBLikeCount())
-                .faqCategory(req.getFaqCategory())
+                .category(req.getCategory())
                 .build();
 
         BoardEntity saved = boardJpaRepository.save(board);
@@ -221,7 +245,7 @@ public class BoardServiceImpl implements BoardService {
 
         Page<BoardEntity> page;
         if (type == BoardType.FAQ && category != null && !category.isBlank()) {
-            page = boardJpaRepository.findByBoardTypeAndFaqCategory(type, category, pageable);
+            page = boardJpaRepository.findByBoardTypeAndCategory(type, category, pageable);
         } else {
             page = boardJpaRepository.findByBoardTypeSafe(type == null ? null : type.name(), pageable);
         }
@@ -263,15 +287,17 @@ public class BoardServiceImpl implements BoardService {
                 .latestDate(e.getLatestDate())
                 .build();
     }
+
     /* ============================ 서버 파일 삭제 ============================ */
-// 참고: MemberServiceImpl에 있는 동일 유틸을 그대로 복사
+    // 참고: MemberServiceImpl에 있는 동일 유틸을 그대로 복사
     private void deletePhysicalIfLocal(String url) {
         try {
             if (url == null) return;
             String fileName = url.substring(url.lastIndexOf('/') + 1);
             java.nio.file.Path path = java.nio.file.Paths.get(uploadDir).resolve(fileName);
             if (java.nio.file.Files.exists(path)) java.nio.file.Files.delete(path);
-        } catch (Exception ignore) { }
+        } catch (Exception ignore) {
+        }
     }
 
     /* ============================ 수정 ============================ */
@@ -290,9 +316,8 @@ public class BoardServiceImpl implements BoardService {
         BoardEntity e = boardJpaRepository.findById(req.getBno())
                 .orElseThrow(() -> new RuntimeException("존재하지 않는 게시글 입니다."));
 
-        if (!memberId.equals(e.getBWriter())) {
-            throw new AccessDeniedException("본인 글만 수정할 수 있습니다.");
-        }
+        // ★ 변경: 관리자면 통과, 아니면 본인만
+        requireOwnerOrAdmin(e.getBWriter(), memberId, "게시글 수정");
 
         if (req.getBTitle() != null) e.setBTitle(req.getBTitle());
         if (req.getBContent() != null) e.setBContent(req.getBContent());
@@ -312,7 +337,7 @@ public class BoardServiceImpl implements BoardService {
 
         if (orders != null && !orders.isEmpty()) {
             Map<UUID, Integer> orderMap = orders.stream()
-                    .collect(Collectors.toMap(ImageOrderReq::getUuid, ImageOrderReq::getSortOrder, (a,b)->b));
+                    .collect(Collectors.toMap(ImageOrderReq::getUuid, ImageOrderReq::getSortOrder, (a, b) -> b));
             e.getImages().forEach(img -> {
                 Integer so = orderMap.get(img.getUuid());
                 if (so != null) img.setSortOrder(so);
@@ -363,9 +388,8 @@ public class BoardServiceImpl implements BoardService {
         BoardEntity e = boardJpaRepository.findById(req.getBno())
                 .orElseThrow(() -> new RuntimeException("게시글 없음"));
 
-        if (!memberId.equals(e.getBWriter())) {
-            throw new AccessDeniedException("본인 글만 삭제할 수 있습니다.");
-        }
+        // ★ 변경: 관리자면 통과, 아니면 본인만
+        requireOwnerOrAdmin(e.getBWriter(), memberId, "게시글 삭제");
 
         boardJpaRepository.delete(e);
 
