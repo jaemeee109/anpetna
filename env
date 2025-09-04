@@ -1,0 +1,2 @@
+HOST_JENKINS_HOME=C:\docker\jenkins
+HOST_JENKINS_WORKER_1=C:\docker\jenkins\worker1
