@@ -76,12 +76,14 @@ public class SecurityConfig {
                         .requestMatchers("/member/login", "/member/join").permitAll()
                         .requestMatchers("/member/readOne", "/member/readAll").hasRole("ADMIN")
                         .requestMatchers("/member/my_page/**", "/member/modify").hasAnyRole("USER")  // ✅ 슬래시 대신 /**
-                        
+
+
                         // --- Board ---
-                        .requestMatchers(HttpMethod.GET,     "/board", "/board/**").permitAll() // 목록/상세 열람 모두 허용
-                        .requestMatchers(HttpMethod.POST,    "/board", "/board/**").hasAnyRole("ADMIN","USER")
-                        .requestMatchers(HttpMethod.PUT,     "/board", "/board/**").hasAnyRole("ADMIN","USER")
-                        .requestMatchers(HttpMethod.DELETE,  "/board", "/board/**").hasAnyRole("ADMIN","USER")
+                        .requestMatchers(HttpMethod.GET, "/board/readAll").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/board/readOne/").hasAnyRole("ADMIN", "USER")
+                        .requestMatchers(HttpMethod.POST, "/board").hasAnyRole("ADMIN", "USER")
+                        .requestMatchers(HttpMethod.PUT, "/board").hasAnyRole("ADMIN", "USER")
+                        .requestMatchers(HttpMethod.DELETE, "/board").hasAnyRole("ADMIN", "USER")
 
                         // --- Comment ---
                         .requestMatchers("/comment/**").hasAnyRole("ADMIN", "USER")
@@ -137,7 +139,8 @@ public class SecurityConfig {
         // CorsConfiguration을 직접 써서 리스트로 지정하는 방식
         // setAllowedOrigins는 여러 개 origin을 한 번에 넣을 수 있으니 다 허용
         cfg.setAllowedOrigins(java.util.List.of(
-                "http://localhost:3000"
+                "http://localhost:3000",
+                "http://192.168.0.160:3000"
         ));
         // === 허용 메서드 ===
         cfg.setAllowedMethods(java.util.List.of(

@@ -70,9 +70,9 @@ public class BoardEntity extends BaseEntity {
 
 
     public void addImage(ImageEntity image) {
-        images.add(image);
-        image.setBoard(this); // ImageEntity에 setBoard(…) 존재해야 함
-    }
+            images.add(image);
+            image.setBoard(this); // ImageEntity에 setBoard(…) 존재해야 함
+        }
 
     public void removeImage(ImageEntity image) {
         images.remove(image);

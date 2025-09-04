@@ -16,31 +16,28 @@ import com.anpetna.core.coreDto.PageResponseDTO;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.UUID;
 
 public interface BoardService {
 
-    // 1. 게시글 등록
-    CreateBoardRes createBoard(CreateBoardReq createBoardReq, List<MultipartFile> files);
+    // 목록(검색 포함)
+    PageResponseDTO<BoardDTO> readAllBoard(PageRequestDTO pageRequestDTO);
+    PageResponseDTO<BoardDTO> readAll(BoardType type, String category, PageRequestDTO pageRequestDTO);
 
-    // 2. 게시글 전체 조회 (페이징) //★ 수정
-    /*ReadAllBoardRes readAllBoard(ReadAllBoardReq readAllBoardReq);*/
-    // BoardService.java
-    PageResponseDTO<BoardDTO> readAllBoard(PageRequestDTO pageRequestDTO);                       // 기존 것 유지
-    PageResponseDTO<BoardDTO> readAll(BoardType type, String category, PageRequestDTO pr);      // 새로 추가
-
-    // ★ 추가
-    CreateBoardRes create(CreateBoardReq req, List<MultipartFile> files);
-
-    // 3. 게시글 1개 상세 조회 + 조회수 증가
+    // 상세 (회원 전용이면 컨트롤러에서 인증 체크 후 호출)
     ReadOneBoardRes readOneBoard(ReadOneBoardReq readOneBoardReq);
 
-    // 4. 게시글 수정
-    UpdateBoardRes updateBoard(UpdateBoardReq req, List<MultipartFile> addFiles, List<Long> deleteUuids, List<ImageOrderReq> orders);
+    // 생성/수정/삭제/좋아요 — ✅ memberId를 인자로 받음
+    CreateBoardRes createBoard(CreateBoardReq req, List<MultipartFile> files, String memberId);
+    CreateBoardRes create(CreateBoardReq req, List<MultipartFile> files, String memberId);
 
-    // 5. 게시글 삭제
-    DeleteBoardRes deleteBoard(DeleteBoardReq deleteBoardReq);
+    UpdateBoardRes updateBoard(UpdateBoardReq req,
+                               List<MultipartFile> addFiles,
+                               List<UUID> deleteUuids,
+                               List<ImageOrderReq> orders,
+                               String memberId);
 
-    // 6. 게시글 좋아요 증가
-    UpdateBoardRes likeBoard(Long bno);
+    DeleteBoardRes deleteBoard(DeleteBoardReq deleteBoardReq, String memberId);
 
+    UpdateBoardRes likeBoard(Long bno, String memberId);
 }

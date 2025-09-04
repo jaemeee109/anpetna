@@ -11,6 +11,9 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.annotations.UuidGenerator;
+import org.hibernate.type.SqlTypes;
 
 import java.util.UUID;
 
@@ -22,7 +25,10 @@ import java.util.UUID;
 public class ImageEntity {
 
     @Id
-    @Column(name = "image_uuid")
+    @GeneratedValue
+    @UuidGenerator
+    @JdbcTypeCode(SqlTypes.CHAR)                        // CHAR(36)로 저장
+    @Column(name = "image_uuid", length = 36, nullable = false)
     private UUID uuid;
 
     @Column(name = "image_ext")
