@@ -73,17 +73,17 @@ public class ItemController {
     }
 
     @GetMapping(value = "/{itemId}")
-    public ResponseEntity<SearchOneItemRes> searchOneItemImages(@PathVariable Long itemId) {
+    public ApiResult<SearchOneItemRes> searchOneItemImages(@PathVariable Long itemId) {
         SearchOneItemReq getOneReq = new SearchOneItemReq();
         getOneReq.setItemId(itemId);
         var getOneRes = itemService.getOneItem(getOneReq);
-        return ResponseEntity.ok(getOneRes);
+        return new ApiResult<>(getOneRes);
     }
 
     @GetMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<PageResponseDTO<SearchAllItemsRes>> searchAllItems(@RequestBody SearchAllItemsReq getReq) {
+    public ApiResult<PageResponseDTO<SearchAllItemsRes>> searchAllItems(@RequestBody SearchAllItemsReq getReq) {
         var getAllResult = itemService.getAllItems(getReq);
-        return ResponseEntity.ok(getAllResult);
+        return new ApiResult<>(getAllResult);
     }
 
     //클라이언트는 JSON 받아서 리스트 렌더링

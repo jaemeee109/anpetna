@@ -15,10 +15,10 @@ import com.anpetna.item.dto.searchAllItem.SearchAllItemsRes;
 import com.anpetna.item.dto.searchOneItem.SearchOneItemReq;
 import com.anpetna.item.dto.searchOneItem.SearchOneItemRes;
 import com.anpetna.item.repository.ItemRepository;
-import groovy.util.logging.Log4j2;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.log4j.Log4j2;
 import org.modelmapper.ModelMapper;
 import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
@@ -41,7 +41,8 @@ public class ItemServiceImpl implements ItemService {
     @Override
     @Transactional
     public RegisterItemRes registerItem(RegisterItemReq req, List<MultipartFile> files) {
-        if (files == null || files.isEmpty()) {
+        // 있으면 넣는다
+        if (files != null && !(files.isEmpty())) {
         files.forEach(file -> {
                 try {
                     req.addImage(imageService.uploadImage(file));
@@ -51,7 +52,6 @@ public class ItemServiceImpl implements ItemService {
             });
         }
         ItemEntity item = itemMapper.cItemMapReq().map(req);
-
         ItemEntity savedItem = itemRepository.save(item);
         RegisterItemRes res = modelMapper.map(savedItem, RegisterItemRes.class);
         return  res.registered();

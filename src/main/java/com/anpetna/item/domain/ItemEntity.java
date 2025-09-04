@@ -1,6 +1,5 @@
 package com.anpetna.item.domain;
 
-
 import com.anpetna.image.domain.ImageEntity;
 import com.anpetna.core.coreDomain.BaseEntity;
 import com.anpetna.item.constant.ItemCategory;

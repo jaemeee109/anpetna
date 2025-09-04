@@ -25,11 +25,14 @@ import java.util.UUID;
 public class ImageEntity {
 
     @Id
-    @GeneratedValue
-    @UuidGenerator
     @JdbcTypeCode(SqlTypes.CHAR)                        // CHAR(36)로 저장
-    @Column(name = "image_uuid", length = 36, nullable = false)
+    @Column(name = "image_uuid", length = 36, nullable = false, updatable = false)
     private UUID uuid;
+    //이미지 등록시 uuid서비스에서 생성...GeneratedValue에 IDENTITY/AUTO에 코드를 맞추면 DB에 들어가고 나서야 UUID를 활용할 수 있음
+
+    //@GeneratedValue
+    //Hibernate가 UUID를 자동 생성하도록 설정.
+    //기본 전략은 JPA AUTO → Hibernate가 UUIDGenerator 사용 가능.
 
     @Column(name = "image_ext")
     private String ext;

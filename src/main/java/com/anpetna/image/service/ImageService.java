@@ -7,5 +7,5 @@ import java.io.IOException;
 
 public interface ImageService {
 
-    public ImageDTO uploadImage(MultipartFile files) throws IOException;
+   ImageDTO uploadImage(MultipartFile files) throws IOException;
 }

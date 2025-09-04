@@ -26,7 +26,7 @@ public class ImageServiceImpl implements ImageService {
     public ImageDTO uploadImage(MultipartFile file) throws IOException {
         ImageDTO imageDTO = new ImageDTO(file);
         Path path = Paths.get(uploadDir, imageDTO.getFileName());
-        Files.copy(file.getInputStream(), path, StandardCopyOption.REPLACE_EXISTING);
+        Files.copy(file.getInputStream(), path, StandardCopyOption.REPLACE_EXISTING); //자동 덮어쓰기
         imageDTO.setUrl(urlBase + "/" + imageDTO.getFileName());
         return imageDTO;
     }
