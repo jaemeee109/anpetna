@@ -25,7 +25,7 @@ async function tryFetchRole(memberId?: string): Promise<'USER' | 'ADMIN' | 'BLAC
   try {
     const me = memberId && memberId.trim()
       ? await readMemberOne(memberId)
-      : await readMemberMe(); // id 없으면 /member/me 사용
+      : await readMemberMe(); // id 없으면 '/member/readOne' 사용
     const raw = pickRoleFrom(me);
     if (raw == null) return null;
     return normalizeRole(raw);

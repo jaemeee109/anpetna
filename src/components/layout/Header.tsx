@@ -133,7 +133,7 @@ export default function Header() {
     setAuthed(true);
 
     const raw = getTokenFromStorage();
-    const isAdminByJwt = payloadHasAdmin(raw ? decodeJwt(raw) : null);
+    const isAdminByJwt = raw ? payloadHasAdmin(decodeJwt(raw)) : false;
 
     // 저장된 memberRole (ADMIN만 신뢰)
     const stored = (typeof window !== 'undefined' && localStorage.getItem('memberRole')) || '';
@@ -151,38 +151,63 @@ export default function Header() {
 
   // 2차: 서버에서 역할 확정 (ADMIN/BLACKLIST/USER 중 하나를 memberRole로 고정 저장)
   async function verifyRoleFromServerIfNeeded() {
+    // 아예 로컬 인증 흔적이 없으면 종료
     if (!hasAnyLocalAuth()) return;
 
-    // 이미 ADMIN이면 서버 확인 생략 가능
-    const raw = getTokenFromStorage();
-    const isAdminByJwt = payloadHasAdmin(raw ? decodeJwt(raw) : null);
+    const token = getTokenFromStorage();
+
+    // ✅ 이미 ADMIN이면 서버 확인 생략 (여기서 끝내면 콘솔의 401 반복 로그가 사라짐)
+    const isAdminByJwt = token ? payloadHasAdmin(decodeJwt(token)) : false;
     const stored = (typeof window !== 'undefined' && localStorage.getItem('memberRole')) || '';
-    const up = String(stored || '').toUpperCase();
+    const up = stored.toUpperCase();
     const isAdminStored = up === 'ADMIN' || up === 'ROLE_ADMIN';
     if (isAdminByJwt || isAdminStored) {
-      setAdmin(true); setAuthed(true);
+      setAuthed(true);
+      setAdmin(true);
       return;
     }
 
+    // 토큰이 없으면 서버조회 스킵 (httpOnly 쿠키 환경 고려)
+    if (!token) {
+      if (stored) {
+        setAuthed(true);
+        setAdmin(isAdminStored);
+      } else {
+        setAuthed(false);
+        setAdmin(false);
+      }
+      return;
+    }
+
+    // 토큰이 있을 때만 서버로 최종 확인 (USER/BLACKLIST 구분용)
+    const id =
+      (typeof window !== 'undefined' && (localStorage.getItem('memberId') || localStorage.getItem('loginId'))) || '';
+    if (!id) return;
+
     const base =
       process.env.NEXT_PUBLIC_API_BASE ||
-      (typeof window !== 'undefined'
-        ? window.location.origin.replace(':3000', ':8000')
-        : '');
-    const candidates = ['/member/me', '/jwt/me', '/auth/me'];
+      (typeof window !== 'undefined' ? window.location.origin.replace(':3000', ':8000') : '');
+
+    const candidates = [
+      `/member/my_page/${encodeURIComponent(id)}`, // ✅ USER 가능
+      `/member/readOne/${encodeURIComponent(id)}`, // 보조
+    ];
 
     for (const p of candidates) {
       try {
         const r = await fetch(new URL(p, base), { credentials: 'include', headers: authHeaders() });
+        // 401/403이어도 로컬 로그인 상태는 유지 (로그만 안 남게 그냥 반환)
         if (r.status === 401 || r.status === 403) {
-          // 인증 아님
-          localStorage.removeItem('memberRole');
-          setAdmin(false); setAuthed(false);
           return;
         }
         if (!r.ok) continue;
-        const data = await r.json().catch(() => ({}));
-        const rawRole = data?.memberRole ?? data?.role ?? data?.roles ?? data?.authorities ?? '';
+
+        const data = await r.json().catch(() => ({} as any));
+        const rawRole =
+          data?.result?.memberRole ??
+          data?.data?.memberRole ??
+          data?.member?.memberRole ??
+          data?.memberRole ?? '';
         const roleStr = (Array.isArray(rawRole) ? rawRole.join(',') : String(rawRole)).toUpperCase();
 
         let norm: 'ADMIN' | 'BLACKLIST' | 'USER' = 'USER';
@@ -193,42 +218,39 @@ export default function Header() {
         setAdmin(norm === 'ADMIN'); setAuthed(true);
         return;
       } catch {
-        // 다음 후보로
+        // 네트워크 오류면 다음 후보
       }
-    }
-
-    // 서버에서 못 알아냈으면 USER로 유지 (토큰이 있다면)
-    if (raw) {
-      try { localStorage.setItem('memberRole', 'USER'); } catch {}
-      setAdmin(false); setAuthed(true);
-    } else {
-      localStorage.removeItem('memberRole');
-      setAdmin(false); setAuthed(false);
     }
   }
 
-  useEffect(() => {
+  // 공용 동기화 헬퍼 (커스텀 이벤트/스토리지/포커스에서 공통 사용)
+  const syncAuth = () => {
     evaluateAuthFromLocal();
-    verifyRoleFromServerIfNeeded();
+    void verifyRoleFromServerIfNeeded();
+  };
+
+  useEffect(() => {
+    syncAuth();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
-      if (['accessToken', 'access_token', 'refreshToken', 'memberRole'].includes(e.key || '')) {
-        evaluateAuthFromLocal();
-        verifyRoleFromServerIfNeeded();
+      if (['accessToken', 'access_token', 'refreshToken', 'memberRole', 'memberId', 'loginId'].includes(e.key || '')) {
+        syncAuth();
       }
     };
-    const onFocus = () => {
-      evaluateAuthFromLocal();
-      verifyRoleFromServerIfNeeded();
-    };
+    const onFocus = () => { syncAuth(); };
+    const onAuthChanged = () => { syncAuth(); }; // 로그인 페이지에서 쏘는 커스텀 이벤트 대응
+
     window.addEventListener('storage', onStorage);
     window.addEventListener('focus', onFocus);
+    window.addEventListener('auth-changed', onAuthChanged as EventListener);
+
     return () => {
       window.removeEventListener('storage', onStorage);
       window.removeEventListener('focus', onFocus);
+      window.removeEventListener('auth-changed', onAuthChanged as EventListener);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

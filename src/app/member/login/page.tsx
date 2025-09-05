@@ -3,7 +3,7 @@
 
 import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { login } from '@/features/member/data/member.api';
+import { login, readMemberMe } from '@/features/member/data/member.api';
 import PawIcon from '@/components/icons/Paw';
 
 /* ---------- 역할 판별 유틸(로직만 추가, UI 비변경) ---------- */
@@ -34,7 +34,6 @@ function toUpperArray(v: unknown): string[] {
   return String(v).toUpperCase().split(',').map((x) => x.trim()).filter(Boolean);
 }
 function pickRoleFromBag(bag: string[]): 'ADMIN' | 'BLACKLIST' | 'USER' | null {
-  // 우선순위: ADMIN > BLACKLIST > USER
   if (bag.some((s) => s.includes('ROLE_ADMIN') || s === 'ADMIN')) return 'ADMIN';
   if (bag.some((s) => s.includes('BLACKLIST') || s === 'ROLE_BLACKLIST')) return 'BLACKLIST';
   if (bag.length > 0) return 'USER';
@@ -57,53 +56,28 @@ function getCookie(name: string) {
   const m = document.cookie.match(new RegExp('(?:^|; )' + safe + '=([^;]*)'));
   return m ? decodeURIComponent(m[1]) : null;
 }
-function authHeaders(): Record<string, string> {
+/** 서버에서 최종 역할 확인 (ADMIN/BLACKLIST/USER) — 토큰 있을 때만 */
+async function roleFromServer(): Promise<'ADMIN' | 'BLACKLIST' | 'USER' | null> {
   const tok =
     (typeof window !== 'undefined' && (localStorage.getItem('accessToken') || sessionStorage.getItem('accessToken'))) ||
     getCookie('Authorization') || '';
-  if (!tok) return {};
-  return { Authorization: tok.startsWith('Bearer ') ? tok : `Bearer ${tok}` };
-}
-/** 서버에서 최종 역할 확인 (ADMIN/BLACKLIST/USER) */
-async function roleFromServer(memberId: string): Promise<'ADMIN' | 'BLACKLIST' | 'USER' | null> {
-  const base =
-    process.env.NEXT_PUBLIC_API_BASE ||
-    (typeof window !== 'undefined' ? window.location.origin.replace(':3000', ':8000') : '');
-
-  const pick = (data: any): 'ADMIN' | 'BLACKLIST' | 'USER' | null => {
-    const bag: string[] = [];
-    bag.push(...toUpperArray(data?.memberRole));
-    bag.push(...toUpperArray(data?.role));
-    bag.push(...toUpperArray(data?.roles));
-    bag.push(...toUpperArray(data?.authorities));
-    const rid = Number(data?.roleId);
-    if (rid === 1) return 'ADMIN';
-    return pickRoleFromBag(bag);
-  };
+  if (!tok) return null; // 토큰 없으면 서버 조회하지 않음 → 401 스팸 방지
 
   try {
-    const r = await fetch(new URL('/member/me', base), { credentials: 'include', headers: authHeaders() });
-    if (r.ok) {
-      const data = await r.json().catch(() => ({}));
-      const role = pick(data);
-      if (role) return role;
-    }
-  } catch {}
-
-  try {
-    if (memberId) {
-      const r2 = await fetch(new URL(`/member/readOne/${encodeURIComponent(memberId)}`, base), {
-        credentials: 'include', headers: authHeaders(),
-      });
-      if (r2.ok) {
-        const data = await r2.json().catch(() => ({}));
-        const role = pick(data);
-        if (role) return role;
-      }
-    }
-  } catch {}
-
-  return null;
+    const me: any = await readMemberMe();
+    const raw =
+      me?.result?.memberRole ??
+      me?.data?.memberRole ??
+      me?.member?.memberRole ??
+      me?.memberRole ?? '';
+    const up = String(raw).toUpperCase();
+    if (up.includes('ADMIN')) return 'ADMIN';
+    if (up.includes('BLACKLIST')) return 'BLACKLIST';
+    if (up) return 'USER';
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 /* ------------------------- 페이지 ------------------------- */
@@ -148,13 +122,13 @@ export default function LoginPage() {
       }
 
       if (!role) {
-        const fromServer = await roleFromServer(memberId);
+        const fromServer = await roleFromServer();
         if (fromServer) role = fromServer;
       }
 
       if (!role) role = 'USER';
 
-      // 4) dev Application에서 보이도록 항상 저장
+      // 4) Application Storage에 항상 기록
       localStorage.setItem('memberRole', role);
 
       // 5) 헤더 즉시 반영

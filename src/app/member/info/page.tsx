@@ -181,8 +181,8 @@ export default function MemberInfoPage() {
           }
         }
 
-        // 2) 토큰/LS에서 못 얻었거나 실패하면 /member/me로 보조 조회
-        const meRes = await fetch(api('/member/me'), {
+        // 2) 토큰/LS에서 못 얻었거나 실패하면'/member/readOne'로 보조 조회
+        const meRes = await fetch(api('/member/readOne'), {
           method: 'GET',
           credentials: 'include',
           headers: authHeaders(),

@@ -15,7 +15,7 @@ type Row = {
   bno?: number;
   bTitle?: string; title?: string; btitle?: string;
   bContent?: string; content?: string; bcontent?: string;
-  bWriter?: string; writer?: string; memberId?: string;
+ bWriter?: string; writer?: string; memberId?: string; bwriter?: string; 
   createDate?: string; createdAt?: string; regDate?: string;
   qnaCategory?: string; category?: string; 
   bCategory?: string; cat?: string; group?: string; section?: string; type2?: string; qCategory?: string;
@@ -88,69 +88,106 @@ export default function QnaPage() {
     } catch {}
   }, []);
 
-  useEffect(() => {
-    if (view !== 'mine') return;
+ useEffect(() => {
+  if (view !== 'mine') return;
 
-    if (!token) {
-      setList([]);
-      setErr('로그인이 필요합니다.');
-      return;
-    } else {
-      setErr(null);
-    }
+  let alive = true;
 
-    const memberId =
-      (typeof window !== 'undefined' && (localStorage.getItem('memberId') || sessionStorage.getItem('memberId'))) || '';
+  (async () => {
+    setLoadingList(true);
+    setErr(null);
 
-    let alive = true;
-    (async () => {
-      setLoadingList(true);
-      try {
-        const url = new URL('/board/readAll', base);
-        url.search = new URLSearchParams({
-          page: '1',
-          size: '100',
-          boardType: 'QNA',
-          type: 'w',
-          keyword: memberId || '',
-        }).toString();
+    try {
+      const memberId =
+        (typeof window !== 'undefined' &&
+          (localStorage.getItem('memberId') || sessionStorage.getItem('memberId'))) ||
+        '';
 
-        const resp = await fetch(url.toString(), {
-          credentials: 'include',
-          headers: authHeaders(),
-        });
-        if (!resp.ok) {
-          const text = await resp.text().catch(() => '');
-          throw new Error(`목록 호출 실패 (HTTP ${resp.status})${text ? `\n${text}` : ''}`);
+      if (!token || !memberId) {
+        if (alive) {
+          setErr('로그인이 필요합니다.');
+          setList([]);
+          setLoadingList(false);
         }
-        const json = await parseJsonSafe(resp);
-
-        const raw =
-          json?.result?.dtoList ??
-          json?.result?.page?.dtoList ??
-          json?.dtoList ??
-          json?.list ??
-          [];
-
-        // ★★★ 추가: 혹시 서버가 잘못 내려줘도 클라이언트에서 최종적으로 "내 글만" 남긴다.
-        const me = String(memberId || '').trim().toLowerCase();
-        const onlyMine = (Array.isArray(raw) ? raw : []).filter((r: Row) => {
-          const w = String(r.bWriter ?? r.writer ?? r.memberId ?? '').trim().toLowerCase();
-          return me && w === me;
-        });
-
-        if (!alive) return;
-        setList(onlyMine);
-      } catch (e) {
-        console.error(e);
-        if (alive) setList([]);
-        if (alive) setErr(e instanceof Error ? e.message : '목록 호출 실패');
-      } finally {
-        if (alive) setLoadingList(false);
+        return;
       }
-    })();
-    return () => { alive = false; };
-  }, [view, token, base]);
+
+      // 관리자 여부: local/session/cookie 어느 쪽이든 잡아서 판단
+      const roleStr = (typeof window !== 'undefined' && (
+        (localStorage.getItem('memberRole') || sessionStorage.getItem('memberRole')) ??
+        (() => {
+          try {
+            const m = document.cookie.match(/(?:^|;\s*)memberRole=([^;]+)/);
+            return m ? decodeURIComponent(m[1]) : '';
+          } catch { return ''; }
+        })()
+      ) || '').toUpperCase();
+
+      const isAdmin = roleStr === 'ADMIN' || roleStr === 'ROLE_ADMIN';
+
+      // ✅ 관리자면 type/keyword 제거 → 전체 QNA
+      //    일반회원이면 내 글만(type=w & keyword=memberId)
+      const url = new URL('/board/readAll', base);
+      url.searchParams.set('page', '1');
+      url.searchParams.set('size', '100');
+      url.searchParams.set('boardType', 'QNA');
+      if (!isAdmin) {
+        url.searchParams.set('type', 'w');
+        url.searchParams.set('keyword', String(memberId));
+      }
+
+      const resp = await fetch(url.toString(), {
+        credentials: 'include',
+        headers: authHeaders(),
+      });
+
+      if (!resp.ok) {
+        const text = await resp.text().catch(() => '');
+        throw new Error(`목록 호출 실패 (HTTP ${resp.status})${text ? `\n${text}` : ''}`);
+      }
+
+      const json = await parseJsonSafe(resp);
+      const raw =
+        json?.result?.dtoList ??
+        json?.result?.page?.dtoList ??
+        json?.dtoList ??
+        json?.list ??
+        json?.content ??
+        [];
+
+      // ✅ 서버가 잘 내려와도 최종 안전 필터
+      const me = String(memberId).trim().toLowerCase();
+
+      const onlyMine = (Array.isArray(raw) ? raw : []).filter((r: Row) => {
+  // boardType이 QNA인지도 함께 확인(혹시 섞여 올 상황 대비)
+  const type =
+    (r as any).boardType ?? (r as any).type ?? (r as any).bType ?? (r as any).board ?? (r as any).type1 ?? '';
+  const w = String(r.bWriter ?? r.writer ?? r.memberId ?? (r as any).bwriter ?? '')
+    .trim()
+    .toLowerCase();
+  return String(type).toUpperCase() === 'QNA' && me && w === me;
+});
+
+      const qnaAll = (Array.isArray(raw) ? raw : []).filter((r: Row) => {
+        const type = (r as any).boardType ?? (r as any).type ?? (r as any).bType ?? (r as any).board ?? (r as any).type1 ?? '';
+        return String(type).toUpperCase() === 'QNA';
+      });
+
+      if (!alive) return;
+      setList(isAdmin ? qnaAll : onlyMine);
+    } catch (e: any) {
+      if (alive) {
+        setList([]);
+        setErr(e?.message || '목록 호출 실패');
+      }
+    } finally {
+      if (alive) setLoadingList(false);
+    }
+  })();
+
+  return () => { alive = false; };
+}, [view, token, base]);
+
 
   useEffect(() => {
     if (view !== 'mine' || list.length === 0 || !token) return;

@@ -18,7 +18,7 @@ export function withPrefix(p: string): string {
 export const ENDPOINT = {
   LOGIN: (process.env.NEXT_PUBLIC_LOGIN_PATH as string | undefined) ?? "/jwt/login",
   REFRESH: withPrefix("/jwt/refresh"),
-  ME: withPrefix((process.env.NEXT_PUBLIC_ME_PATH as string | undefined) ?? "/member/me"),
+  ME: withPrefix((process.env.NEXT_PUBLIC_ME_PATH as string | undefined) ?? "/member/readOne"),
   MY_PAGE_PREFIX: withPrefix(
     (process.env.NEXT_PUBLIC_MY_PAGE_PREFIX as string | undefined) ?? "/member/my_page"
   ),

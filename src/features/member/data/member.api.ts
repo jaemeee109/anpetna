@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type {
-  Member,
   ReadMemberAllRes,
   ReadMemberOneRes,
   ModifyMemberReq,
@@ -9,7 +8,6 @@ import type {
   LoginReq,
   LoginRes,
 } from './member.types';
-import { cacheMemberRole } from '@/features/member/utils/memberRole';
 
 /* ---------------- 공통 유틸 ---------------- */
 function setCookie(name: string, value: string, days = 7) {
@@ -23,6 +21,13 @@ function setCookie(name: string, value: string, days = 7) {
 }
 function deleteCookie(name: string) {
   try { document.cookie = `${encodeURIComponent(name)}=; Max-Age=0; path=/`; } catch {}
+}
+function getCookie(name: string): string {
+  try {
+    const safe = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const m = document.cookie.match(new RegExp('(?:^|; )' + safe + '=([^;]*)'));
+    return m ? decodeURIComponent(m[1]) : '';
+  } catch { return ''; }
 }
 function getAccessToken(): string {
   try {
@@ -38,28 +43,18 @@ function authHeaders(): HeadersInit {
   return t ? { Authorization: t.startsWith('Bearer ') ? t : `Bearer ${t}` } : {};
 }
 
-/** (호환용) ADMIN일 때만 쿠키/키 추가로 기록하는 유틸 — 삭제하지 않고 유지 */
-function persistRoleAdminOnly(isAdmin: boolean) {
-  try {
-    if (isAdmin) {
-      localStorage.setItem('memberRole', 'ADMIN'); // UI는 'ADMIN' 문자열을 신뢰
-      setCookie('memberRole', 'ADMIN', 7);
-    } else {
-      // 기존 구현은 키를 삭제했지만, 이제는 로그인 로직에서 항상 USER/ADMIN을 먼저 기록하므로
-      // 여기선 삭제하지 않는 편이 안전하다. (호출 자체를 하지 않거나, 아래 두 줄 그대로 둬도 무방)
-      localStorage.removeItem('memberRole');
-      deleteCookie('memberRole');
-    }
-  } catch {}
-}
-
-/** API 베이스 후보 */
+/** API 베이스 후보 (백엔드 우선, 프론트는 맨 마지막) */
 function bases(): string[] {
-  return Array.from(new Set([
+  const list = [
     (process.env.NEXT_PUBLIC_API_BASE || '').replace(/\/$/, ''),
-    typeof window !== 'undefined' ? window.location.origin.replace(':3000', ':8000') : '',
-    typeof window !== 'undefined' ? window.location.origin : '',
-  ].filter(Boolean)));
+    (typeof window !== 'undefined'
+      ? window.location.origin.replace(':3000', ':8000')
+      : ''
+    ).replace(/\/$/, ''),
+    // 프론트(3000)는 마지막 후보로 남겨 404 스팸을 줄인다.
+    (typeof window !== 'undefined' ? window.location.origin : '').replace(/\/$/, ''),
+  ].filter(Boolean);
+  return Array.from(new Set(list));
 }
 
 async function jsonFetch<T=any>(url: string, init?: RequestInit): Promise<T> {
@@ -70,7 +65,7 @@ async function jsonFetch<T=any>(url: string, init?: RequestInit): Promise<T> {
   return data as T;
 }
 
-/* ---------------- ADMIN 판별 유틸 ---------------- */
+/* ---------------- JWT 디코드 보조 ---------------- */
 function parseJwt(token: string): any | null {
   try {
     const clean = token.replace(/^Bearer\s+/i, '');
@@ -84,7 +79,7 @@ function parseJwt(token: string): any | null {
 }
 function arrayify(v: any): string[] {
   if (!v) return [];
-  if (Array.isArray(v)) return v.map(x => x && typeof x==='object' && 'authority' in x ? String((x as any).authority) : String(x));
+  if (Array.isArray(v)) return v.map(x => (x && typeof x==='object' && 'authority' in x ? String((x as any).authority) : String(x)));
   if (typeof v === 'string') return v.split(/[,\s]+/).filter(Boolean);
   return [String(v)];
 }
@@ -101,30 +96,34 @@ function isAdminFromClaims(claims: any): boolean {
   return numericAdmin || booleanAdmin || all.includes('ADMIN') || all.includes('ROLE_ADMIN');
 }
 
-/** 서버에서 역할 확인: me/info + /member/read{One}/{id} 모두 시도 (보강용) */
-async function resolveRoleFromServer(memberId?: string|number): Promise<'ADMIN'|'USER'|null> {
-  const mePaths = ['/member/me','/jwt/me','/auth/me','/member/info','/jwt/info','/auth/me'];
-  const readById = (memberId ? [`/member/readOne/${memberId}`, `/member/read/${memberId}`] : []);
+/** 서버에서 역할 확인(있으면) */
+async function resolveRoleFromServer(memberId?: string): Promise<string | null> {
+  const id =
+    memberId ||
+    (typeof window !== 'undefined' && (localStorage.getItem('memberId') || localStorage.getItem('loginId'))) ||
+    '';
+
+  if (!id) return null;
+
+  const candidates = [
+    `/member/my_page/${encodeURIComponent(id)}`,       // USER 접근 가능
+    `/member/readOne/${encodeURIComponent(id)}`,      // (백엔드 허용 시 보조)
+  ];
+
+  // 토큰/세션 없으면 시도하지 않음 → 401 스팸 방지
+  const hasAuth = !!getAccessToken() || !!getCookie('JSESSIONID');
+  if (!hasAuth) return null;
+
   for (const b of bases()) {
-    for (const p of mePaths) {
+    for (const p of candidates) {
       try {
-        const d: any = await jsonFetch(`${b}${p}`, { method:'GET', credentials:'include', headers: authHeaders() });
-        const src = d?.result ?? d?.data ?? d?.user ?? d?.member ?? d ?? {};
-        const claimsLike = src?.claims ?? src?.tokenPayload ?? src;
-        if (isAdminFromClaims(claimsLike)) return 'ADMIN';
-        const serverField =
-          src?.memberRole ?? src?.member_role ?? src?.role ?? src?.roles ?? src?.roleId ?? src?.role_id;
-        if (String(serverField).toUpperCase().includes('ADMIN') || Number(serverField)===1) return 'ADMIN';
-        return 'USER';
-      } catch {}
-    }
-    for (const p of readById) {
-      try {
-        const d: any = await jsonFetch(`${b}${p}`, { method:'GET', credentials:'include', headers: authHeaders() });
-        const src = d?.result ?? d ?? {};
-        const v = src?.memberRole ?? src?.member_role ?? src?.role ?? src?.roles ?? src?.roleId ?? src?.role_id;
-        if (String(v).toUpperCase().includes('ADMIN') || Number(v)===1) return 'ADMIN';
-        return 'USER';
+        const d: any = await jsonFetch(`${b}${p}`, { method: 'GET', credentials: 'include', headers: authHeaders() });
+        const role =
+          d?.result?.memberRole ??
+          d?.data?.memberRole ??
+          d?.member?.memberRole ??
+          d?.memberRole ?? null;
+        if (role) return String(role);
       } catch {}
     }
   }
@@ -142,35 +141,53 @@ export async function listMembers(): Promise<ReadMemberAllRes> {
   return [] as ReadMemberAllRes;
 }
 
-/** 🔹 본인 정보 조회: /member/me, /jwt/me, /auth/me 후보 */
-export async function readMemberMe(): Promise<ReadMemberOneRes> {
-  const meCandidates = ['/member/me', '/jwt/me', '/auth/me'];
+/** 🔹 본인 정보 조회 — 토큰/세션 없으면 호출 안 함 */
+export async function readMemberMe(): Promise<any> {
+  const id =
+    (typeof window !== 'undefined' && (localStorage.getItem('memberId') || localStorage.getItem('loginId'))) || '';
+  if (!id) throw new Error('로그인 후 시도하세요');
+
+  // 토큰이나 세션쿠키가 전혀 없으면 서버 호출하지 않음
+  const hasAuth = !!getAccessToken() || !!getCookie('JSESSIONID');
+  if (!hasAuth) throw new Error('인증 정보 없음');
+
+  const pathCandidates = [
+    `/member/my_page/${encodeURIComponent(id)}`,   // ✅ USER 접근 가능 엔드포인트
+    `/member/readOne/${encodeURIComponent(id)}`,  // (백엔드 허용 시 보조)
+  ];
+
   for (const b of bases()) {
-    for (const p of meCandidates) {
+    for (const p of pathCandidates) {
       try {
-        const d: any = await jsonFetch(`${b}${p}`, { method:'GET', credentials:'include', headers: authHeaders() });
-        const res = (d?.result ?? d?.data ?? d ?? null) as ReadMemberOneRes | null;
-        if (res) return res as ReadMemberOneRes;
+        const d: any = await jsonFetch(`${b}${p}`, {
+          method: 'GET',
+          credentials: 'include',
+          headers: authHeaders(),
+        });
+        const res = d?.result ?? d?.data ?? d?.item ?? d?.member ?? d ?? null;
+        if (res) return res;
       } catch {}
     }
   }
   throw new Error('본인 정보 조회 실패');
 }
 
-export async function readMemberOne(id: string): Promise<ReadMemberOneRes> {
-  // id가 비어 있으면 me로 우회 -> 빈 /member/read/ 호출 방지
-  if (!id || String(id).trim() === '') {
-    return await readMemberMe();
-  }
+export async function readMemberOne(id: string): Promise<any> {
+  const baseList = bases();
   const pathCandidates = [
     `/member/readOne/${encodeURIComponent(id)}`,
-    `/member/read/${encodeURIComponent(id)}`,
+    `/member/my_page/${encodeURIComponent(id)}`,
   ];
-  for (const b of bases()) {
+  for (const b of baseList) {
     for (const p of pathCandidates) {
       try {
-        const d: any = await jsonFetch(`${b}${p}`, { method:'GET', credentials:'include', headers:authHeaders() });
-        return (d?.result ?? d ?? null) as ReadMemberOneRes;
+        const d: any = await jsonFetch(`${b}${p}`, {
+          method: 'GET',
+          credentials: 'include',
+          headers: authHeaders(),
+        });
+        const res = d?.result ?? d?.data ?? d?.item ?? d?.member ?? d ?? null;
+        if (res) return res;
       } catch {}
     }
   }
@@ -217,7 +234,7 @@ export async function signup(body: JoinMemberReq): Promise<JoinMemberRes> {
   throw new Error('회원가입 실패');
 }
 
-/** ⭐ 로그인: 프론트에서 선(先) 확정 기록 → 서버 확인은 보강(실패해도 강등 금지) */
+/** ⭐ 로그인 */
 export async function login(body: LoginReq): Promise<LoginRes> {
   const paths = ['/jwt/login'];
   let last: any;
@@ -230,52 +247,23 @@ export async function login(body: LoginReq): Promise<LoginRes> {
           body: JSON.stringify(body),
         });
 
-        // 1) 토큰/아이디 저장
         const r: any = (data as any)?.result ?? (data as any);
         const access: string|undefined = r?.accessToken || r?.token || r?.access_token;
         const refresh: string|undefined = r?.refreshToken || r?.refresh_token;
         const mid: string|number|undefined = r?.memberId || r?.id || r?.username || r?.loginId;
+
         try {
           if (access) localStorage.setItem('accessToken', access);
           if (refresh) localStorage.setItem('refreshToken', refresh);
           if (mid !== undefined) localStorage.setItem('memberId', String(mid));
         } catch {}
 
-        // 2) 프론트 선(先) 판별: 응답필드/토큰/JWT/아이디로 ADMIN 추정
-        let isAdmin =
-          String(
-            r?.memberRole ?? r?.member_role ?? r?.role ?? r?.roles ?? r?.roleId
-          ).toUpperCase().includes('ADMIN') ||
-          Number(r?.roleId) === 1 ||
-          Number(r?.memberRole) === 1 ||
-          Number(r?.member_role) === 1;
-
-        if (!isAdmin && access) {
-          const claims = parseJwt(access);
-          isAdmin = isAdminFromClaims(claims);
-        }
-        if (!isAdmin && typeof mid !== 'undefined') {
-          if (String(mid).toLowerCase() === 'master') isAdmin = true;
-        }
-
-        // 3) ✅ 선확정 기록(항상 기록) — 여기서 Application Storage에 즉시 보임
+        // 프론트 선판정(로그인 응답 기반) — 상세 ADMIN 판정은 화면에서 추가 실행
         try {
-          const roleName = isAdmin ? 'ADMIN' : 'USER';
-          localStorage.setItem('memberRole', roleName); // 문자열로 통일 ('ADMIN' | 'USER')
-          if (roleName === 'ADMIN') setCookie('memberRole', 'ADMIN', 7);
-          else deleteCookie('memberRole');
+          const claims = access ? parseJwt(access) : null;
+          const isAdmin = isAdminFromClaims(claims);
+          localStorage.setItem('memberRole', isAdmin ? 'ADMIN' : 'USER');
         } catch {}
-
-        // 4) (선택) 서버 보강 — 실패해도 강등 금지
-        try {
-          const confirmed = await resolveRoleFromServer(mid);
-          if (confirmed === 'ADMIN') {
-            localStorage.setItem('memberRole', 'ADMIN');
-            setCookie('memberRole', 'ADMIN', 7);
-          }
-        } catch {}
-
-        // (참고) 과거 호환 유틸은 호출하지 않음: persistRoleAdminOnly(isAdmin);
 
         return data;
       } catch (e) { last = e; }
