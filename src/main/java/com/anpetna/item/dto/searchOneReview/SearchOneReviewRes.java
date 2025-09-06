@@ -18,4 +18,7 @@ public class SearchOneReviewRes extends ImageListDTO {
     private ItemDTO itemId;
 
 
+    public SearchOneReviewRes() {
+        super();
+    }
 }

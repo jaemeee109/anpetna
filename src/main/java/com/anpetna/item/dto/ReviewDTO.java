@@ -16,4 +16,7 @@ public class ReviewDTO extends ImageListDTO {
 
     private ItemDTO itemId;
 
+    public ReviewDTO() {
+        super();
+    }
 }

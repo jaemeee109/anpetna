@@ -22,9 +22,9 @@ import java.util.List;
 
 public interface ItemService {
 
-    RegisterItemRes registerItem(RegisterItemReq req,  List<MultipartFile> files) throws IOException;
+    RegisterItemRes registerItem(RegisterItemReq req, MultipartFile thumb, List<MultipartFile> files);
 
-    ModifyItemRes modifyItem(ModifyItemReq req,  List<MultipartFile> files);
+    ModifyItemRes modifyItem(ModifyItemReq req, MultipartFile thumb, List<MultipartFile> files);
 
     DeleteItemRes deleteItem(DeleteItemReq req);
 

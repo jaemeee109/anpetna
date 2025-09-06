@@ -3,13 +3,11 @@ package com.anpetna.item.dto.registerItem;
 import com.anpetna.image.dto.ImageListDTO;
 import com.anpetna.item.constant.ItemCategory;
 import com.anpetna.item.constant.ItemSellStatus;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 @Builder
 @Getter
+@ToString
 public class RegisterItemReq extends ImageListDTO {
 
     private String itemName; // 상품명

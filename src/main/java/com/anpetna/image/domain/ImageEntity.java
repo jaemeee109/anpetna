@@ -1,18 +1,12 @@
 package com.anpetna.image.domain;
 
-
 import com.anpetna.board.domain.BoardEntity;
-import com.anpetna.image.constant.ImageUsage;
 import com.anpetna.item.domain.ItemEntity;
 import com.anpetna.item.domain.ReviewEntity;
 import com.anpetna.member.domain.MemberEntity;
 import jakarta.persistence.*;
-import lombok.AccessLevel;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.annotations.UuidGenerator;
 import org.hibernate.type.SqlTypes;
 
 import java.util.UUID;
@@ -45,10 +39,6 @@ public class ImageEntity {
 
     @Column(name = "image_url")
     private String url;
-
-    @Column(name = "image_usage")
-    @Enumerated(EnumType.STRING)
-    private ImageUsage usage;
 
     @Column(name = "image_contentType")
     private String contentType;

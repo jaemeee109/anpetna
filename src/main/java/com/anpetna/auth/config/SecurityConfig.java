@@ -12,6 +12,7 @@ import org.springframework.security.config.annotation.authentication.configurati
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configuration.WebSecurityCustomizer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -128,6 +129,13 @@ public class SecurityConfig {
                         UsernamePasswordAuthenticationFilter.class                                   // 위치 지정만, 폼 로그인은 사용 안함
                 );
         return http.build();
+    }
+
+    //<img src="http://localhost:8080/files/test.png" alt="테스트 이미지"> 프론트 호출 허용
+    @Bean
+    public WebSecurityCustomizer webSecurityCustomizer() {
+        return (web) -> web.ignoring()
+                .requestMatchers("/files","/files/**");
     }
 
     //Security가 참조할 CORS 설정(Origin/Headers/Methods).

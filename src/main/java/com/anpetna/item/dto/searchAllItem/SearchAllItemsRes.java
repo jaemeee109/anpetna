@@ -21,13 +21,7 @@ public class SearchAllItemsRes {
 
     private Integer itemPrice; // 가격
 
-    private Integer itemStock; // 재고수량
-
-    private String itemDetail; // 상품 상세설명
-
     private ItemSellStatus itemSellStatus; // 상품 판매상태
-
-    private ItemCategory itemCategory; // 상품 카테고리
 
     private String thumbnailUrl;
 

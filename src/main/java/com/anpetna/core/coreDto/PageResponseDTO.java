@@ -6,6 +6,7 @@ import lombok.ToString;
 import org.springframework.data.domain.Page;
 
 import java.util.List;
+import java.util.function.Function;
 
 @Getter
 @ToString
@@ -32,6 +33,12 @@ public class PageResponseDTO<E> { // <E> E 엔티티용 변수명 (변할 수 �
         this.total= (int)page.getTotalElements();
         this.prev = page.hasPrevious();
         this.next = page.hasNext();
+    }
+
+    //Page<Entity>와 EntityToDto를 받아 PafeResponseDTO<DTO>반환
+    public static <E, D> PageResponseDTO<D> toDTO(Page<E> page, Function<E, D> mapper) {
+        Page<D> pageDTO = page.map(mapper);
+        return new PageResponseDTO(pageDTO);
     }
 
     //생성자
