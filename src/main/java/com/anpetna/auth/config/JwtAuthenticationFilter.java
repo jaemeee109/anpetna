@@ -32,14 +32,12 @@ import java.util.List;
 @Slf4j
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 전달사항 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 전달사항 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //return : return 없으면 아래 JWT 검증 로직까지 계속 실행되어 불필요하게 예외가 발생할 수 있음
     //다음 필터로 넘어가는 부분, 예외처리 부분에 로그처리 다 했습니다.
-    //Deprecated 래퍼내의 메서드들 리펙토링 진행했습니다.
     //SecurityContextHolder 주입 로직에 dev/pro 구분해놓았으니 주석처리로 사용 부탁드립니다.
     //🔴➡️는 예외처리 경로이니 참고해주세요
-    //case1 : access 만료 -> jwt/refresh  |  case2 : 서명 위조, null 토큰 -> 401 Unauthorized 다시 나눠놨습니다.
-    //validateAccessToken() boolean 제거 → try-catch로 만료/위조 구분
+    //validateAccessToken() boolean 수정 요함 → try-catch로 만료/위조 구분
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     private final JwtProvider jwtProvider;

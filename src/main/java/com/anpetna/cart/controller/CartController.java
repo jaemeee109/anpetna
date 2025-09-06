@@ -17,7 +17,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/anpetna/cart")
+@RequestMapping("/cart")
 @PreAuthorize("isAuthenticated()")  // 방어 심층화(Defense in Depth): 보안 설정이 바뀌거나 다른 필터체인/매칭 실수로 경로가 열려도, 메서드에서 한 번 더 걸러진다. & 비즈니스 규칙을 명시
 public class CartController {
 

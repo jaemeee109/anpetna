@@ -7,6 +7,9 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.util.List;
+import java.util.UUID;
+
 @Builder
 @Getter
 public class ModifyItemReq extends ImageListDTO {
@@ -25,5 +28,7 @@ public class ModifyItemReq extends ImageListDTO {
     private ItemSellStatus itemSellStatus; // 상품 판매상태
 
     private ItemCategory itemCategory; // 상품 카테고리
+
+    List<String> deleteImages;
 
 }

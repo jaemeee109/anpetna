@@ -1,10 +1,7 @@
 package com.anpetna.image.dto;
 
 
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
-import lombok.ToString;
+import lombok.*;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -14,10 +11,9 @@ import java.util.List;
 @Setter
 public class ImageListDTO {
 
-    public List<ImageDTO> images = new ArrayList<>();
+    private final List<ImageDTO> images = new ArrayList<>();
 
     public void addImage(ImageDTO imageDTO) {
-        images.add(imageDTO);
+        this.images.add(imageDTO);
     }
-
 }

@@ -1,5 +1,6 @@
 package com.anpetna.item.controller;
 
+import com.anpetna.ApiResult;
 import com.anpetna.core.coreDto.PageResponseDTO;
 import com.anpetna.item.dto.ItemDTO;
 import com.anpetna.item.dto.deleteItem.DeleteItemReq;
@@ -26,6 +27,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/item")
@@ -43,47 +45,65 @@ public class ItemController {
     // CONTENTTYPE 점검
     // json만 /json & file -> 상품에는 필요없으나 리뷰는 선택 가능하도록
     // 삭제한 상품에 대한 응답처리
-    // image 종류별 구분 (thumbnail은 완)
+    //일반 쇼핑몰/커머스에서는 상품에 종속된 구조(/items/{itemId}/images)가 RESTful
+    // IOException에 대한 전체적인 예외처리
     //=====================================================================
 
     private final ItemService itemService;
 
+    // 썸네일은 sortOrder==0, 핅수 입력
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<RegisterItemRes> registerItem(@RequestPart RegisterItemReq postReq, @RequestPart List<MultipartFile> files ) throws IOException {
-        var postRes = itemService.registerItem(postReq, files);
-        return ResponseEntity.ok(postRes);
+    public ApiResult<RegisterItemRes> registerItem(@RequestPart RegisterItemReq postReq,
+                                                   @RequestPart MultipartFile thumb,
+                                                   @RequestPart(required = false)List<MultipartFile> files) {
+        var postRes = itemService.registerItem(postReq, thumb, files);
+        return new ApiResult<>(postRes);
     }
 
+
+
     //URL → 자원 식별, Body → 수정할 필드들로 역할을 분리
+    //삭제할 이미지는 reqDTO에 List<UUID>로 담음
     @PutMapping(value = "/{itemId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<ModifyItemRes> updateItem(@PathVariable Long itemId, @RequestPart ModifyItemReq putReq, @RequestPart List<MultipartFile> files) {
+    public ApiResult<ModifyItemRes> updateItem(@PathVariable Long itemId,
+                                               @RequestPart ModifyItemReq putReq,
+                                               @RequestPart MultipartFile thumb,
+                                               @RequestPart List<MultipartFile> files) {
         putReq.setItemId(itemId);
-        var putRes = itemService.modifyItem(putReq, files);
-        return ResponseEntity.ok(putRes);
+        var putRes = itemService.modifyItem(putReq,thumb,files);
+        return new ApiResult<>(putRes);
     }
 
     @DeleteMapping("/{itemId}")
-    public ResponseEntity<DeleteItemRes> deleteItem(@PathVariable Long itemId) {
+    public ApiResult<DeleteItemRes> deleteItem(@PathVariable Long itemId) {
         DeleteItemReq deleteReq = DeleteItemReq.builder()
                 .itemId(itemId)
                 .build();
         var deleteRes = itemService.deleteItem(deleteReq);
-        return ResponseEntity.ok(deleteRes);
+        return new ApiResult<>(deleteRes);
     }
 
-    @GetMapping(value = "/{itemId}")
-    public ResponseEntity<SearchOneItemRes> searchOneItemImages(@PathVariable Long itemId) {
+    @GetMapping({"/{itemId}", "/{itemId}/edit"}) //상품 수정 화면용 데이터 조회시 필요 (기존 정보 채우기)
+    public ApiResult<SearchOneItemRes> searchOneItem(@PathVariable Long itemId) {
         SearchOneItemReq getOneReq = new SearchOneItemReq();
         getOneReq.setItemId(itemId);
         var getOneRes = itemService.getOneItem(getOneReq);
-        return ResponseEntity.ok(getOneRes);
+        return new ApiResult<>(getOneRes);
     }
 
     @GetMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<PageResponseDTO<SearchAllItemsRes>> searchAllItems(@RequestBody SearchAllItemsReq getReq) {
+    public ApiResult<PageResponseDTO<SearchAllItemsRes>> searchAllItems(@RequestBody SearchAllItemsReq getReq) {
         var getAllResult = itemService.getAllItems(getReq);
-        return ResponseEntity.ok(getAllResult);
+        return new ApiResult<>(getAllResult);
     }
+
+    //REST 철학 : 리소스를 명확하게 표현하고, 동사는 HTTP 메서드로 해결
+    //순수 백엔드 설계 + 다양한 클라이언트 (웹, 앱) 를 고려한다면 RESTful이 맞고,
+    //웹 프론트 React/Vue 전용 백엔드라면 Pragmatic이 더 실용적
+
+    //통계
+    //옵션 처리
+
 
     //클라이언트는 JSON 받아서 리스트 렌더링
     //이미지 <img src="{thumbnailUrl}">로 lazy load 가능
