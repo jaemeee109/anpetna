@@ -25,7 +25,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/item/{itemId}")
+@RequestMapping("/item/{itemId}/review")
 @Log4j2
 @RequiredArgsConstructor
 public class ReviewController {
