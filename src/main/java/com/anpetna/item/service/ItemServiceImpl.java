@@ -2,6 +2,7 @@ package com.anpetna.item.service;
 
 import com.anpetna.core.coreDto.PageResponseDTO;
 import com.anpetna.image.domain.ImageEntity;
+import com.anpetna.image.repository.ImageRepository;
 import com.anpetna.image.service.LocalStorage;
 import com.anpetna.item.config.ItemMapper;
 import com.anpetna.item.domain.ItemEntity;
@@ -41,6 +42,7 @@ public class ItemServiceImpl implements ItemService {
     private final ModelMapper modelMapper;
     private final ItemMapper itemMapper;
     private final ItemRepository itemRepository;
+    private final ImageRepository imageRepository;
 
     //catch (IOException e) {throw new RuntimeException(e);}
     //업로드 실패했는데 클라이언트에 에러를 알려줄 방법이 불명확해짐.
@@ -80,13 +82,22 @@ public class ItemServiceImpl implements ItemService {
         return res.modified();
     }
 
+
     @Override
+    @Transactional
     public DeleteItemRes deleteItem(DeleteItemReq req) {
+        List<String> images= imageRepository.getFileName(req.getItemId());
+
         itemRepository.deleteById(req.getItemId());
-        DeleteItemRes res = DeleteItemRes.builder()
+        itemRepository.flush();
+
+        for(String fileName : images){
+            fileService.deleteFile(fileName);
+        }
+
+        return DeleteItemRes.builder()
                 .itemId(req.getItemId())
                 .build();
-        return res.deleted();
     }
 
     @Override
@@ -147,4 +158,29 @@ public class ItemServiceImpl implements ItemService {
     //팩토리 메서드 : 객체 생성 로직을 캡슐화해서, 외부에서 new를 직접 호출하지 않고도 객체를 생성하도록 하는 패턴
     //생성자 대신 사용 : 복잡한 생성 로직이나 변환이 필요할 때 유용
     //재사용성, 가독성 향상 : 공통 변환 로직을 한 곳에 모아두면 코드 중복 감소
+
+    // --- 상품 삭제 ---
+    //DB 삭제 후 바로 응답, 파일 삭제는 별도
+    //파일 삭제는 별도 스레드/큐에서 비동기 처리
+    //@Async나 메시지 큐(RabbitMQ, Kafka 등)로 처리.
+    //사용자 요청과 로컬 I/O가 분리되어 응답 지연 최소화.
+
+    //DTO에서 키 받아서 삭제
+    //호출자가 직접 어떤 키를 삭제할지 선택 가능
+    //클라이언트가 key를 알고 있어야 함 → 보안 취약, 실수 가능
+    //DB에서 키 조회 후 삭제(현재 코드)
+    //서버에서 안전하게 처리, 클라이언트에 key 노출 불필요
+    //DB 조회 추가 필요, 트랜잭션 관리 필요
+
+    // --- @Transactional ---
+    //트랜잭션 = DB 작업의 논리적 단위
+    //원자성(Atomicity): 모든 작업이 완료되거나 전혀 적용되지 않음
+    //일관성(Consistency): 트랜잭션 전/후 DB 상태가 항상 일관
+    //격리성(Isolation): 다른 트랜잭션의 중간 작업에 영향 없음
+    //지속성(Durability): 트랜잭션 커밋 후 영구 반영
+
+    // --- flush ---
+    //현재 영속성 컨텍스트(Persistence Context)에 쌓인 변경 내용을 즉시 DB에 반영.
+    //삭제나 변경을 즉시 반영 → 이후 로직에서 DB 상태 확인 가능.
+    //트랜잭션 내에서 DB 제약 조건 체크 → FK, NOT NULL 등 위반 여부 즉시 확인.
 }
