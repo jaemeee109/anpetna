@@ -1,5 +1,7 @@
 package com.anpetna.item.service;
 
+import com.anpetna.core.coreDto.PageRequestDTO;
+import com.anpetna.core.coreDto.PageResponseDTO;
 import com.anpetna.item.dto.ReviewDTO;
 import com.anpetna.item.dto.deleteReview.DeleteReviewReq;
 import com.anpetna.item.dto.deleteReview.DeleteReviewRes;
@@ -24,7 +26,7 @@ public interface ReviewService {
     //@PreAuthorize("@authEvaluator.authorizeReview(#req.reviewId, principal.getUsername())")
     DeleteReviewRes deleteReview(DeleteReviewReq req);
 
-    List<ReviewDTO> getAllReviews(SearchAllReviewsReq req);
+    PageResponseDTO<ReviewDTO> getAllReviews(SearchAllReviewsReq req, PageRequestDTO pageRequestDTO, String order);
 
     SearchOneReviewRes getOneReview(SearchOneReviewReq req);
 

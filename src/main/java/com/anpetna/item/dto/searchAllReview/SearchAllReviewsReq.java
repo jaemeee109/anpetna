@@ -16,4 +16,6 @@ public class SearchAllReviewsReq {
 
     private SortDirection direction; // ASC, DESC (Enum)
 
+    private Long itemId;
+
 }

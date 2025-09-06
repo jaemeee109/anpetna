@@ -1,5 +1,7 @@
 package com.anpetna.item.service;
 
+import com.anpetna.core.coreDto.PageRequestDTO;
+import com.anpetna.core.coreDto.PageResponseDTO;
 import com.anpetna.item.config.ReviewMapper;
 import com.anpetna.item.domain.ReviewEntity;
 import com.anpetna.item.dto.ReviewDTO;
@@ -14,10 +16,12 @@ import com.anpetna.item.dto.searchOneReview.SearchOneReviewReq;
 import com.anpetna.item.dto.searchOneReview.SearchOneReviewRes;
 import com.anpetna.item.repository.ReviewRepository;
 import jakarta.persistence.EntityNotFoundException;
+import org.hibernate.query.SortDirection;
 import org.modelmapper.ModelMapper;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
 import java.util.Optional;
 
 //  item(ONE)을 등록하면 image(MANY)가 등록
@@ -69,21 +73,28 @@ public class ReviewServiceImpl implements ReviewService {
     }
 
     @Override
-    public List<ReviewDTO> getAllReviews(SearchAllReviewsReq req) {
-        List<ReviewEntity> found = null;
-        //  사용자는 둘 중 하나를 선택하고 DTO에는 값이 하나만 지정된다.
-        if (req.getOrderByRegDate() != null){
-            found = repository.orderByRegDate(req);
-        }else if (req.getOrderByRating() != null){
-            found = repository.orderByRating(req);
+    public PageResponseDTO<ReviewDTO> getAllReviews(SearchAllReviewsReq req, PageRequestDTO pageRequestDTO, String order) {
+
+        if (req.getItemId() == null) {
+            throw new IllegalArgumentException("ItemId is required");
         }
 
-        List<ReviewDTO> res  = null;
-        found.forEach(reviewEntity -> {
-            res.add(reviewMapper.rReviewMapRes().map(reviewEntity));
-        });
+        Pageable pageable = pageRequestDTO.getPageable("rating", "regDate");
 
-        return res;
+        SortDirection sortDirection = (req.getDirection() == null)
+                ? SortDirection.DESCENDING
+                : req.getDirection();
+
+        Page<ReviewEntity> page;
+        if ("rating".equalsIgnoreCase(order)) {
+            page = repository.findByRating(req.getItemId(), sortDirection, pageable);
+        }else {
+            page = repository.findByRegDate(req.getItemId(), sortDirection, pageable);
+        }
+
+        Page<ReviewDTO> mapped = page.map(e -> reviewMapper.rReviewMapRes().map(e));
+
+        return new PageResponseDTO<>(mapped);
     }
 
 
