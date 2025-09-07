@@ -4,11 +4,13 @@ import com.anpetna.member.domain.MemberEntity;
 import com.anpetna.member.dto.joinMember.JoinMemberRes;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.util.List;
 
 @Builder
+@Getter
 @AllArgsConstructor
 @NoArgsConstructor
 public class ModifyMemberRes {

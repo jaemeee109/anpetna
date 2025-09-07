@@ -11,6 +11,5 @@ import lombok.ToString;
 public class DeleteItemReq {
 
     private Long itemId;
-    private String itemName;
 
 }

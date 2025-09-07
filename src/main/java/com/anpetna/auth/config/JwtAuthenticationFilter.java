@@ -19,23 +19,25 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 
 @RequiredArgsConstructor
 @Slf4j
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 전달사항 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 전달사항 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //return : return 없으면 아래 JWT 검증 로직까지 계속 실행되어 불필요하게 예외가 발생할 수 있음
     //다음 필터로 넘어가는 부분, 예외처리 부분에 로그처리 다 했습니다.
-    //Deprecated 래퍼내의 메서드들 리펙토링 진행했습니다.
     //SecurityContextHolder 주입 로직에 dev/pro 구분해놓았으니 주석처리로 사용 부탁드립니다.
     //🔴➡️는 예외처리 경로이니 참고해주세요
-    //case1 : access 만료 -> jwt/refresh  |  case2 : 서명 위조, null 토큰 -> 401 Unauthorized 다시 나눠놨습니다.
-    //validateAccessToken() boolean 제거 → try-catch로 만료/위조 구분
+    //validateAccessToken() boolean 수정 요함 → try-catch로 만료/위조 구분
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     private final JwtProvider jwtProvider;
@@ -110,34 +112,29 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     response.sendError(HttpServletResponse.SC_FORBIDDEN, "User is blacklisted");  // 🔴➡️
                     return;
                 }
-                Authentication auth = jwtProvider.getAuthentication(access);
-                SecurityContextHolder.getContext().setAuthentication(auth);
+                // 5) SecurityContext에 인증 주입 — DB 기반 권한 부여
+                Collection<? extends GrantedAuthority> authorities = List.of(
+                        new SimpleGrantedAuthority(
+                                status.name().startsWith("ROLE_") ? status.name() : "ROLE_" + status.name()
+                        )
+                );
+                UserDetails user = User.withUsername(memberId)
+                        .password("") // 사용 안함
+                        .authorities(authorities)
+                        .build();
 
-                // =====================[ 추가 시작 ]=====================
-                // DB의 member_role 기준으로 권한을 부여(ROLE_USER / ROLE_ADMIN)하여 컨텍스트를 덮어씁니다.
-                // ※ jwtProvider.getAuthentication(access) 내 권한 세팅이 불분명/간소한 경우를 대비한 안정장치.
-                var authorities = new java.util.ArrayList<GrantedAuthority>();
-                authorities.add(new SimpleGrantedAuthority(status.authority())); // e.g. ROLE_ADMIN or ROLE_USER
-
-                var principal = org.springframework.security.core.userdetails.User
-                        .withUsername(memberId)
-                        .password("")                   // 비밀번호 검증 안함
-                        .authorities(authorities)       // ★ 여기서 최종 권한 주입
-                        .accountExpired(false)
+                Authentication authentication =
+                        new UsernamePasswordAuthenticationToken(user, "", authorities);
+                SecurityContextHolder.getContext().setAuthentication(authentication);
+                //end~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                /*.accountExpired(false)
                         .accountLocked(false)
                         .credentialsExpired(false)
                         .disabled(false)
                         .build();
 
                 var authDb = new UsernamePasswordAuthenticationToken(principal, null, authorities);
-                authDb.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-
-                // ★ 컨텍스트 덮어쓰기: 토큰에 들어있던 권한 대신 DB에 저장된 최신 권한 사용
-                SecurityContextHolder.getContext().setAuthentication(authDb);
-                // ======================[ 추가 끝 ]======================
-
-                //end~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+                authDb.setDetails(new WebAuthenticationDetailsSource().buildDetails(request)); */
 
             }
             chain.doFilter(request, response);

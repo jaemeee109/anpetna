@@ -70,15 +70,28 @@ public class MemberController {
 
 
 
-    @PostMapping(value="/modify", consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces="application/json")
+    @PostMapping(value = "/modify",
+            consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE)
+    public ApiResult<ModifyMemberRes> modifyJson(
+            @RequestBody @Valid ModifyMemberReq body
+    ) throws MemberService.MemberIdExistException {
+        var res = memberService.modify(body, null, null);
+        return new ApiResult<>(res);
+    }
+
+    @PostMapping(value = "/modify",
+            consumes = MediaType.MULTIPART_FORM_DATA_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE)
     public ApiResult<ModifyMemberRes> modify(
             @RequestPart("json") ModifyMemberReq body,
             @RequestPart(value="profileFile", required=false) MultipartFile profileFile,
-            @RequestPart(value="removeProfile", required=false) Boolean removeProfile)
-            throws MemberService.MemberIdExistException {
-        var modify = memberService.modify(body, profileFile, removeProfile);
-        return new ApiResult<>(modify);
+            @RequestPart(value="removeProfile", required=false) Boolean removeProfile
+    ) throws MemberService.MemberIdExistException {
+        var res = memberService.modify(body, profileFile, removeProfile);
+        return new ApiResult<>(res);
     }
+
 
 
 //    //수정
