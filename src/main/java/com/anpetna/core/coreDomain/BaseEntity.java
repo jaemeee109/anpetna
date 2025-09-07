@@ -3,6 +3,7 @@ package com.anpetna.core.coreDomain;
 import jakarta.persistence.Column;
 import jakarta.persistence.EntityListeners;
 import jakarta.persistence.MappedSuperclass;
+import jakarta.persistence.PreUpdate;
 import lombok.Getter;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
@@ -21,4 +22,9 @@ public abstract class BaseEntity {
     @LastModifiedDate
     @Column(name = "latest_date")
     private LocalDateTime latestDate;
+
+    @PreUpdate
+    public void preUpdate() {
+        this.latestDate = LocalDateTime.now();
+    }
 }
