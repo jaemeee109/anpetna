@@ -1,11 +1,10 @@
 package com.anpetna.item.dto.searchOneReview;
 
-import com.anpetna.image.dto.ImageListDTO;
 import com.anpetna.item.dto.ItemDTO;
 
 import java.time.LocalDateTime;
 
-public class SearchOneReviewRes extends ImageListDTO {
+public class SearchOneReviewRes {
 
     private Long reviewId;
 
@@ -17,8 +16,4 @@ public class SearchOneReviewRes extends ImageListDTO {
 
     private ItemDTO itemId;
 
-
-    public SearchOneReviewRes() {
-        super();
-    }
 }
