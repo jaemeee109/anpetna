@@ -1,6 +1,9 @@
 // src/features/item/data/item.api.ts
-import http from '@/shared/data/http';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import type { ItemDTO, PageRes, ItemListQuery } from './item.types';
+import http from '@/shared/data/http';
+
 
 /** BASE URL 정규화 */
 function normalizeBase(base?: string) {
@@ -8,7 +11,7 @@ function normalizeBase(base?: string) {
   return base.replace(/\/+$/, '');
 }
 
-/** 배열 안전 파싱 */
+/** 배열 추출 유틸 */
 function toArray<T = any>(input: any): T[] {
   if (Array.isArray(input)) return input;
   if (Array.isArray(input?.content)) return input.content;
@@ -18,9 +21,27 @@ function toArray<T = any>(input: any): T[] {
   return [];
 }
 
+/** 토큰 → Authorization 헤더(게스트면 빈 객체) */
+function getAccessToken(): string {
+  try {
+    return (
+      localStorage.getItem('accessToken') ||
+      sessionStorage.getItem('accessToken') ||
+      ''
+    );
+  } catch {
+    return '';
+  }
+}
+function authHeaders(): HeadersInit {
+  const t = getAccessToken();
+  if (!t) return {};
+  return { Authorization: t.startsWith('Bearer ') ? t : `Bearer ${t}` };
+}
+
+/** 정렬 문자열 파싱: "date,desc" | "price,asc" */
 type SortKey = 'date' | 'price' | 'sales';
 type SortDir = 'asc' | 'desc';
-
 function parseSort(sort?: string): { key?: SortKey; dir?: SortDir } {
   if (!sort) return {};
   const [k, d] = String(sort).split(',').map(s => s.trim().toLowerCase());
@@ -32,78 +53,79 @@ function parseSort(sort?: string): { key?: SortKey; dir?: SortDir } {
   return { key, dir };
 }
 
+/* ===== 실제 API ===== */
 export const itemApi = {
-  /** 목록 조회 (백엔드 SearchAllItemsReq 규격) */
+  /**
+   * 목록 조회
+   * 백엔드 SearchAllItemsReq 스펙에 맞춰 **GET /item** 으로 쿼리스트링 전달
+   * - itemCategory: 카테고리 (ALL/빈값이면 미전달)
+   * - keyword: 검색어(옵션)
+   * - page: 0-base (기본 0)
+   * - size: 페이지 크기 (기본 12)
+   * - orderByDate: 'ASC' | 'DESC'
+   * - orderByPrice: 'ASC' | 'DESC'
+   */
   async list(params: ItemListQuery & { excludeSoldOut?: boolean }): Promise<PageRes<ItemDTO>> {
-    // ✅ 백 기준: GET /item (body: SearchAllItemsReq)
-    // SearchAllItemsReq: itemCategory, keyword, page(0-base), size, orderByDate(ASC|DESC), orderByPrice(ASC|DESC)
-    // 참고: 컨트롤러가 GET 이지만 JSON Body를 요구합니다. :contentReference[oaicite:2]{index=2}
-    const base = normalizeBase(process.env.NEXT_PUBLIC_API_BASE as any);
-    const url = new URL('/item', base || '');
+  const base = normalizeBase(process.env.NEXT_PUBLIC_API_BASE as any);
+  const url = new URL('/item', base || '');
 
-    // 카테고리: 셀렉트에서는 ALL을 빼기로 했지만, 혹시 프론트 상단에서 'ALL'이 들어오면 undefined로 보내 전체 조회
-    const rawCat = (params.category ?? '').toString().toUpperCase();
-    const itemCategory = rawCat === 'ALL' || rawCat === '' ? undefined : rawCat;
+  // 카테고리: 'ALL' 또는 빈값이면 전달하지 않음(=전체)
+  const rawCat = (params.category ?? '').toString().toUpperCase();
+  const itemCategory = rawCat === 'ALL' || rawCat === '' ? undefined : rawCat;
 
-    // 페이징(백엔드 0-base!)
-    const page0 = Math.max(0, Number(params.page ? Number(params.page) - 1 : 0));
-    const size = Math.max(1, Number(params.size ?? 12));
+  // 페이지: UI가 1-base일 가능성 → 서버는 0-base
+  const page0 = Math.max(0, Number(params.page ?? 1) - 1);
+  const size = Math.max(1, Number(params.size ?? 12));
 
-    // 정렬(백이 지원: 날짜/가격)
-    const { key, dir } = parseSort(params.sort);
-    const orderByDate = key === 'date' || !key ? (dir ?? 'desc').toUpperCase() : undefined;
-    const orderByPrice = key === 'price' ? (dir ?? 'desc').toUpperCase() : undefined;
+  // 정렬 파라미터
+  const { key, dir } = (function parseSort(sort?: string) {
+    if (!sort) return {};
+    const [k, d] = String(sort).split(',').map(s => s.trim().toLowerCase());
+    const dir = d === 'asc' || d === 'desc' ? d : undefined;
+    return { key: (k === 'date' || k === 'price' || k === 'sales') ? (k as 'date'|'price'|'sales') : undefined, dir: dir as 'asc'|'desc'|undefined };
+  })(params.sort);
 
-    // 품절 제외(백 enum: SELL / SOLD_OUT) → SELL만 보고 싶으면 body에 itemSellStatus: 'SELL'
-    const itemSellStatus = params.excludeSoldOut ? 'SELL' : undefined;
+  const orderByDate  = key === 'date'  || !key ? (dir ?? 'desc').toUpperCase() : undefined;
+  const orderByPrice = key === 'price' ? (dir ?? 'desc').toUpperCase() : undefined;
 
-    const body: Record<string, any> = {
+  // 품절 제외 옵션(백엔드가 itemSellStatus를 받는다면 사용)
+  const itemSellStatus = params.excludeSoldOut ? 'SELL' : undefined;
+
+  // ✅ GET + params 로 전달 (절대 body 사용 X)
+  const r: any = await (http as any).get(url.toString(), { 
+    params: {
       ...(itemCategory ? { itemCategory } : {}),
-      ...(params.q ? { keyword: params.q } : {}),
+      ...(params.q ? { keyword: String(params.q) } : {}),
       page: page0,
       size,
       ...(orderByDate ? { orderByDate } : {}),
       ...(orderByPrice ? { orderByPrice } : {}),
       ...(itemSellStatus ? { itemSellStatus } : {}),
-    };
+    },
+  });
 
-    // axios는 v1에서 GET data를 지원합니다. http는 axios instance이므로 request로 보냅니다.
-    const r: any = await (http as any).request({
-      url: url.toString(),
-      method: 'GET',
-      data: body,
-    });
+  const data = r?.data ?? r;
+  const payload = data?.result ?? data;
 
-    const data = r?.data ?? r;           // axios/직접 fetch 모두 방어
-    const payload = data?.result ?? data; // ApiResult.result 또는 바로 본문
+  const dtoList = toArray<ItemDTO>(payload);
+  const pageNum0 = Number(payload?.page ?? payload?.pageable?.pageNumber ?? page0);
+  const sizeNum = Number(payload?.size ?? size);
+  const totalElements = Number(payload?.totalElements ?? payload?.total ?? dtoList.length);
+  const totalPages = Number(payload?.totalPages ?? Math.ceil((totalElements || 1) / (sizeNum || 1)));
 
-    const dtoList = toArray<ItemDTO>(payload);
-    const pageNum0 = Number(payload?.page ?? payload?.pageable?.pageNumber ?? page0);
-    const sizeNum = Number(payload?.size ?? size);
-    const totalElements = Number(payload?.totalElements ?? payload?.total ?? dtoList.length);
-    const totalPages = Number(payload?.totalPages ?? Math.ceil((totalElements || 1) / (sizeNum || 1)));
+  // 1-base로 맞춰 반환
+  const page1 = pageNum0 + 1;
 
-    // 기존 프론트 타입(PageRes)에 맞춰 반환 (1-base page로 보정)
-    const page1 = pageNum0 + 1;
+  return {
+    page: page1,
+    size: sizeNum,
+    total: totalPages,
+    start: 1,
+    end: totalPages,
+    prev: page1 > 1,
+    next: page1 < totalPages,
+    dtoList,
+  } as PageRes<ItemDTO>;
+},
 
-    return {
-      page: page1,
-      size: sizeNum,
-      total: totalPages,
-      start: 1,
-      end: totalPages,
-      prev: page1 > 1,
-      next: page1 < totalPages,
-      dtoList,
-    } as PageRes<ItemDTO>;
-  },
-
-  /** 단건 조회 */
-  async getOne(id: number): Promise<ItemDTO> {
-    const base = normalizeBase(process.env.NEXT_PUBLIC_API_BASE as any);
-    const url = new URL(`/item/${encodeURIComponent(String(id))}`, base || '');
-    const r: any = await http.get(url.toString());
-    const data = r?.data ?? r;
-    return (data?.result ?? data) as ItemDTO;
-  },
 };

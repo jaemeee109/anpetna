@@ -6,23 +6,23 @@ import Image from 'next/image';
 import { useMemo, useState, useEffect } from 'react';
 import { useItemList } from '@/features/item/hooks/useItems';
 import type { ItemCategory, ItemListQuery } from '@/features/item/data/item.types';
-import Paw from '@/components/icons/Paw'; // ✅ Paw 아이콘
+import Paw from '@/components/icons/Paw';
 
-// 카테고리 (백 enum 값 그대로)
+/** 카테고리(백엔드 enum 그대로) */
 const CATS = [
   { label: 'ALL', value: 'ALL' },
   { label: 'FEED', value: 'FEED' },
   { label: 'SNACKS', value: 'SNACKS' },
   { label: 'CLOTHING', value: 'CLOTHING' },
   { label: 'BATH', value: 'BATH_PRODUCT' },
-  { label: 'BEAUTY', value: 'BEUTY_PRODUCT' }, // 백 enum 철자 그대로
+  { label: 'BEAUTY', value: 'BEUTY_PRODUCT' }, // 백엔드 철자 그대로
   { label: 'TOY', value: 'TOY' },
   { label: 'OTHERS', value: 'OTHERS' },
 ] as const;
 
 type CatValue = (typeof CATS)[number]['value'];
 
-// 정렬 옵션 (ItemListQuery['sort'] 타입 고정)
+/** 정렬 옵션(ItemListQuery['sort']) */
 const SORTS: ReadonlyArray<{ label: string; value: ItemListQuery['sort'] }> = [
   { label: '신상품순', value: 'date,desc' },
   { label: '등록일순', value: 'date,asc' },
@@ -30,35 +30,35 @@ const SORTS: ReadonlyArray<{ label: string; value: ItemListQuery['sort'] }> = [
   { label: '낮은가격순', value: 'price,asc' },
 ] as const;
 
-// KRW 포맷
+/** KRW 포맷 */
 function formatPriceKRW(n?: number) {
   return new Intl.NumberFormat('ko-KR').format(n ?? 0) + '원';
 }
 
-// ADMIN 여부 (클라이언트 저장소/쿠키)
+/** 관리자 여부(로컬 저장소/쿠키) */
 function isAdminClient(): boolean {
   try {
-    const role =
-      (
-        (typeof window !== 'undefined' &&
-          ((localStorage.getItem('memberRole') ||
-            sessionStorage.getItem('memberRole')) ??
-            (() => {
-              try {
-                const m = document.cookie.match(/(?:^|;\\s*)memberRole=([^;]+)/);
-                return m ? decodeURIComponent(m[1]) : '';
-              } catch { return ''; }
-            })())) ||
-        ''
-      ).toUpperCase();
+    const raw =
+      (typeof window !== 'undefined' &&
+        (localStorage.getItem('memberRole') ??
+         sessionStorage.getItem('memberRole') ??
+         (() => {
+           try {
+             const m = document.cookie.match(/(?:^|;\s*)memberRole=([^;]+)/);
+             return m ? decodeURIComponent(m[1]) : '';
+           } catch { return ''; }
+         })())) || '';
+    const role = raw.toUpperCase();
     return role === 'ADMIN' || role === 'ROLE_ADMIN';
-  } catch { return false; }
+  } catch {
+    return false;
+  }
 }
 
-// 레이아웃 래퍼
-const WRAP = 'apn-main max-w-screen-xl mx-auto px-4';
+/** 레이아웃 래퍼 */
+const WRAP = 'apn-main mx-auto px-4 max-w-[1220px]';
 
-/** 페이저 (첨부 page.tsx의 느낌 반영) */
+/** Pager(디자인 클래스 유지) */
 function Pager({
   current, totalPages, onPage,
 }: { current: number; totalPages: number; onPage: (p: number) => void; }) {
@@ -102,6 +102,23 @@ function Pager({
   );
 }
 
+/** 이미지 절대경로 베이스 계산:
+ * - NEXT_PUBLIC_API_BASE_URL(또는 NEXT_PUBLIC_API_PREFIX 기반) 사용
+ * - 개발환경(3000)에서 8000으로 포트 스왑
+ */
+function resolveImgBase(): string {
+  const envBase =
+    (process.env.NEXT_PUBLIC_API_BASE_URL as string | undefined) ||
+    (process.env.NEXT_PUBLIC_API_BASE as string | undefined) ||
+    '';
+  if (envBase) return envBase.replace(/\/+$/, '');
+
+  if (typeof window === 'undefined') return '';
+  const { protocol, hostname, port } = window.location;
+  const guessPort = port ? (port === '3000' ? '8000' : port) : '';
+  return `${protocol}//${hostname}${guessPort ? `:${guessPort}` : ''}`.replace(/\/+$/, '');
+}
+
 export default function ItemsPage() {
   const [cat, setCat] = useState<CatValue>('ALL');
   const [sort, setSort] = useState<ItemListQuery['sort']>('date,desc');
@@ -116,20 +133,28 @@ export default function ItemsPage() {
   useEffect(() => setIsAdmin(isAdminClient()), []);
 
   const query = useMemo<ItemListQuery>(() => ({
-    category: cat as ItemCategory, q: q.trim() || undefined, sort, page, size,
+    category: cat as ItemCategory,
+    q: q.trim() || undefined,
+    sort,
+    page,
+    size,
   }), [cat, q, sort, page, size]);
+
   const { data, isLoading, isError } = useItemList(query);
 
   const items = useMemo(() => data?.dtoList ?? [], [data]);
 
+  // 당신의 item.api.ts가 totalPages를 total에 담아주므로, 우선순위를 total로 둡니다.
   const totalPages =
-    Number((data as any)?.totalPages) ||
     Number((data as any)?.total) ||
+    Number((data as any)?.totalPages) ||
     Number((data as any)?.page?.totalPages) ||
     Number((data as any)?.result?.totalPages) ||
     1;
 
   const onSearch = () => { setPage(1); setQ(keyword.trim()); };
+
+  const IMG_BASE = resolveImgBase();
 
   return (
     <main className={WRAP}>
@@ -138,12 +163,13 @@ export default function ItemsPage() {
       </div>
 
       {/* 카테고리 탭 */}
-      <div className="store-catbar flex gap-[5px] justify-center">
+      <div className="store-catbar flex gap-[10px] justify-center">
         {CATS.map((c) => (
           <button
             key={c.value}
             onClick={() => { setCat(c.value); setPage(1); }}
             className={`pill ${cat === c.value ? 'pill--active' : ''}`}
+            type="button"
           >
             {c.label}
           </button>
@@ -161,14 +187,7 @@ export default function ItemsPage() {
             onKeyDown={(e) => { if (e.key === 'Enter') onSearch(); }}
             aria-label="검색어"
           />
-          <button
-            className="store-ico-search"
-            onClick={onSearch}
-            aria-label="검색"
-            type="button"
-            /* 👉 여기서 이 페이지에서만 색 바꾸고 싶다면: style={{ color: '#FF6F61' }} 처럼 주면 됨 */
-            // style={{ color: '#FF6F61' }}
-          >
+          <button className="store-ico-search" onClick={onSearch} aria-label="검색" type="button">
             <Paw className="store-ico" />
           </button>
         </div>
@@ -176,14 +195,15 @@ export default function ItemsPage() {
 
       <div className="store-sep" />
 
-      {/* 정렬 — 오른쪽 정렬 */}
-      <div className="store-sortbar flex justify-end">
-        <select
-          className="dropdown"
-          value={sort}
-          onChange={(e) => { setSort(e.target.value as ItemListQuery['sort']); setPage(1); }}
-          aria-label="정렬 옵션"
-        >
+      {/* 정렬 */}
+      <div className="store-sortbar flex justify-end mt-[20px] mb-[20px] mr-[20px]">
+      <select
+  className="dropdown sort-select"
+  value={sort}
+  onChange={(e) => { setSort(e.target.value as ItemListQuery['sort']); setPage(1); }}
+  aria-label="정렬 옵션"
+>
+
           {SORTS.map((s) => (<option key={s.value} value={s.value}>{s.label}</option>))}
         </select>
       </div>
@@ -196,32 +216,69 @@ export default function ItemsPage() {
       ) : items.length === 0 ? (
         <div className="text-center py-12 text-gray-500">상품이 없습니다.</div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+    <div
+  className="items-grid grid gap-[16px] justify-center"
+  style={{ gridTemplateColumns: 'repeat(4, 260px)' }}
+>
+
+
+
+
           {items.map((it: any) => {
             const id = it.itemId ?? it.id;
             const title = it.itemName ?? it.title ?? it.name ?? `상품#${id}`;
+
+            // 1) 백이 준 원본 이미지 경로 추출
+            const imgRaw =
+              it.thumbnailUrl ??
+              it.imageUrl ??
+              it.thumbnail ??
+              (Array.isArray(it.images) && it.images[0]?.url) ??
+              '';
+
+            // 2) 상대경로(/files/...)면 절대경로로 변환
             const img =
-              it.thumbnailUrl ?? it.imageUrl ?? it.thumbnail ??
-              (Array.isArray(it.images) && it.images[0]?.url) ?? '';
+              imgRaw && !/^https?:\/\//i.test(imgRaw)
+                ? new URL(imgRaw.startsWith('/') ? imgRaw : `/${imgRaw}`, IMG_BASE).toString()
+                : imgRaw;
+
             const price = Number(it.itemPrice ?? it.price ?? it.salePrice ?? it.amount ?? 0);
 
             return (
-              <Link key={id} href={`/items/${encodeURIComponent(String(id))}`} className="block group" prefetch={false}>
-                <div className="w-full aspect-[4/3] overflow-hidden rounded bg-gray-100">
-                  {img ? (
-                    <Image src={img} alt={title} width={800} height={600} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-400">No Image</div>
-                  )}
+              <Link
+  key={id}
+  href={`/items/${id}`}
+  className="block group no-underline apn-link-reset"
+  prefetch={false}
+  style={{ color: '#000', textDecoration: 'none' }}
+>
+
+
+
+                <div className="w-full overflow-hidden rounded-xl bg-white shadow-sm">
+                  {/* 고정 높이 썸네일 래퍼: 뷰포트 관계없이 카드 썸네일을 동일 크기로 */}
+<div className="relative w-260px] h-[340px] overflow-hidden">
+  {img ? (
+    <Image src={img} alt={title} fill className="object-cover" unoptimized />
+  ) : (
+    <div className="absolute inset-0 flex items-center justify-center text-gray-400">No Image</div>
+  )}
+</div>
+
+
+
+                <div className="mt-[16px] truncate text-center !text-black">{title}</div>
+<div className="text-sm text-center !text-black">{formatPriceKRW(price)}</div>
+
+
                 </div>
-                <div className="mt-2 truncate">{title}</div>
-                <div className="text-sm text-gray-800">{formatPriceKRW(price)}</div>
               </Link>
             );
           })}
         </div>
       )}
-      <br></br>
+
+      <br />
 
       <div className="store-sep" />
 
@@ -234,97 +291,82 @@ export default function ItemsPage() {
         </div>
       </div>
 
-      {/* 페이지 한정 스타일 */}
-    <style jsx>{`
-  /* 카테고리 탭: 기본 흰 배경 + 회색 테두리, 활성 진한 회색 + 흰 글자 */
-  .store-catbar .pill {
-    border-radius: 9999px;
-    background: #ffffff;         /* 기본 흰색 */
-    border: 1px solid #d1d5db;   /* 회색 테두리 */
-    color: #111;
-    height: 30px;
-    line-height: 30px;
-    padding: 0 14px;
-    font-weight: 500;
-    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
-    -webkit-tap-highlight-color: transparent;
-  }
-  .store-catbar .pill:hover { background: #f3f4f6; }
-  .store-catbar .pill.pill--active {
-    background: #555555;         /* 진한 회색 */
-    color: #ffffff;
-    border-color: #555555;
-  }
-  .store-catbar .pill:focus,
-  .store-catbar .pill:focus-visible,
-  .store-catbar .pill:active,
-  .store-catbar button:focus,
-  .store-catbar button:focus-visible {
-    outline: none;
-    box-shadow: none !important;
-  }
+      {/* 페이지 한정 스타일(디자인 클래스 유지) */}
+      <style jsx>{`
+        .store-catbar .pill {
+          border-radius: 9999px;
+          background: #ffffff;
+          border: 1px solid #d1d5db;
+          color: #111;
+          height: 38px;
+          line-height: 30px;
+          padding: 0 14px;
+          font-weight: 500;
+          transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+          -webkit-tap-highlight-color: transparent;
+        }
 
-  /* 분리선 */
-  .store-sep {
-    border-top: 1px solid #e5e7eb;
-    margin: 16px 0;
-  }
+        .store-catbar .pill:hover { background: #f3f4f6; }
+        .store-catbar .pill.pill--active {
+          background: #555555;
+          color: #ffffff;
+          border-color: #555555;
+        }
+        .store-catbar .pill:focus,
+        .store-catbar .pill:focus-visible,
+        .store-catbar .pill:active,
+        .store-catbar button:focus,
+        .store-catbar button:focus-visible {
+          outline: none;
+          box-shadow: none !important;
+        }
+        .store-sep { border-top: 1px solid #e5e7eb; margin: 16px 0; }
+        .store-search { display: inline-flex; align-items: center; gap: 8px; border: none; background: transparent; }
+        .store-input {
+          height: 40px; width: 250px; padding: 0 12px;
+          border: 1px solid #e5e7eb; border-radius: 10px; outline: none;
+          text-align: center;
+        }
+        .store-input::placeholder { text-align: center; }
+        .store-input:not(:placeholder-shown) { text-align: left; }
+        .store-ico-search {
+          display: inline-flex; align-items: center; justify-content: center;
+          width: 35px; height: 35px; border-radius: 40%;
+          border: 1px solid #e5e7eb; background: #fff; cursor: pointer; color: #6e6e6eff;
+        }
+        .store-ico { width: 16px; height: 16px; display: block; }
+        .store-ico :global(*) { fill: currentColor; stroke: currentColor; }
 
-  /* 검색 입력 + 버튼 래퍼 */
-  .store-search {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    border: none;         /* 래퍼 테두리 제거 */
-    background: transparent;
-  }
+        
+/* 이 페이지(상품 리스트) 영역의 모든 링크를 전역으로 검정 고정 */
+:global(.items-grid a),
+:global(.items-grid a:visited),
+:global(.items-grid a:hover),
+:global(.items-grid a:active),
+:global(.items-grid a:focus) {
+  color: #000 !important;
+  text-decoration: none !important;
+}
 
-  /* 입력창 */
-  .store-input {
-    height: 30px;
-    width: 220px;
-    padding: 0 12px;
-    border: 1px solid #e5e7eb;
-    border-radius: 10px;
-    outline: none;
+/* 정렬 옵션 셀렉트 크기 고정 (이 페이지 한정) */
+.store-sortbar .sort-select {
+  width: 120px !important;   /* ← 원하는 폭(px) */
+  height: 35px !important;   /* ← 원하는 높이(px) */
+  font-size: 14px !important;
+  font-color: #7a7979ff !important;
+  padding: 0 8px !important; /* 좌우 여백 */
+  line-height: 28px;         /* 높이에 맞춰 줄 높이 보정(선택) */
+   border-color: #bbb8b8ff;
+   border-radius: 15px !important; 
 
-    /*  placeholder일 때는 가운데 정렬 */
-    text-align: center;
-  }
-  /*  placeholder 텍스트도 확실히 가운데 정렬 */
-  .store-input::placeholder {
-    text-align: center;
-  }
-  /*  값이 입력되면 자동으로 왼쪽 정렬로 전환 */
-  .store-input:not(:placeholder-shown) {
-    text-align: left;
-  }
+   
+}
 
-  /* 아이콘 버튼: 내부에 Paw 아이콘을 중앙 정렬 */
-  .store-ico-search {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 31px;
-    height: 31px;
-    border-radius: 40%;
-    border: 1px solid #e5e7eb;
-    background: #fff;
-    cursor: pointer;
-    color: #6e6e6eff; /* Paw 색상은 여기서 조절 (이 페이지 한정) */
-  }
-  .store-ico {
-    width: 16px;
-    height: 16px;
-    display: block;
-  }
-  /* Paw 내부 요소가 버튼 color를 따르도록 (이 페이지 한정) */
-  .store-ico :global(*) {
-    fill: currentColor;
-    stroke: currentColor;
-  }
-`}</style>
 
+
+      `}
+
+      </style>
     </main>
   );
 }
