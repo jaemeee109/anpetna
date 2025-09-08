@@ -14,6 +14,6 @@ public class SearchOneReviewRes {
 
     private LocalDateTime regDate;
 
-    private ItemDTO itemId;
+    private Long itemId;
 
 }
