@@ -20,11 +20,11 @@ import java.util.List;
 public interface ReviewService {
 
 
-    RegisterReviewRes registerReview(RegisterReviewReq req);
+    RegisterReviewRes registerReview(Long itemId, RegisterReviewReq req);
    // @PreAuthorize("@authEvaluator.authorizeReview(#req.reviewId, principal.getUsername())")
-    ModifyReviewRes modifyReview(ModifyReviewReq req);
+    ModifyReviewRes modifyReview(Long itemId, Long reviewId, ModifyReviewReq req);
     //@PreAuthorize("@authEvaluator.authorizeReview(#req.reviewId, principal.getUsername())")
-    DeleteReviewRes deleteReview(DeleteReviewReq req);
+    DeleteReviewRes deleteReview(Long itemId, DeleteReviewReq req);
 
     PageResponseDTO<ReviewDTO> getAllReviews(SearchAllReviewsReq req, PageRequestDTO pageRequestDTO, String order);
 

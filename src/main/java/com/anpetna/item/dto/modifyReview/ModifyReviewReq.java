@@ -15,6 +15,6 @@ public class ModifyReviewReq extends ImageListDTO {
 
     private int rating;
 
-    private ItemDTO itemId;
+    private Long itemId;
 
 }

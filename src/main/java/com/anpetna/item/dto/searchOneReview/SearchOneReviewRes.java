@@ -15,7 +15,7 @@ public class SearchOneReviewRes extends ImageListDTO {
 
     private LocalDateTime regDate;
 
-    private ItemDTO itemId;
+    private Long itemId;
 
 
 }
