@@ -3,7 +3,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 
 /** 가격 포맷(1,000 단위 + 원) */
 function formatPriceKRW(n?: number) {
@@ -30,6 +30,34 @@ function isAdminClient(): boolean {
   } catch {
     return false;
   }
+}
+
+/** 액세스 토큰/헤더 (수정 페이지와 동일 컨벤션) */
+function toBearer(t?: string) {
+  return `Bearer ${t ?? ''}`.trim();
+}
+function getAccessToken() {
+  try {
+    return (
+      localStorage.getItem('accessToken') ||
+      sessionStorage.getItem('accessToken') ||
+      (() => {
+        try {
+          const m = document.cookie.match(/(?:^|;\s*)accessToken=([^;]+)/);
+          return m ? decodeURIComponent(m[1]) : '';
+        } catch {
+          return '';
+        }
+      })() ||
+      ''
+    );
+  } catch {
+    return '';
+  }
+}
+function authHeaders(): Record<string, string> {
+  const token = getAccessToken();
+  return token ? { Authorization: toBearer(token) } : {};
 }
 
 /** 이미지 베이스 URL 추정(개발 3000↔8000 포트 스왑) */
@@ -93,6 +121,7 @@ function toAbs(url?: string, base?: string) {
 
 export default function ItemDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
 
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -143,6 +172,46 @@ export default function ItemDetailPage() {
     setQty(Math.max(1, v === '' ? 1 : Number(v)));
   };
 
+  /** 삭제 요청 */
+  async function onDelete() {
+    try {
+      // 권한/토큰 확인
+      const token = getAccessToken();
+      if (!token) {
+        alert('로그인이 필요합니다.');
+        return;
+      }
+      if (!isAdmin) {
+        alert('관리자만 삭제할 수 있습니다.');
+        return;
+      }
+      if (!confirm('정말 이 상품을 삭제할까요?')) return;
+
+      const resp = await fetch(`${API_BASE}/item/${id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: ({
+          ...authHeaders(),
+          Accept: 'application/json',
+        } as HeadersInit),
+      });
+
+      // 응답 파싱(문자/JSON 모두 대응)
+      const raw = await resp.clone().text();
+      let body: any = {};
+      try { body = JSON.parse(raw); } catch { body = { message: raw }; }
+
+      if (!resp.ok) {
+        throw new Error(body?.message || body?.resMessage || `삭제 실패 (HTTP ${resp.status})`);
+      }
+
+      alert('상품이 삭제되었습니다.');
+      router.replace('/items');
+    } catch (e: any) {
+      alert(e?.message || '상품 삭제 중 문제가 발생했습니다.');
+    }
+  }
+
   if (loading)
     return (
       <main className="apn-detail px-4 py-8 text-center">
@@ -171,7 +240,7 @@ export default function ItemDetailPage() {
             <button
               type="button"
               className="btn-3d btn-white px-3 py-1 rounded border"
-              onClick={() => alert('삭제 기능은 아직 연결되지 않았습니다.')}
+              onClick={onDelete}
             >
               삭제
             </button>
@@ -265,8 +334,6 @@ export default function ItemDetailPage() {
 
       <div className="divider mb-[20px]" />
 
-    
-
       {/* 고정 안내문 (모든 상세페이지) */}
       <section className="policy mt-[30px] mb-[30px]">
         <p>· 상품의 색상은 모니터 사양에 따라 실제 색상과 다소 차이가 있을 수 있습니다.</p>
@@ -308,7 +375,7 @@ export default function ItemDetailPage() {
 
       <div className="divider " />
 
-        {/* '목록으로' 버튼 (가운데 정렬, /items로 이동) */}
+      {/* '목록으로' 버튼 (가운데 정렬, /items로 이동) */}
       <div className="back-row ">
         <Link href="/items" prefetch={false} className="btn-3d btn-white px-4 py-2 rounded border mt-[30px] mb-[50px]">
           목록으로
@@ -457,11 +524,9 @@ export default function ItemDetailPage() {
         }
 
         /* 상품이름 행은 두 컬럼 전체 사용 → 짧은 이름 1줄 유지 */
-.name-row .left-value { grid-column: 1 / 3; }
-/* 함께 넣어둔 자리 채움 span은 숨김 (불필요한 줄바꿈 방지) */
-.name-row > span:last-child { display: none; }
-
-
+        .name-row .left-value { grid-column: 1 / 3; }
+        /* 함께 넣어둔 자리 채움 span은 숨김 (불필요한 줄바꿈 방지) */
+        .name-row > span:last-child { display: none; }
       `}</style>
     </main>
   );
