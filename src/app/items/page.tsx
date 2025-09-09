@@ -102,10 +102,7 @@ function Pager({
   );
 }
 
-/** 이미지 절대경로 베이스 계산:
- * - NEXT_PUBLIC_API_BASE_URL(또는 NEXT_PUBLIC_API_PREFIX 기반) 사용
- * - 개발환경(3000)에서 8000으로 포트 스왑
- */
+/** 이미지 절대경로 베이스 계산 */
 function resolveImgBase(): string {
   const envBase =
     (process.env.NEXT_PUBLIC_API_BASE_URL as string | undefined) ||
@@ -132,19 +129,40 @@ export default function ItemsPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   useEffect(() => setIsAdmin(isAdminClient()), []);
 
-  const query = useMemo<ItemListQuery>(() => ({
-    category: cat as ItemCategory,
-    q: q.trim() || undefined,
-    sort,
-    page,
-    size,
-  }), [cat, q, sort, page, size]);
+  /** 검색어가 있으면 카테고리 파라미터 전송 안 함(전체 검색) */
+  const query = useMemo<ItemListQuery>(() => {
+    const qTrim = q.trim();
+    const effectiveCategory = qTrim ? undefined : (cat as ItemCategory);
+    return {
+      category: effectiveCategory,
+      q: qTrim || undefined,
+      sort,
+      page,
+      size,
+    };
+  }, [cat, q, sort, page, size]);
 
   const { data, isLoading, isError } = useItemList(query);
 
+  // 원본 목록
   const items = useMemo(() => data?.dtoList ?? [], [data]);
 
-  // 당신의 item.api.ts가 totalPages를 total에 담아주므로, 우선순위를 total로 둡니다.
+  /** 품절 상품을 항상 뒤로(안정 정렬) */
+  const itemsSorted = useMemo(() => {
+    const withIdx = (items as any[]).map((it, idx) => {
+      const status =
+        (it.itemSellStatus ?? it.sellStatus ?? it.status ?? '').toString().toUpperCase();
+      const soldOut = status === 'SOLD_OUT';
+      return { it, idx, soldOut };
+    });
+    withIdx.sort((a, b) => {
+      if (a.soldOut === b.soldOut) return a.idx - b.idx;
+      return a.soldOut ? 1 : -1;
+    });
+    return withIdx.map(x => x.it);
+  }, [items]);
+
+  // 페이지 수
   const totalPages =
     Number((data as any)?.total) ||
     Number((data as any)?.totalPages) ||
@@ -152,6 +170,7 @@ export default function ItemsPage() {
     Number((data as any)?.result?.totalPages) ||
     1;
 
+  // 검색 실행
   const onSearch = () => { setPage(1); setQ(keyword.trim()); };
 
   const IMG_BASE = resolveImgBase();
@@ -197,13 +216,12 @@ export default function ItemsPage() {
 
       {/* 정렬 */}
       <div className="store-sortbar flex justify-end mt-[20px] mb-[20px] mr-[20px]">
-      <select
-  className="dropdown sort-select"
-  value={sort}
-  onChange={(e) => { setSort(e.target.value as ItemListQuery['sort']); setPage(1); }}
-  aria-label="정렬 옵션"
->
-
+        <select
+          className="dropdown sort-select"
+          value={sort}
+          onChange={(e) => { setSort(e.target.value as ItemListQuery['sort']); setPage(1); }}
+          aria-label="정렬 옵션"
+        >
           {SORTS.map((s) => (<option key={s.value} value={s.value}>{s.label}</option>))}
         </select>
       </div>
@@ -213,20 +231,22 @@ export default function ItemsPage() {
         <div className="text-center py-12 text-gray-500">로딩중…</div>
       ) : isError ? (
         <div className="text-center py-12 text-gray-500">상품 로딩 오류가 발생했습니다.</div>
-      ) : items.length === 0 ? (
+      ) : itemsSorted.length === 0 ? (
         <div className="text-center py-12 text-gray-500">상품이 없습니다.</div>
       ) : (
-    <div
-  className="items-grid grid gap-[16px] justify-center"
-  style={{ gridTemplateColumns: 'repeat(4, 260px)' }}
->
-
-
-
-
-          {items.map((it: any) => {
+        <div
+          className="items-grid grid gap-[16px] justify-center"
+          style={{ gridTemplateColumns: 'repeat(4, 260px)' }}
+        >
+          {itemsSorted.map((it: any) => {
             const id = it.itemId ?? it.id;
             const title = it.itemName ?? it.title ?? it.name ?? `상품#${id}`;
+
+            // 상태값(SOLD_OUT 여부)
+            const sellStatus = String(
+              (it.itemSellStatus ?? it.sellStatus ?? it.status ?? '')
+            ).toUpperCase();
+            const isSoldOut = sellStatus === 'SOLD_OUT';
 
             // 1) 백이 준 원본 이미지 경로 추출
             const imgRaw =
@@ -244,33 +264,40 @@ export default function ItemsPage() {
 
             const price = Number(it.itemPrice ?? it.price ?? it.salePrice ?? it.amount ?? 0);
 
+            // ✅ 여기서 SOLD OUT/제목/가격 간 여백만 조건부로 조정
+            const titleMarginClass = isSoldOut ? 'mt-[8px]' : 'mt-[16px]';
+            const priceMarginClass = isSoldOut ? 'mt-[6px]' : '';
+
             return (
               <Link
-  key={id}
-  href={`/items/${id}`}
-  className="block group no-underline apn-link-reset"
-  prefetch={false}
-  style={{ color: '#000', textDecoration: 'none' }}
->
-
-
-
+                key={id}
+                href={`/items/${id}`}
+                className="block group no-underline apn-link-reset"
+                prefetch={false}
+                style={{ color: '#000', textDecoration: 'none' }}
+              >
                 <div className="w-full overflow-hidden rounded-xl bg-white shadow-sm">
-                  {/* 고정 높이 썸네일 래퍼: 뷰포트 관계없이 카드 썸네일을 동일 크기로 */}
-<div className="relative w-260px] h-[340px] overflow-hidden">
-  {img ? (
-    <Image src={img} alt={title} fill className="object-cover" unoptimized />
-  ) : (
-    <div className="absolute inset-0 flex items-center justify-center text-gray-400">No Image</div>
-  )}
-</div>
+                  {/* 고정 높이 썸네일 래퍼: SOLD_OUT이면 회색 필터 */}
+                  <div
+                    className="relative w-260px] h-[340px] overflow-hidden"
+                    style={{ filter: isSoldOut ? 'grayscale(100%)' : undefined }}
+                  >
+                    {img ? (
+                      <Image src={img} alt={title} fill className="object-cover" unoptimized />
+                    ) : (
+                      <div className="absolute inset-0 flex items-center justify-center text-gray-400">
+                        No Image
+                      </div>
+                    )}
+                  </div>
 
+                  {/* SOLD OUT 배지 (여백: mt-[8px]) */}
+                  {isSoldOut && (
+                    <div className="mt-[10px] text-center !text-black"><b>SOLD OUT</b></div>
+                  )}
 
-
-                <div className="mt-[16px] truncate text-center !text-black">{title}</div>
-<div className="text-sm text-center !text-black">{formatPriceKRW(price)}</div>
-
-
+                  <div className={`truncate text-center !text-black ${titleMarginClass}`}>{title}</div>
+                  <div className={`text-sm text-center !text-black ${priceMarginClass}`}>{formatPriceKRW(price)}</div>
                 </div>
               </Link>
             );
@@ -337,36 +364,28 @@ export default function ItemsPage() {
         .store-ico { width: 16px; height: 16px; display: block; }
         .store-ico :global(*) { fill: currentColor; stroke: currentColor; }
 
-        
-/* 이 페이지(상품 리스트) 영역의 모든 링크를 전역으로 검정 고정 */
-:global(.items-grid a),
-:global(.items-grid a:visited),
-:global(.items-grid a:hover),
-:global(.items-grid a:active),
-:global(.items-grid a:focus) {
-  color: #000 !important;
-  text-decoration: none !important;
-}
+        /* 이 페이지(상품 리스트) 영역의 모든 링크를 전역으로 검정 고정 */
+        :global(.items-grid a),
+        :global(.items-grid a:visited),
+        :global(.items-grid a:hover),
+        :global(.items-grid a:active),
+        :global(.items-grid a:focus) {
+          color: #000 !important;
+          text-decoration: none !important;
+        }
 
-/* 정렬 옵션 셀렉트 크기 고정 (이 페이지 한정) */
-.store-sortbar .sort-select {
-  width: 120px !important;   /* ← 원하는 폭(px) */
-  height: 35px !important;   /* ← 원하는 높이(px) */
-  font-size: 14px !important;
-  font-color: #7a7979ff !important;
-  padding: 0 8px !important; /* 좌우 여백 */
-  line-height: 28px;         /* 높이에 맞춰 줄 높이 보정(선택) */
-   border-color: #bbb8b8ff;
-   border-radius: 15px !important; 
-
-   
-}
-
-
-
-      `}
-
-      </style>
+        /* 정렬 옵션 셀렉트 크기 고정 (이 페이지 한정) */
+        .store-sortbar .sort-select {
+          width: 120px !important;
+          height: 35px !important;
+          font-size: 14px !important;
+          font-color: #7a7979ff !important;
+          padding: 0 8px !important;
+          line-height: 28px;
+          border-color: #bbb8b8ff;
+          border-radius: 15px !important;
+        }
+      `}</style>
     </main>
   );
 }
