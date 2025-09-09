@@ -1,7 +1,7 @@
 // src/app/items/[id]/edit/page.tsx
 'use client';
 
-import { useEffect, useMemo, useState, FormEvent } from 'react';
+import { useEffect, useMemo, useState, FormEvent, useRef } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 
@@ -63,8 +63,8 @@ const CATEGORIES = [
   { label: 'FEED', value: 'FEED' },
   { label: 'SNACKS', value: 'SNACKS' },
   { label: 'CLOTHING', value: 'CLOTHING' },
-  { label: 'BATH', value: 'BATH_PRODUCT' },     // 백엔드 enum: BATH_PRODUCT
-  { label: 'BEAUTY', value: 'BEUTY_PRODUCT' },  // 백엔드 enum: BEUTY_PRODUCT(오타 포함)
+  { label: 'BATH', value: 'BATH_PRODUCT' },
+  { label: 'BEAUTY', value: 'BEUTY_PRODUCT' },
   { label: 'TOY', value: 'TOY' },
   { label: 'OTHERS', value: 'OTHERS' },
 ] as const;
@@ -87,8 +87,8 @@ type ItemDetailRes = {
   imageUrls?: string[];    // 상세 이미지 URL(또는 경로) 목록
 };
 
-/** 내부 상태: 기존 이미지 + 유지/삭제 + 정렬 */
-type ExistingImg = { url: string; keep: boolean; sortOrder: number };
+/** 내부 상태: 기존 이미지 + 유지/삭제 + 정렬(정렬 입력은 숨김) */
+type ExistingImg = { url: string; sortOrder: number };
 type NewImg = { file: File; sortOrder: number };
 
 export default function ItemEditPage() {
@@ -110,7 +110,7 @@ export default function ItemEditPage() {
   const [itemDetail, setItemDetail] = useState('');
 
   // 썸네일(기존/새 파일)
-  const [existingThumb, setExistingThumb] = useState<string>(''); // 유지 시 그대로 보냄(원본 보관)
+  const [existingThumb, setExistingThumb] = useState<string>(''); // 원본 경로/파일명 보관
   const [newThumb, setNewThumb] = useState<File | null>(null);
 
   // 상세이미지(기존/신규)
@@ -186,8 +186,7 @@ export default function ItemEditPage() {
 
         const imgs = (payload.imageUrls || []).map((u, i) => ({
           url: u,        // 원본 보관
-          keep: true,
-          sortOrder: i + 1,
+          sortOrder: i + 1, // 상세는 1부터
         }));
         setExistingImages(imgs);
       } catch (e: any) {
@@ -221,29 +220,33 @@ export default function ItemEditPage() {
     e.currentTarget.value = '';
   };
 
-  /** 기존 상세이미지 유지/삭제 토글 */
-  const toggleKeep = (idx: number) => {
-    setExistingImages((prev) =>
-      prev.map((it, i) => (i === idx ? { ...it, keep: !it.keep } : it))
-    );
+  /** 기존 상세이미지 삭제(버튼 누르면 즉시 화면에서 제거되고 서버에선 삭제됨) */
+  const removeExisting = (idx: number) => {
+    setExistingImages((prev) => prev.filter((_, i) => i !== idx));
   };
 
-  /** sortOrder 변경(기존/신규 공통) */
-  const setOrderExisting = (idx: number, v: number) => {
-    setExistingImages((prev) =>
-      prev.map((it, i) => (i === idx ? { ...it, sortOrder: Math.max(1, v) } : it))
-    );
+  /** 기존 상세이미지 교체(미리보기 클릭 → 파일 선택 → 기존은 제거하고 같은 sortOrder로 신규 추가) */
+  const onReplacePick = (idx: number) => {
+    const input = document.getElementById(`__rep_${idx}`) as HTMLInputElement | null;
+    input?.click();
   };
-  const setOrderNew = (idx: number, v: number) => {
-    setNewImages((prev) =>
-      prev.map((it, i) => (i === idx ? { ...it, sortOrder: Math.max(1, v) } : it))
-    );
-  };
-  const removeNew = (idx: number) => {
-    setNewImages((prev) => prev.filter((_, i) => i !== idx));
+  const onReplaceChosen: React.ChangeEventHandler<HTMLInputElement> = (e) => {
+    const idx = Number(e.currentTarget.dataset.idx || -1);
+    const file = e.currentTarget.files?.[0];
+    e.currentTarget.value = ''; // 같은 파일 재선택 허용
+    if (!file || idx < 0) return;
+
+    setExistingImages((prev) => {
+      const target = prev[idx];
+      const rest = prev.filter((_, i) => i !== idx);
+      if (target) {
+        setNewImages((n) => [...n, { file, sortOrder: target.sortOrder }]);
+      }
+      return rest;
+    });
   };
 
-  /** 저장(수정) — 항상 multipart/form-data + 백엔드 시그니처에 정확히 맞춤 */
+  /** 저장(수정) — multipart/form-data */
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (submitting) return;
@@ -257,20 +260,25 @@ export default function ItemEditPage() {
         throw new Error('로그인이 필요합니다.');
       }
 
-      // ★ 1) 제출 직전 정렬/유지 목록을 "연속 번호"로 리노멀라이즈(중간 인덱스 누락 방지)
-      const keptExisting = existingImages
-        .filter((x) => x.keep)
-        .sort((a, b) => (a.sortOrder || 1) - (b.sortOrder || 1))
-        .map((x) => ({ ...x }));
-      keptExisting.forEach((x, i) => (x.sortOrder = i + 1)); // 1..N 재부여
+      // 썸네일 파일명(상세 목록에서 제외해 썸네일이 상세로 섞이는 문제 방지)
+      const thumbName = toBaseName(existingThumb);
 
-      const newImgsSorted = [...newImages].sort(
-        (a, b) => (a.sortOrder || 1) - (b.sortOrder || 1)
-      );
-      newImgsSorted.forEach((x, i) => (x.sortOrder = keptExisting.length + i + 1)); // N+1.. 부여
+      // 기존 상세: 화면에 남아있는 것만 keep (썸네일과 동일 파일명은 혹시 몰라 제외)
+      const seen = new Set<string>();
+      const keepList = existingImages
+        .filter((x) => toBaseName(x.url) !== thumbName)
+        .filter((x) => {
+          const fn = toBaseName(x.url);
+          if (seen.has(fn)) return false;
+          seen.add(fn);
+          return true;
+        })
+        .map((x) => ({
+          fileName: toBaseName(x.url),
+          sortOrder: Number(x.sortOrder) || 1,
+        }));
 
-      // ★ 2) 전송용 JSON (썸네일은 그대로, 상세는 '유지할 기존'만 파일명+정렬)
-      const json = {
+      const json: any = {
         itemId: Number(id),
         itemName,
         itemPrice: Number(itemPrice || 0),
@@ -278,30 +286,22 @@ export default function ItemEditPage() {
         itemCategory,
         itemSellStatus,
         itemDetail,
-        existingThumb: toBaseName(existingThumb), // 썸네일은 변경 없으면 그대로 유지
-        existingImages: keptExisting.map((x) => ({
-          fileName: toBaseName(x.url),
-          sortOrder: Number(x.sortOrder) || 1,
-        })),
+        existingThumb: thumbName || '',   // @NotNull 대응
+        existingImages: keepList,
       };
 
-      // ★ 3) 항상 멀티파트 (백엔드가 multipart/form-data로만 수신)
       const fd = new FormData();
       const jsonBlob = new Blob([JSON.stringify(json)], { type: 'application/json' });
       fd.append('putReq', jsonBlob);
 
-      // 새 썸네일(선택 시에만 전송) → 메인이미지와 상세이미지 혼선 방지
+      // 새 썸네일(선택한 경우에만)
       if (newThumb) {
         fd.append('newThumb', newThumb);
       }
 
-      // ★ 4) 신규 상세이미지 파일 전송(신규만) + 동일 길이의 sortOrder 전송(연속 번호)
-      newImgsSorted.forEach((ni) => {
-        fd.append('newFiles', ni.file);
-      });
-      newImgsSorted.forEach((ni) => {
-        fd.append('sortOrder', String(Number(ni.sortOrder) || 1));
-      });
+      // 신규 상세이미지 + 같은 길이의 sortOrder
+      newImages.forEach((ni) => fd.append('newFiles', ni.file));
+      newImages.forEach((ni) => fd.append('sortOrder', String(Number(ni.sortOrder) || 1)));
 
       const resp = await fetch(`${API_BASE}/item/${id}`, {
         method: 'PUT',
@@ -484,27 +484,33 @@ export default function ItemEditPage() {
             {existingImages.length > 0 ? (
               <ul className="imgs">
                 {existingImages.map((img, i) => (
-                  <li key={img.url} className={`imgitem ${img.keep ? '' : 'dim'}`}>
-                    {/* 미리보기 때만 절대경로로 변환 */}
-                    <img src={toAbs(img.url)} alt={`img-${i + 1}`} />
+                  <li key={`${img.url}-${i}`} className="imgitem">
+                    {/* 미리보기 클릭 → 교체 */}
+                    <img
+                      src={toAbs(img.url)}
+                      alt={`img-${i + 1}`}
+                      onClick={() => onReplacePick(i)}
+                      style={{ cursor: 'pointer' }}
+                      title="클릭하여 다른 이미지로 교체"
+                    />
+                    {/* 숨겨진 파일 입력(교체용) */}
+                    <input
+                      id={`__rep_${i}`}
+                      data-idx={i}
+                      type="file"
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      onChange={onReplaceChosen}
+                    />
                     <div className="img-controls">
-                      <label className="checkbox">
-                        <input
-                          type="checkbox"
-                          checked={img.keep}
-                          onChange={() => toggleKeep(i)}
-                        />
+                      <button
+                        type="button"
+                        className="btn-3d btn-white px-3 py-1 rounded border"
+                        onClick={() => removeExisting(i)}
+                        title="삭제"
+                      >
                         삭제
-                      </label>
-                      <label className="order">
-                        순서
-                        <input
-                          type="number"
-                          min={1}
-                          value={img.sortOrder}
-                          onChange={(e) => setOrderExisting(i, Number(e.target.value || 1))}
-                        />
-                      </label>
+                      </button>
                     </div>
                   </li>
                 ))}
@@ -518,7 +524,7 @@ export default function ItemEditPage() {
               <input type="file" accept="image/*" multiple onChange={onAddNewImages} />
             </div>
 
-            {/* 신규 이미지 미리보기/정렬/제거 */}
+            {/* 신규 이미지 미리보기/제거 (정렬 입력 제거) */}
             {newImages.length > 0 && (
               <ul className="imgs mt-2">
                 {newImages.map((ni, i) => {
@@ -527,18 +533,14 @@ export default function ItemEditPage() {
                     <li key={`${ni.file.name}-${i}`} className="imgitem">
                       <img src={url} alt={`new-${i + 1}`} />
                       <div className="img-controls">
-                        <label className="order">
-                          정렬
-                          <input
-                            type="number"
-                            min={1}
-                            value={ni.sortOrder}
-                            onChange={(e) => setOrderNew(i, Number(e.target.value || 1))}
-                          />
-                        </label>
-                        <button type="button" className="btn-3d btn-white px-3 py-1 rounded border"
-                          onClick={() => removeNew(i)}>
-                          제거
+                        <button
+                          type="button"
+                          className="btn-3d btn-white px-3 py-1 rounded border"
+                          onClick={() =>
+                            setNewImages((prev) => prev.filter((_, idx) => idx !== i))
+                          }
+                        >
+                          삭제
                         </button>
                       </div>
                     </li>
@@ -583,7 +585,7 @@ export default function ItemEditPage() {
         {errMsg && <p className="err">{errMsg}</p>}
       </form>
 
-      {/* 등록 페이지와 동일한 톤의 스타일을 그대로 유지 */}
+      {/* 등록 페이지와 동일한 톤의 스타일 유지 + 삭제 버튼 가로 정렬 보장 */}
       <style jsx>{`
         .apn-form {
           max-width: 720px;
@@ -626,17 +628,9 @@ export default function ItemEditPage() {
           width: 100%; height: 160px; object-fit: cover;
           border: 1px solid #e5e7eb; border-radius: 8px;
         }
-        .imgitem.dim img { opacity: .45; }
         .img-controls {
-          display: flex; align-items: center; justify-content: space-between;
-          gap: 8px; margin-top: 6px;
-        }
-        .checkbox { display: inline-flex; align-items: center; gap: 6px; color: #374151; }
-        .order { display: inline-flex; align-items: center; gap: 6px; color: #374151; }
-        .order input {
-          width: 70px; height: 32px;
-          border: 1px solid #e5e7eb; border-radius: 6px;
-          padding: 0 8px; text-align: center;
+          display: flex; align-items: center; justify-content: flex-end;
+          gap: 8px; margin-top: 6px; white-space: nowrap;
         }
 
         .actions { display: flex; justify-content: center; gap: 8px; margin-top: 8px; }
