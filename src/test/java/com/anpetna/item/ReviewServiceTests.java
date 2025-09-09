@@ -111,11 +111,28 @@ class ReviewServiceImplIT {
 
     private ItemEntity createAndSaveItem() {
         ItemEntity it = new ItemEntity();
-        // NOT NULL 필드 자동 채우기
-        fillRequiredFields(it);
-        it = itemRepository.save(it);
-        return it;
+        // latest_date 필요 시
+        try {
+            ItemEntity.class.getMethod("setLatestDate", LocalDateTime.class)
+                    .invoke(it, LocalDateTime.now());
+        } catch (NoSuchMethodException ignored) {
+            // BaseEntity @PrePersist로 처리되는 경우
+        } catch (Exception e) {
+            throw new RuntimeException("latestDate 세팅 실패", e);
+        }
+
+        it.setItemName("dummy_name");
+        it.setItemDetail("dummy_detail");
+        it.setItemPrice(1000);
+        it.setItemStock(10);
+        it.setItemCategory(com.anpetna.item.constant.ItemCategory.FEED);
+        it.setItemSellStatus(com.anpetna.item.constant.ItemSellStatus.SELL);
+        it.setItemSaleStatus(0);
+
+        return itemRepository.save(it);
     }
+
+
 
     private static void invokeSetter(Object target, String method, Class<?> pType, Object val) {
         try {

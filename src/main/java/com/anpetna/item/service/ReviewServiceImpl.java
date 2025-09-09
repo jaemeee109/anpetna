@@ -73,6 +73,7 @@ public class ReviewServiceImpl implements ReviewService {
         // 4) 신뢰할 수 없는 필드 오버라이드(보안): 반드시 서버에서 지정
         reqEntity.setItemId(item);
         reqEntity.setMemberId(member);
+        reqEntity.setRegDate(java.time.LocalDateTime.now());
 
         // 5) 저장
         ReviewEntity saved = reviewRepository.save(reqEntity);
@@ -124,7 +125,7 @@ public class ReviewServiceImpl implements ReviewService {
         var originalItem   = found.getItemId();   // 소속 고정
         var originalMember = found.getMemberId(); // 작성자 고정
 
-        reviewMapper.uReviewMapReq().map(req, found); // null 값 처리 정책은 매퍼 설정을 따름(현재 규격 유지)
+        reviewMapper.uReviewMapReq().map(req, found);
 
         // 안전장치: 클라가 item/member를 바꾸려 해도 원래 값 유지
         found.setItemId(originalItem);
