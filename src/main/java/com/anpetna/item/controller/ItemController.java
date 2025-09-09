@@ -99,7 +99,7 @@ public class ItemController {
     }
 
     //실무에서는 정렬/필터 조건이 많아지면 POST로 바꾸는 게 보통 관행
-    @GetMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     public ApiResult<PageResponseDTO<SearchAllItemsRes>> searchAllItems(@ModelAttribute SearchAllItemsReq getReq) {
         var getAllResult = itemService.getAllItems(getReq);
         return new ApiResult<>(getAllResult);

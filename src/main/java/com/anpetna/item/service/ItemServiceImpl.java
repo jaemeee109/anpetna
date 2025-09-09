@@ -29,6 +29,8 @@ import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -72,26 +74,30 @@ public class ItemServiceImpl implements ItemService {
 
         // 3. 썸네일 수정
         MultipartFile thumb = req.getNewThumb();
-        log.info(req);
         if(thumb!=null && !thumb.isEmpty()){
             // 삭제
             fileService.deleteFile(req.getExistingThumb());
-            item.getImages().remove(0);
+            if (!item.getImages().isEmpty()) {
+                item.getImages().remove(0);
+            }
             // 추가
             ImageDTO newImg = fileService.uploadFile(thumb, 0);
-            log.info(newImg.getFileName(),newImg.getSortOrder());
             ImageEntity newImage = modelMapper.map(newImg, ImageEntity.class);
-            log.info(newImage.getFileName(), newImage.getSortOrder(), newImage.getItem());
             item.setImage(newImage,0);
         }
 
         // 4. 기존 이미지 삭제 (삭제 대상 찾기 -> Entity -> Storage)
         List<ExistingImageDTO> existings = req.getExistingImages();
         if (existings != null && !existings.isEmpty()) {
-            List<String> existFileNames = existings.stream().map(ExistingImageDTO::getFileName).toList();
+            Set<String> keep = existings.stream()
+                    .map(ExistingImageDTO::getFileName)
+                    .collect(Collectors.toSet());
 
+            //** 썸네일은 항상 분리 관리되어 상세 삭제/정렬과 충돌하지 않습니다.
+            // (기존 문제가 발생한 원인 코드: 전체 이미지에서 keep 비교로 일괄 삭제를 수행하던 부분)
             List<ImageEntity> toDelete = item.getImages().stream()
-                    .filter(img -> !existFileNames.contains(img.getFileName()))
+                    .filter(img -> (img.getSortOrder() == null ? 1 : img.getSortOrder()) >= 1)
+                    .filter(img -> !keep.contains(img.getFileName()))
                     .toList();
             item.getImages().removeAll(toDelete);
 
@@ -106,11 +112,13 @@ public class ItemServiceImpl implements ItemService {
                         .ifPresent(img -> img.setSortOrder(existing.getSortOrder()));
             }
         }else { //null 또는 빈 리스트
-            List<ImageEntity> toDelete = item.getImages().subList(1, item.getImages().size());
-            item.getImages().removeAll(toDelete);
+            if (item.getImages().size() > 1) {
+                List<ImageEntity> toDelete = item.getImages().subList(1, item.getImages().size());
+                item.getImages().removeAll(toDelete);
 
-            for (ImageEntity delete : toDelete) {
-                fileService.deleteFile(delete.getFileName());
+                for (ImageEntity delete : toDelete) {
+                    fileService.deleteFile(delete.getFileName());
+                }
             }
         }
 
