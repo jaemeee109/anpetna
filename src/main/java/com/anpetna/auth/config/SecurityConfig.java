@@ -112,7 +112,10 @@ public class SecurityConfig {
 
 
                         // --- Cart ---
-                        .requestMatchers("/cart/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/cart").hasRole("USER")
+                        .requestMatchers(HttpMethod.GET, "/cart").hasRole("USER")
+                        .requestMatchers(HttpMethod.PUT, "/cart/**").hasRole("USER")
+                        .requestMatchers(HttpMethod.DELETE, "/cart/**").hasRole("USER")
 
                         // --- Order ---
                         .requestMatchers("/order/**").permitAll()
