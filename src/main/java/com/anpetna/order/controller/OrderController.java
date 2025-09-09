@@ -22,7 +22,7 @@ import java.util.Map;
 
 @Validated // ✅ PathVariable/RequestParam 검증 활성화
 @RestController
-@RequestMapping("/api/orders")
+@RequestMapping("/order")
 @RequiredArgsConstructor
 public class OrderController {
 
