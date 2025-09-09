@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
+import { useAddCart } from '@/features/cart/hooks/useCart';
 
 /** 가격 포맷(1,000 단위 + 원) */
 function formatPriceKRW(n?: number) {
@@ -131,7 +132,7 @@ export default function ItemDetailPage() {
   const [qty, setQty] = useState<number>(1);
 
   const IMG_BASE = resolveImgBase();
-
+const addMut = useAddCart();
   useEffect(() => setIsAdmin(isAdminClient()), []);
 
   // 상세 조회
@@ -299,8 +300,9 @@ export default function ItemDetailPage() {
             <button
               type="button"
               className="btn-3d btn-white btn-cta rounded border"
-              onClick={() => alert('장바구니 기능은 아직 연결되지 않았습니다.')}
-            >
+              onClick={() => addMut.mutate({ itemId: Number(id), quantity: Math.max(1, Number(qty || 1)) })}
+  disabled={addMut.isPending}
+>
               장바구니
             </button>
             <button

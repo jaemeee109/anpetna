@@ -55,19 +55,69 @@ function isExpiredJwt(token: string): boolean {
   return p.exp <= nowSec;
 }
 
-/** localStorage에서 토큰 얻기(만료면 null 반환) */
+/** 쿠키 읽기 */
+function getCookie(name: string): string {
+  try {
+    if (typeof document === "undefined") return "";
+    const m = document.cookie.match(
+      new RegExp("(?:^|;\\s*)" + name.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&") + "=([^;]+)")
+    );
+    return m ? decodeURIComponent(m[1]) : "";
+  } catch {
+    return "";
+  }
+}
+
+/** 쿠키 제거(선택) */
+function clearCookie(name: string) {
+  try {
+    if (typeof document === "undefined") return;
+    document.cookie = `${encodeURIComponent(name)}=; Max-Age=0; path=/`;
+  } catch {}
+}
+
+/** 다양한 저장소(local/session/cookie)에서 토큰 획득 + 만료 시 정리 */
+function pickRawTokenFromStores(): string | null {
+  // 1) localStorage
+  try {
+    const l1 = localStorage.getItem("accessToken");
+    const l2 = localStorage.getItem("Authorization");
+    if (l1) return l1;
+    if (l2) return l2;
+  } catch {}
+
+  // 2) sessionStorage
+  try {
+    const s1 = sessionStorage.getItem("accessToken");
+    const s2 = sessionStorage.getItem("Authorization");
+    if (s1) return s1;
+    if (s2) return s2;
+  } catch {}
+
+  // 3) cookie (accessToken 쿠키)
+  const c1 = getCookie("accessToken");
+  if (c1) return c1;
+
+  // 4) 기타 관용 키
+  try {
+    const l3 = localStorage.getItem("access_token");
+    if (l3) return l3;
+    const s3 = sessionStorage.getItem("access_token");
+    if (s3) return s3;
+  } catch {}
+
+  return null;
+}
+
+/** local/session/cookie에서 토큰 얻기(만료면 정리 후 null 반환) */
 export function getAccessToken(): string | null {
   if (typeof window === "undefined") return null;
 
-  const raw =
-    localStorage.getItem("accessToken") ??
-    localStorage.getItem("Authorization") ??
-    null;
-
-  if (!raw) return null;
+  const raw0 = pickRawTokenFromStores();
+  if (!raw0) return null;
 
   // 'Bearer xxx' 형태로 저장돼 있을 수도 있음
-  const token = raw.startsWith("Bearer ") ? raw.slice(7) : raw;
+  const token = raw0.startsWith("Bearer ") ? raw0.slice(7) : raw0;
 
   // 만료면 제거하고 null
   if (isExpiredJwt(token)) {
@@ -75,6 +125,11 @@ export function getAccessToken(): string | null {
       localStorage.removeItem("accessToken");
       localStorage.removeItem("Authorization");
     } catch {}
+    try {
+      sessionStorage.removeItem("accessToken");
+      sessionStorage.removeItem("Authorization");
+    } catch {}
+    clearCookie("accessToken");
     return null;
   }
   return token;
@@ -84,13 +139,20 @@ export function getAccessToken(): string | null {
 export function setAccessToken(token: string | null) {
   if (typeof window === "undefined") return;
   if (token) {
-    localStorage.setItem(
-      "accessToken",
-      token.startsWith("Bearer ") ? token.slice(7) : token
-    );
+    const pure = token.startsWith("Bearer ") ? token.slice(7) : token;
+    try {
+      localStorage.setItem("accessToken", pure);
+    } catch {}
   } else {
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("Authorization");
+    try {
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("Authorization");
+    } catch {}
+    try {
+      sessionStorage.removeItem("accessToken");
+      sessionStorage.removeItem("Authorization");
+    } catch {}
+    clearCookie("accessToken");
   }
 }
 
@@ -117,7 +179,7 @@ instance.interceptors.request.use((config: InternalAxiosRequestConfig) => {
       const token = getAccessToken();
       if (token) headers.Authorization = toBearer(token);
     }
-    // 인증 호출은 기본값 유지
+    // 인증 호출은 기본값 유지(withCredentials=true)
   } else {
     // ✅ 비인증 호출: 헤더/쿠키 모두 제거
     delete headers.Authorization;
