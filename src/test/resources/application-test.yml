@@ -1,0 +1,31 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:anpetna;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver   # ← 표준 키로 정리 (driverClassName 도 동작하지만 권장 표기)
+  jpa:
+    hibernate:
+      ddl-auto: create                 # 테스트 시 매번 깨끗한 스키마
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+        hbm2ddl.drop_constraints: false
+
+# 보안/JWT (코드에서 @Value("${jwt.*}") 또는 @ConfigurationProperties("jwt")로 읽는지 확인)
+jwt:
+  secret: ZHVtbXktMzJieXRlcy1hdC1sZWFzdC1iYXNlNjQtc2VjcmV0LXNlZWQ=
+  access-exp-ms: 900000        # 15분
+  refresh-exp-ms: 1209600000   # 14일
+
+# --- 아래는 선택(디버깅 편의) -----------------------------
+# H2 콘솔을 테스트 중 열어보고 싶을 때
+# spring:
+#   h2:
+#     console:
+#       enabled: true
+#       path: /h2-console
+#
+# 401/403 등 보안 이슈 디버깅 시
+# logging:
+#   level:
+#     org.springframework.security: DEBUG
+

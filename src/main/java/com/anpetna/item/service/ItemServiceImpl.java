@@ -77,9 +77,8 @@ public class ItemServiceImpl implements ItemService {
         if(thumb!=null && !thumb.isEmpty()){
             // 삭제
             fileService.deleteFile(req.getExistingThumb());
-            if (!item.getImages().isEmpty()) {
-                item.getImages().remove(0);
-            }
+            item.getImages().remove(0);
+
             // 추가
             ImageDTO newImg = fileService.uploadFile(thumb, 0);
             ImageEntity newImage = modelMapper.map(newImg, ImageEntity.class);
@@ -89,21 +88,20 @@ public class ItemServiceImpl implements ItemService {
         // 4. 기존 이미지 삭제 (삭제 대상 찾기 -> Entity -> Storage)
         List<ExistingImageDTO> existings = req.getExistingImages();
         if (existings != null && !existings.isEmpty()) {
-            Set<String> keep = existings.stream()
+            List<String> keep = existings.stream()
                     .map(ExistingImageDTO::getFileName)
-                    .collect(Collectors.toSet());
+                    .toList();  //순서 보장을 위해 List 처리
 
-            //** 썸네일은 항상 분리 관리되어 상세 삭제/정렬과 충돌하지 않습니다.
-            // (기존 문제가 발생한 원인 코드: 전체 이미지에서 keep 비교로 일괄 삭제를 수행하던 부분)
+            //ImageEntity에서 썸네일 제외, keep에 포함되어 있으면 제외
             List<ImageEntity> toDelete = item.getImages().stream()
-                    .filter(img -> (img.getSortOrder() == null ? 1 : img.getSortOrder()) >= 1)
+                    .filter(img -> img.getSortOrder()>= 1) // 입력시 sort 입력하므로 유무 검증은 안 해도 됨.
                     .filter(img -> !keep.contains(img.getFileName()))
                     .toList();
             item.getImages().removeAll(toDelete);
-
             for (ImageEntity delete : toDelete) {
                 fileService.deleteFile(delete.getFileName());
             }
+
             // 5. 기존 이미지 정렬 조건 업데이트
             for(ExistingImageDTO existing : existings){
                 item.getImages().stream()

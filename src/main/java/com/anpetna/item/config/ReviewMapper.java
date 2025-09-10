@@ -8,6 +8,7 @@ import com.anpetna.item.dto.modifyReview.ModifyReviewReq;
 import com.anpetna.item.dto.registerReview.RegisterReviewReq;
 import com.anpetna.item.dto.searchOneReview.SearchOneReviewRes;
 import lombok.RequiredArgsConstructor;
+import org.modelmapper.Conditions;
 import org.modelmapper.ModelMapper;
 import org.modelmapper.TypeMap;
 import org.springframework.stereotype.Component;

@@ -18,7 +18,7 @@ public class ModifyReviewReq {
 
     private int rating;
 
-    private ItemDTO itemId;
+    private Long itemId;
 
 
 }
