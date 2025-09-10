@@ -112,8 +112,7 @@ public class CartServiceImpl implements CartService{
 
         // cartPage 안에 있는 CartEntity 목록을 꺼내 각각의 ItemEntity를 꺼낸 후 ItemDTO로 변환해 리스트에 넣는다.
         List<ItemDTO> items = cartPage.getContent().stream()
-                .map(CartEntity::getItem)
-                .map(item -> toItemDTO(item, includeImages))
+                .map(cart -> toItemDTO(cart, includeImages))
                 .toList();
 
         CartSummaryDTO summary = buildSummary(memberId);
@@ -188,10 +187,13 @@ public class CartServiceImpl implements CartService{
             return modelMapper.map(item, ItemDTO.class);
     }
 
-    private ItemDTO toItemDTO(ItemEntity item, boolean includeImages) {
+    private ItemDTO toItemDTO(CartEntity cart, boolean includeImages) {
+        ItemEntity item = cart.getItem();
         ItemDTO dto = modelMapper.map(item, ItemDTO.class);
 
         if (includeImages) { dto.setThumbnails(extractThumbnails(item)); }
+
+        dto.setQuantity(cart.getQuantity());
 
         return dto;
     }
