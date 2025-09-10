@@ -108,10 +108,12 @@ public class CartServiceImpl implements CartService{
         // fetch join 적용된 페이징 메서드 사용
         Page<CartEntity> cartPage = cartRepository.findPageWithFetchJoinByMemberId(memberId, pageable);
 
+        boolean includeImages = request.isIncludeImages();
+
         // cartPage 안에 있는 CartEntity 목록을 꺼내 각각의 ItemEntity를 꺼낸 후 ItemDTO로 변환해 리스트에 넣는다.
         List<ItemDTO> items = cartPage.getContent().stream()
                 .map(CartEntity::getItem)
-                .map(this::toItemDTO)
+                .map(item -> toItemDTO(item, includeImages))
                 .toList();
 
         CartSummaryDTO summary = buildSummary(memberId);
@@ -183,8 +185,100 @@ public class CartServiceImpl implements CartService{
     }
 
     private ItemDTO toItemDTO(ItemEntity item) {
-        return modelMapper.map(item, ItemDTO.class);
+            return modelMapper.map(item, ItemDTO.class);
     }
+
+    private ItemDTO toItemDTO(ItemEntity item, boolean includeImages) {
+        ItemDTO dto = modelMapper.map(item, ItemDTO.class);
+
+        if (includeImages) { dto.setThumbnails(extractThumbnails(item)); }
+
+        return dto;
+    }
+
+    private List<String> extractThumbnails(ItemEntity item) {
+        try {
+
+            var method = item.getClass().getMethod("getThumbnails");
+            Object val = method.invoke(item);
+            if (val instanceof List<?> list) {
+                // 문자열 리스트만 선별
+                List<String> asString = list.stream()
+                        .filter(Objects::nonNull)
+                        .filter(o -> o instanceof String)
+                        .map(o -> (String) o)
+                        .toList();
+                if (!asString.isEmpty()) return asString;
+            }
+        } catch (NoSuchMethodException ignore) {
+            // thumbnails 게터가 없는 경우 -> images로 유도
+        } catch (Exception e) {
+            // 리플렉션 실패 시 images로 유도
+        }
+
+        // 2) images(예: List<ImageEntity>)에서 유도
+        //    아래는 필드명이 다를 수 있으니 프로젝트 상황에 맞게 한 번만 손봐주세요.
+        if (item.getImages() == null || item.getImages().isEmpty()) {
+            return List.of();
+        }
+
+        // (A) 썸네일 플래그가 있다면 그걸 우선
+        // boolean isThumbnail(), getUrl() 라고 가정
+        List<String> byFlag = item.getImages().stream()
+                .filter(Objects::nonNull)
+                .filter(img -> {
+                    try {
+                        var m = img.getClass().getMethod("isThumbnail");
+                        Object v = m.invoke(img);
+                        return v instanceof Boolean b && b;
+                    } catch (Exception e) {
+                        return false;
+                    }
+                })
+                .map(img -> {
+                    try {
+                        var m = img.getClass().getMethod("getUrl");
+                        Object v = m.invoke(img);
+                        return (v instanceof String s) ? s : null;
+                    } catch (Exception e) {
+                        return null;
+                    }
+                })
+                .filter(Objects::nonNull)
+                .toList();
+
+        if (!byFlag.isEmpty()) return byFlag;
+
+        // (B) 플래그가 없다면 정렬 기준(예: sortOrder)로 첫 1~N장 추출
+        // int getSortOrder(), String getUrl() 라고 가정
+        return item.getImages().stream()
+                .filter(Objects::nonNull)
+                .sorted((a, b) -> {
+                    try {
+                        var ma = a.getClass().getMethod("getSortOrder");
+                        var mb = b.getClass().getMethod("getSortOrder");
+                        Object va = ma.invoke(a);
+                        Object vb = mb.invoke(b);
+                        int ia = (va instanceof Integer i) ? i : Integer.MAX_VALUE;
+                        int ib = (vb instanceof Integer i) ? i : Integer.MAX_VALUE;
+                        return Integer.compare(ia, ib);
+                    } catch (Exception e) {
+                        return 0;
+                    }
+                })
+                .map(img -> {
+                    try {
+                        var m = img.getClass().getMethod("getUrl");
+                        Object v = m.invoke(img);
+                        return (v instanceof String s) ? s : null;
+                    } catch (Exception e) {
+                        return null;
+                    }
+                })
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
 
     // 장바구니 정보 CartSummaryDTO 빌드하기
     private CartSummaryDTO buildSummary(String memberId) {
