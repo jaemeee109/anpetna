@@ -48,8 +48,8 @@ function pickImagePath(it: CartItemDTO): string {
   return (
     any?.imageUrl ||
     any?.thumbnailUrl ||
-    any?.item?.thumbnailUrl ||
-    // 서버가 images 배열을 내려주는 케이스
+    any?.thumbnails?.[0] ||
+    any?.item?.thumbnails?.[0] ||
     any?.images?.[0]?.url ||
     any?.item?.images?.[0]?.url ||
     ''
@@ -63,7 +63,7 @@ export default function CartPage() {
 
   const IMG_BASE = resolveImgBase();
 
-  // ✅ 선택 상태: itemId 기준으로 관리(백엔드 아이템 중심 DTO 구조)
+  // ✅ 선택 상태: itemId 기준으로 관리
   const [selected, setSelected] = useState<Set<number>>(new Set());
 
   // 장바구니 로딩/갱신 시 초기값(전체선택)
@@ -80,10 +80,10 @@ export default function CartPage() {
     return total > 0 && selected.size === total;
   }, [cart?.items, selected]);
 
-  // (9) 총 n건: 선택된 itemId 개수
+  // (9) 총 n건
   const selectedCount = selected.size;
 
-  // (10) 선택된 카드들의 (수량×단가) 합
+  // (10) 선택 합계
   const selectedTotal = useMemo(() => {
     if (!cart?.items) return 0;
     return cart.items.reduce((sum, it) => {
@@ -105,14 +105,11 @@ export default function CartPage() {
   // (2) 전체선택 토글
   const toggleAll = () => {
     if (!cart?.items?.length) return;
-    if (allSelected) {
-      setSelected(new Set());
-    } else {
-      setSelected(new Set(cart.items.map((it) => it.itemId)));
-    }
+    if (allSelected) setSelected(new Set());
+    else setSelected(new Set(cart.items.map((it) => it.itemId)));
   };
 
-  // (6) 수량 변경 (최소 1) → itemId 기준으로 업데이트
+  // (6) 수량 변경
   const changeQty = (it: CartItemDTO, delta: -1 | 1) => {
     const current = Math.max(1, Number(it.quantity) || 1);
     const next = Math.max(1, current + delta);
@@ -120,7 +117,7 @@ export default function CartPage() {
     updateMut.mutate({ itemId: it.itemId, quantity: next });
   };
 
-  // (4)(16) 선택된 항목만 삭제 (itemId 기준)
+  // (4)(16) 선택 삭제
   const handleDeleteSelected = async () => {
     if (!cart?.items?.length || selected.size === 0) return;
     const targets = cart.items.filter((it) => selected.has(it.itemId));
@@ -132,25 +129,26 @@ export default function CartPage() {
     setSelected(new Set());
   };
 
-  // 이미지 URL 안전 처리(상대경로 보정) — 여러 후보 필드를 지원
+  // 이미지 URL 보정
   const imgSrc = (it: CartItemDTO) => {
     const candidate = pickImagePath(it);
     const abs = toAbs(candidate, IMG_BASE);
     return abs || '/file.svg';
   };
 
-  // (1) 본문 전체 가운데정렬 컨테이너
+  // (1) 본문 컨테이너 너비 고정 — 본문 폭은 여기에서만 조정 (카드 폭과 무관)
+  //    ▶ 원하는 폭으로 바꿔 사용: w-[750px] → w-[900px] 등
   return (
-    <main className="mx-auto max-w-4xl px-4">
+    <main className="mx-auto w-[750px] px-4">
       <h1 className="text-2xl font-semibold text-center mt-6 mb-4">
         CART&nbsp;<PawIcon />
       </h1>
 
       {/* 상단 회색 실선 */}
-      <hr className="border-gray-300" />
+      <hr className="apn-hr" />
 
-      {/* (2) 전체선택: 왼쪽 정렬 */}
-      <div className="flex items-center gap-2 py-3">
+      {/* (2) 전체선택 */}
+      <div className="flex items-center gap-2 py-3 mt-[20px] mb-[30px]">
         <input
           id="check-all"
           type="checkbox"
@@ -162,8 +160,7 @@ export default function CartPage() {
         </label>
       </div>
 
-      {/* 회색 실선 */}
-      <hr className="border-gray-300" />
+      
 
       {/* (18) 비어있을 때 */}
       {!isLoading && (!cart?.items || cart.items.length === 0) && (
@@ -171,81 +168,104 @@ export default function CartPage() {
       )}
 
       {/* (3) 상품 카드들 */}
-      <div className="flex flex-col gap-3 my-4">
+      <div className="flex flex-col gap-3 my-4 ">
         {cart?.items?.map((it, idx) => {
           const lineTotal = (Number(it.price) || 0) * (Number(it.quantity) || 0);
           const isChecked = selected.has(it.itemId);
-          // 고유 key: itemId → 보조로 idx
           const _key = it.itemId ?? `idx-${idx}`;
           return (
-            <section key={_key} className="apn-card p-3">
-              <div className="flex items-stretch gap-3">
-                {/* 상품 선택 체크박스 */}
-                <div className="pt-2">
-                  <input
-                    type="checkbox"
-                    checked={isChecked}
-                    onChange={() => toggleOne(it.itemId)}
-                  />
-                </div>
-                
-                {/* (5) 고정 크기 이미지 */}
-                <div
-                  className="shrink-0 overflow-hidden border border-gray-200 rounded-lg"
-                  style={{ width: 120, height: 120 }}
-                >
+            /**
+             * ▶ (1)(2) 상품카드 크기 별개/고정
+             * - 카드의 가로/세로 고정은 .cart-card 클래스에서 조정 (아래 style 블록)
+             * - 필요 시 아래 className에서 w-[…], h-[…]로 직접 줄 수도 있음 (권장은 .cart-card에서 통합 관리)
+             */
+            <section key={_key} className="apn-card cart-card p-3">
+              {/* ✅ 카드 상단 한 줄 전체를 체크박스가 차지 */}
+              <div className="pb-2">
+                {/**
+                 * ▶ (3) 체크박스 크기 조절: .card-check 에서 scale/size 조정
+                 */}
+                <input
+                  type="checkbox"
+                  className="card-check"
+                  checked={isChecked}
+                  onChange={() => toggleOne(it.itemId)}
+                />
+              </div>
+
+              {/* 본문 행 */}
+              <div className="flex items-stretch gap-3 h-[calc(100%-36px)]">
+                {/**
+                 * ▶ (4) 썸네일 크기 조절: .card-thumb에서 가로/세로 조정
+                 *   - 아래 <Image>의 width/height 숫자도 .card-thumb의 값과 동일하게 맞춰줄 것
+                 */}
+                <div className="card-thumb shrink-0 overflow-hidden rounded-lg ml-[15px] mr-[15px]">
                   <Image
                     src={imgSrc(it)}
                     alt={it?.name ? `${it.name} 썸네일` : '상품 이미지'}
-                    width={120}
-                    height={120}
-                    className="object-cover w-[120px] h-[120px]"
+                    width={140}   /* ← 썸네일 가로(px) — .card-thumb와 일치시킬 것 */
+                    height={140}  /* ← 썸네일 세로(px) — .card-thumb와 일치시킬 것 */
+                    className="object-cover w-full h-full"
                     unoptimized
                   />
                 </div>
-                
-                {/* 상품명/가격 */}
-                <div className="flex-1 min-w-0 flex flex-col justify-between py-1">
-                  <div className="font-medium leading-6 line-clamp-2" title={it.name}>
-                    {it.name}
-                  </div>
-                  <div className="text-sm text-gray-600 mt-1">
-                    {formatKRW(Number(it.price) || 0)}원
-                  </div>
-                </div>
 
-                   <div className="h-3 border-l border-gray-300 mt-[10px] mb-[10px]"></div>
+                {/* 이미지 제외 영역: 가운데 세로선 고정 + 우측 반영역 중앙 정렬 */}
+                <div className="flex-1 relative">
+                  <div className="apn-vline-abs" />
 
-                {/* 수량/금액 영역 */}
-                <div className="w-[160px] flex flex-col items-center justify-between py-1">
-                  {/* 수량 */}
-                  <div className="text-sm text-gray-600">수량</div>
-                  <div className="mt-1 inline-flex items-center gap-2">
-                    <button
-                      type="button"
-                      className="btn-3d btn-white px-2 py-1 text-sm"
-                      onClick={() => changeQty(it, -1)}
-                      disabled={updateMut.isPending}
-                      aria-label="수량 감소"
-                    >
-                      −
-                    </button>
-                    <span className="px-2 tabular-nums">{Number(it.quantity) || 0}</span>
-                    <button
-                      type="button"
-                      className="btn-3d btn-white px-2 py-1 text-sm"
-                      onClick={() => changeQty(it, +1)}
-                      disabled={updateMut.isPending}
-                      aria-label="수량 증가"
-                    >
-                      +
-                    </button>
-                  </div>
+                  {/* 좌/우 2등분 */}
+                  <div className="grid grid-cols-2 h-full">
+                    {/**
+                     * ▶ (5) 상품명/금액 타이포/여백/정렬 조정:
+                     *   - .info-name / .info-price (글자 크기/줄수/두께/여백)
+                     *   - .info-box(좌측 컨테이너 패딩/정렬)
+                     */}
+                    <div className="info-box min-w-0 flex items-start">
+                      <div>
+                        <div className="info-name" title={it.name}>
+                          {it.name}
+                        </div>
+                        <div className="info-price">
+                          {formatKRW(Number(it.price) || 0)}원
+                        </div>
+                      </div>
+                    </div>
 
-                  {/* 금액 */}
-                  <div className="mt-3 text-sm text-gray-600">금액</div>
-                  <div className="text-2xl font-extrabold tabular-nums">
-                    {formatKRW(lineTotal)} <span className="text-base font-semibold">원</span>
+                    {/* 우측: 수량/금액 — 오른쪽 절반 중앙 정렬 */}
+                    <div className="py-1 pl-6 flex flex-col items-center justify-start gap-3 mt-[10px]">
+                      <div>
+                        <div className="qty-label text-center">수량</div>
+                        <div className="qty-box mt-1">
+                          <button
+                            type="button"
+                            className="qty-btn"
+                            onClick={() => changeQty(it, -1)}
+                            disabled={updateMut.isPending}
+                            aria-label="수량 감소"
+                          >
+                            −
+                          </button>
+                          <span className="qty-num">{Number(it.quantity) || 0}</span>
+                          <button
+                            type="button"
+                            className="qty-btn"
+                            onClick={() => changeQty(it, +1)}
+                            disabled={updateMut.isPending}
+                            aria-label="수량 증가"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="text-center mt-[13px]">
+                        <div className="amt-label">금액</div>
+                        <div className="amt-strong">
+                          {formatKRW(lineTotal)} <span className="amt-won">원</span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -254,20 +274,19 @@ export default function CartPage() {
         })}
       </div>
 
-      {/* 하단 회색 실선 */}
-      <hr className="border-gray-300" />
+      
 
-      {/* (13) 총 n건 주문금액 ___원 : 1줄 굵은 텍스트, 가운데 정렬 */}
-      <div className="text-center my-6 text-2xl font-bold">
-        총 <span className="tabular-nums">{selectedCount}</span>건&nbsp;&nbsp;
-        주문금액 <span className="tabular-nums">{formatKRW(selectedTotal)}</span>원
+      {/* (4) 총 n건 주문금액 — 글씨 크기 조절은 .cart-summary 에서 */}
+      <div className="cart-summary text-center my-6 mt-[30px] font-bold">
+       <b> 총 </b><span className="tabular-nums">{selectedCount}</span><b>건</b>&nbsp;&nbsp;
+        <b>주문금액</b> <span className="tabular-nums">{formatKRW(selectedTotal)}</span><b>원</b>
       </div>
 
-      {/* (14)(4) 버튼: 가운데 정렬 + 선택된 항목만 동작 */}
-      <div className="flex justify-center gap-3 mb-8">
+      {/* 버튼 */}
+      <div className="flex justify-center gap-[10px] mt-[20px] mb-[20px]">
         <button
           type="button"
-          className="btn-3d btn-white px-4 py-2"
+          className="btn-3d btn-white w-[120px] px-4 py-2"
           disabled={selected.size === 0}
           onClick={() => {
             if (selected.size === 0) return;
@@ -278,7 +297,7 @@ export default function CartPage() {
         </button>
         <button
           type="button"
-          className="btn-3d btn-white px-4 py-2"
+          className="btn-3d btn-white w-[120px] px-4 py-2"
           disabled={selected.size === 0 || removeMut.isPending}
           onClick={handleDeleteSelected}
         >
@@ -287,10 +306,12 @@ export default function CartPage() {
       </div>
 
       {/* 회색 실선 */}
-      <hr className="border-gray-300" />
+      <hr className="apn-hr" />
 
-      {/* 안내 문구 */}
-      <ul className="text-sm text-gray-600 my-6 leading-6 list-disc list-inside">
+      {/**
+       * ▶ (6) 장바구니 설명 리스트 글씨 색/크기 조절은 .cart-notes / .cart-notes li 에서
+       */}
+      <ul className="cart-notes my-6 mt-[20px] mb-[50px]">
         <li>장바구니에 최대 00개의 상품을 담을 수 있습니다.</li>
         <li>장바구니 상품은 최대 00일간 저장됩니다.</li>
         <li>장바구니에 담긴 상품은 옵션 또는 추가상품 단위로 최대 100개의 상품만 동시 주문할 수 있습니다.</li>
@@ -299,25 +320,142 @@ export default function CartPage() {
         <li>장바구니에 배송비는 표기되지 않으며, 주문 시 구매 금액이나 주문 주소지에 따라 추가 됩니다.</li>
       </ul>
 
-      {/* 이 페이지 한정 스타일: 기존 UI 톤과 맞춘 3D 버튼/카드 */}
+      {/* 이 페이지 한정 스타일 (요청한 항목들 조절 지점에 전부 주석 처리) */}
       <style jsx global>{`
+        /* ----------------------------- 공통 버튼/카드 베이스 ----------------------------- */
         .btn-3d {
           border: 1px solid #e5e7eb;
           box-shadow: 0 2px 0 rgba(0, 0, 0, 0.06);
           border-radius: 12px;
           transition: transform 0.02s ease-in-out;
         }
-        .btn-3d:active {
-          transform: translateY(1px);
-        }
-        .btn-white {
-          background: #ffffff;
-        }
+        .btn-3d:active { transform: translateY(1px); }
+        .btn-white { background: #ffffff; }
+
         .apn-card {
           background: #ffffff;
           border: 1px solid #e5e7eb;
           border-radius: 16px;
           box-shadow: 0 2px 0 rgba(0, 0, 0, 0.06);
+          overflow: hidden;  /* 썸네일이 카드 밖으로 보이지 않게 */
+        }
+
+        /* ----------------------------- (6) 실선 색상 조절 ----------------------------- */
+        .apn-hr { border-color: #f0f0f0ff; } /* 필요 시 한 번에 변경 */
+        .apn-vline-abs {
+          position: absolute;
+          top: 10px;
+          bottom: 20px;
+          left: 50%;
+          transform: translateX(-50%);
+          border-left: 1px solid #d9d9df; /* 필요 시 색 조정 */
+          pointer-events: none;
+        }
+
+        /* ----------------------------- (1)(2) 카드 크기 별개/고정 ----------------------------- */
+        /* ▶ 여기서 "본문과 별개로" 카드 가로/세로를 고정한다 */
+        .cart-card {
+          width: 650px;    /* ← 카드 가로 고정(px). 본문 폭과 무관. 원하는 값으로 변경 */
+          height: 200px;   /* ← 카드 세로 고정(px). auto 금지 요구 반영 */
+          margin: 0 auto;  /* 카드 자체 가운데 정렬 */
+          margin-bottom: 20px;
+          display: block;
+        }
+
+        /* ----------------------------- (3) 체크박스 크기 조절 ----------------------------- */
+        /* 방법 A) 스케일로 확대/축소 (가장 호환성 좋음) */
+        .card-check {
+          transform: scale(1.2); /* ← 체크박스 크기 배율. 1.0~2.0 사이로 조정 */
+          transform-origin: top left;
+          margin-left: 10px;
+          margin-top: 10px;
+          margin-bottom: 10px;
+        }
+        /* 방법 B) 실제 사이즈 지정 (브라우저별 차이 존재) */
+        /* .card-check { width: 30px; height: 30px; } */
+
+        /* ----------------------------- (4) 썸네일 크기 조절 ----------------------------- */
+        /* ▶ 아래 값 변경 시, 위 <Image width/height> 숫자도 같은 값으로 수정 */
+        .card-thumb { 
+        width: 140px; 
+        height: 140px; 
+        margin-left: 20px;
+        margin-bottom:20px;
+        } /* ← 썸네일 가로/세로(px) */
+
+        /* ----------------------------- (5) 상품명/금액 타이포 & 여백/정렬 ----------------------------- */
+        .info-box { padding: 4px 16px 4px 0; } /* ← 좌측 텍스트 영역 여백 (top/right/bottom/left) */
+        .info-name {
+          font-size: 20px;    /* ← 상품명 글씨 크기 */
+          font-weight: 600;
+          line-height: 1.5;
+          display: -webkit-box;
+          -webkit-line-clamp: 2;   /* 2줄 말줄임 */
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+          margin-top: 20px;
+          margin-bottom: 15px;  /* ← 상품명과 가격 사이 간격 */
+          
+        }
+        .info-price {
+          font-size: 15px;     /* ← 상품 단가 글씨 크기 */
+          color: #4b5563;      /* text-gray-600 */
+          margint-left: 10px;
+        }
+
+        /* 수량 영역(버튼 3개는 기존 스타일 유지) */
+        .qty-label { font-size: 13px; color: #4b5563;}
+        .qty-box {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          border: none;  /* 외곽 큰 테두리 없앰 */
+          padding: 0;
+          background: transparent;
+        }
+        .qty-btn {
+          width: 26px; height: 26px;
+          line-height: 24px;
+          text-align: center;
+          border: 1px solid #e5e7eb;
+          border-radius: 6px;
+          background: #ffffff;
+          box-shadow: 0 2px 0 rgba(0,0,0,0.06);
+          font-size: 16px;
+        }
+        .qty-btn:active { transform: translateY(1px); }
+        .qty-num {
+          min-width: 24px;
+          text-align: center;
+          font-variant-numeric: tabular-nums;
+        }
+        .amt-label { margin-top: 6px; font-size: 13px; color: #4b5563; }
+        .amt-strong { font-size: 28px; font-weight: 800; font-variant-numeric: tabular-nums; }
+        .amt-won { font-size: 15px; font-weight: 700; }
+
+        /* ----------------------------- (4) 하단 요약 줄 크기 ----------------------------- */
+        .cart-summary { 
+        font-size: 21px; } /* ← 하단 "총 N건 주문금액" 글씨 크기 */
+
+        /* ----------------------------- (6) 설명 리스트 글씨/색/불릿 ----------------------------- */
+        .cart-notes {
+          /* 글씨 크기/색은 여기서 조정 */
+          font-size: 13px;     /* ← 설명 글씨 크기 */
+          color: #4b5563;      /* ← 설명 글씨 색 */
+          line-height: 1.6;
+          list-style: none;    /* 기본 불릿 제거 */
+          padding-left: 0;
+          
+        }
+        .cart-notes li { position: relative; padding-left: 14px; }
+        .cart-notes li::before {
+          content: '·';        /* 작은 점 불릿 */
+          position: absolute;
+          left: 0;
+          top: 0;
+          line-height: 1.2;
+          font-size: 18px;     /* 불릿 크기 */
+          color: #4b5563;      /* 불릿 색상 */
         }
       `}</style>
     </main>
