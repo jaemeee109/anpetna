@@ -308,10 +308,20 @@ const addMut = useAddCart();
             <button
               type="button"
               className="btn-3d btn-white btn-cta rounded border"
-              onClick={() => alert('주문하기 기능은 아직 연결되지 않았습니다.')}
-            >
-              주문하기
-            </button>
+              onClick={() => {
+      // 현재 페이지 params에서 [id] 추출
+      const m = location.pathname.match(/\/items\/(\d+)/);
+      const id = m ? Number(m[1]) : 0;
+      const q = 1; // 기본 수량 1 (필요 시 상세 페이지의 수량 상태값으로 교체)
+      if (id > 0) {
+        location.href = `/order/checkout?itemId=${id}&quantity=${q}`;
+      } else {
+        alert('상품 정보를 확인할 수 없습니다.');
+      }
+    }}
+  >
+    주문하기
+  </button>
           </div>
         </div>
       </section>

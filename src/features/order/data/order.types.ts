@@ -1,33 +1,31 @@
-export type OrderItemDTO = {
+// src/features/order/data/order.types.ts
+export type OrdersSummary = {
+  ordersId: number;
+  memberId: string;
+  totalAmount: number;
+  cardId?: string;
+  itemImageUrl?: string;
+  itemImageName?: string;
+  // 백 응답 필드 여유분
+  [k: string]: any;
+};
+
+export type OrdersListRes = {
+  content: OrdersSummary[];
+  totalElements: number;
+  totalPages: number;
+  number: number;  // 현재 페이지(0-base일 수 있어 프론트에서 +1 처리 권장)
+  size: number;
+};
+
+export type OrderItemView = {
   itemId: number;
+  name: string;
   price: number;
   quantity: number;
-  name?: string;
   imageUrl?: string;
 };
 
-export type OrdersDTO = {
-  ordersId: number;
-  memberId: string;
-  cardId?: string;
-  totalPrice: number;
-  itemQuantity: number;
-  createdAt?: string;
-  status?: "CREATED" | "PAID" | "CANCELLED" | "SHIPPED" | "DELIVERED";
-  items?: OrderItemDTO[];
-};
-
-export type CreateOrderReq = {
-  memberId: string;
-  items: { itemId: number; quantity: number; price?: number }[];
-  address?: {
-    zipcode?: string;
-    address1?: string;
-    address2?: string;
-  };
-  payment?: { cardId?: string; method?: string };
-};
-export type CreateOrderRes = { orders: OrdersDTO };
-
-export type OrdersDetailRes = { orders: OrdersDTO };
-export type OrdersListRes = { list: OrdersDTO[]; total?: number };
+export type CheckoutFromQuery =
+  | { mode: 'item'; itemId: number; quantity: number }
+  | { mode: 'cart'; itemIds: number[] };

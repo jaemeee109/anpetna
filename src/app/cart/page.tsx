@@ -284,17 +284,21 @@ export default function CartPage() {
 
       {/* 버튼 */}
       <div className="flex justify-center gap-[10px] mt-[20px] mb-[20px]">
-        <button
-          type="button"
-          className="btn-3d btn-white w-[120px] px-4 py-2"
-          disabled={selected.size === 0}
-          onClick={() => {
-            if (selected.size === 0) return;
-            alert('주문 페이지는 준비 중입니다');
-          }}
-        >
-          주문하기
-        </button>
+       <button
+  type="button"
+  className="btn-3d btn-white w-[120px] px-4 py-2"
+  onClick={() => {
+    const ids = Array.from(selected).map(Number);
+    if (!ids.length) {
+      alert('주문할 상품을 선택해 주세요.');
+      return;
+    }
+    location.href = `/order/checkout?cartItems=${ids.join(',')}`;
+  }}
+>
+  주문하기
+</button>
+
         <button
           type="button"
           className="btn-3d btn-white w-[120px] px-4 py-2"

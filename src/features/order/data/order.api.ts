@@ -1,46 +1,45 @@
-import { http } from "@/shared/data/http";
-import type {
-  CreateOrderReq, CreateOrderRes,
-  OrdersDetailRes, OrdersListRes,
-} from "./order.types";
+// src/features/order/data/order.api.ts
+import http from '@/shared/data/http';
+import { withPrefix } from '@/lib/api';
+import type { OrdersListRes, OrdersSummary } from './order.types';
 
-/** ApiResult<T> 래퍼 */
-type ApiResult<T> = {
-  isSuccess: boolean;
-  resCode: number;
-  resMessage: string;
-  result: T;
-};
-/** ApiResult<T> → T 언랩 */
-const unwrap = async <T>(p: Promise<{ data: ApiResult<T> }>) => {
-  const { data } = await p;
-  return data.result;
-};
+const BASE = withPrefix('/order'); // 백엔드 컨트롤러 base에 맞춤
 
-const BASE = "/orders";
+/** 회원별 주문 요약 페이지 조회: GET /order?memberId=...&page=&size= */
+async function summaryByMember(memberId: string, opts?: { page?: number; size?: number }): Promise<OrdersListRes> {
+  const page = Math.max(1, opts?.page ?? 1);
+  const size = Math.max(1, opts?.size ?? 10);
+  const { data } = await http.get(`${BASE}`, { params: { memberId, page, size } });
+  const result = data?.result ?? data;
+  return (result ?? data) as OrdersListRes;
+}
 
-export const orderApi = {
-  // 주문 생성
-  create:        (body: CreateOrderReq)                 => unwrap<CreateOrderRes>(http.post(BASE, body)),
+/** 상세: GET /order/{ordersId} */
+async function detail(ordersId: number): Promise<OrdersSummary> {
+  const { data } = await http.get(`${BASE}/${ordersId}`);
+  const result = data?.result ?? data;
+  return (result ?? data) as OrdersSummary;
+}
 
-  // 주문 상세
-  detail:        (ordersId: number)                     => unwrap<OrdersDetailRes>(http.get(`${BASE}/${ordersId}`)),
+/** 삭제(취소 대용): DELETE /order/{ordersId} — 백엔드에 맞춰 제공 */
+async function remove(ordersId: number): Promise<{ ok: true }> {
+  await http.delete(`${BASE}/${ordersId}`);
+  return { ok: true };
+}
 
-  // 특정 회원 주문 목록
-  listByMemberId:(memberId: string, params?: { page?: number; size?: number }) =>
-                   unwrap<OrdersListRes>(http.get(`${BASE}/member/${memberId}`, { params })),
+export const orderApi = { summaryByMember, detail, remove };
+export default orderApi;
 
-  // 내 주문 목록
-  listMe:        (params?: { page?: number; size?: number }) =>
-                   unwrap<OrdersListRes>(http.get(`${BASE}/me`, { params })),
+// 파일 상단의 공통 import/BASE 정의는 그대로 두고, 아래만 추가
+export type CreateOrderReq =
+  | { mode: 'ITEM'; itemId: number; quantity: number }
+  | { mode: 'CART'; itemIds: number[] };
 
-  // 주문 취소
-  cancel:        (ordersId: number)                     => unwrap<void>(http.put(`${BASE}/${ordersId}/cancel`, {})),
+export type CreateOrderRes = { ordersId: number };
 
-  // 상태 변경(관리자)
-  updateStatus:  (ordersId: number, status: string)     => unwrap<void>(http.patch(`${BASE}/${ordersId}/status`, { status })),
-
-  // 요약(페이지네이션)
-  summaryByMember:(memberId: string, params?: { page?: number; size?: number }) =>
-                   unwrap<OrdersListRes>(http.get(`${BASE}/summary`, { params: { memberId, ...params } })),
-};
+// 주문 생성
+export async function createOrder(body: CreateOrderReq): Promise<CreateOrderRes> {
+  const res = await http.post(withPrefix('/order'), body);
+  const d = res?.data;
+  return (d?.result ?? d) as CreateOrderRes;
+}
