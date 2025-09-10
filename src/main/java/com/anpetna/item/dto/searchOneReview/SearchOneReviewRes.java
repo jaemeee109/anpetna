@@ -1,9 +1,10 @@
 package com.anpetna.item.dto.searchOneReview;
 
-import com.anpetna.item.dto.ItemDTO;
+import lombok.Setter;
 
 import java.time.LocalDateTime;
 
+@Setter
 public class SearchOneReviewRes {
 
     private Long reviewId;

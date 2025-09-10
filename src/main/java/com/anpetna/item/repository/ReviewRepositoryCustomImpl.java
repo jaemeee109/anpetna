@@ -28,13 +28,17 @@ public class ReviewRepositoryCustomImpl implements ReviewRepositoryCustom {
 
     @Override
     public List<ReviewEntity> orderByRegDate(SearchAllReviewsReq req) {
-        var dir =  req.getDirection();
-        if (dir.equals(SortDirection.DESCENDING)) {
+        var dir = req.getDirection();
+        var where = qReview.itemId.itemId.eq(req.getItemId());
+
+        if (dir == null || dir == SortDirection.DESCENDING) {
             return queryFactory.selectFrom(qReview)
+                    .where(where)
                     .orderBy(qReview.regDate.desc())
                     .fetch();
-        }else{
+        } else {
             return queryFactory.selectFrom(qReview)
+                    .where(where)
                     .orderBy(qReview.regDate.asc())
                     .fetch();
         }
@@ -42,18 +46,22 @@ public class ReviewRepositoryCustomImpl implements ReviewRepositoryCustom {
 
     @Override
     public List<ReviewEntity> orderByRating(SearchAllReviewsReq req) {
-        var dir =  req.getDirection();
-        if (dir.equals(SortDirection.DESCENDING)) {
+        var dir = req.getDirection();
+        var where = qReview.itemId.itemId.eq(req.getItemId());
+
+        if (dir == null || dir == SortDirection.DESCENDING) {
             return queryFactory.selectFrom(qReview)
-                    .orderBy(qReview.rating.desc(), qReview.regDate.asc())
-                    // 평점순으로 1차 정렬후, 같은 평점끼리는 날짜순으로 2차정렬 추가
+                    .where(where)
+                    .orderBy(qReview.rating.desc(), qReview.regDate.desc())
                     .fetch();
-        }else{
+        } else {
             return queryFactory.selectFrom(qReview)
+                    .where(where)
                     .orderBy(qReview.rating.asc(), qReview.regDate.asc())
                     .fetch();
         }
     }
+
 
     @Override
     public Page<ReviewEntity> findByRegDate(Long itemId, SortDirection direction, Pageable pageable) {

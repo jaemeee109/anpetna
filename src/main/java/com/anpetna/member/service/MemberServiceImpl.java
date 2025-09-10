@@ -3,7 +3,6 @@ package com.anpetna.member.service;
 
 import com.anpetna.image.domain.ImageEntity;
 import com.anpetna.item.repository.ItemRepository;
-import com.anpetna.member.constant.MemberRole;
 import com.anpetna.member.domain.MemberEntity;
 import com.anpetna.member.dto.deleteMember.DeleteMemberReq;
 import com.anpetna.member.dto.deleteMember.DeleteMemberRes;
@@ -23,7 +22,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.parameters.P;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
