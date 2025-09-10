@@ -1,6 +1,5 @@
 package com.anpetna.order.dto;
 
-import com.anpetna.item.domain.ItemEntity;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -20,5 +19,6 @@ public class OrderDTO {
 
     private int quantity;   // 주문 수량
 
+    private String thumbnailUrl;   // 라인 썸네일 URL
 
 }
