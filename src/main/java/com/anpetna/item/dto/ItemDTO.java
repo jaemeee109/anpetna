@@ -1,6 +1,5 @@
 package com.anpetna.item.dto;
 
-import com.anpetna.image.dto.ImageListDTO;
 import com.anpetna.item.constant.ItemCategory;
 import com.anpetna.item.constant.ItemSellStatus;
 import lombok.*;
@@ -11,7 +10,7 @@ import java.util.List;
 @Setter
 @ToString
 @NoArgsConstructor
-public class ItemDTO extends ImageListDTO {
+public class ItemDTO {
 
     private Long itemId; // 상품코드
 
