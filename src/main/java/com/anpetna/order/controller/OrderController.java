@@ -16,11 +16,7 @@ import org.springframework.web.bind.annotation.*;
 
 @Validated // ✅ PathVariable/RequestParam 검증 활성화
 @RestController
-<<<<<<< HEAD
 @RequestMapping("/order")
-=======
-@RequestMapping("/anpetna/order")
->>>>>>> origin/Feature/Order
 @RequiredArgsConstructor
 public class OrderController {
 
