@@ -32,7 +32,7 @@ public class OrderController {
     // ==============================================================
 
     /** 주문 생성 (직구/장바구니 겸용) */
-    @PostMapping
+    @PostMapping("/buy")
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<ApiResult<CreateOrderRes>> create(
             Authentication authentication,
