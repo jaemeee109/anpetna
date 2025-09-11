@@ -53,6 +53,10 @@ public class OrdersEntity {
     @Column(name = "orders_itemImageUrl", nullable = false) // 대표이미지 URL
     private String itemImageUrl;
 
+    // (추가) DB 실 컬럼명에 맞춰 매핑 — NOT NULL 회피용으로라도 값 채워 저장
+    @Column(name = "order_item_image_name", nullable = false)
+    private String itemImageName;
+
 
      @Builder.Default // 빌더 사용 시에도 빈 리스트로 기본값 세팅 (null 방지)
      @ToString.Exclude // Lombok toString()에서 제외 → 순환참조/과도한 출력 방지

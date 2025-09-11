@@ -118,6 +118,12 @@ public class OrdersServiceImpl implements OrdersService {
         String thumb = firstImageUrlFromHeader(orders); // 동일 클래스에 이미 존재하는 보조 메소드
         orders.setItemImageUrl(thumb != null ? thumb : "");
 
+        // ImageName이 없는 오류 수정
+        String thumbName = (thumb != null && !thumb.isBlank())
+                ? thumb.substring(thumb.lastIndexOf('/') + 1)
+                : "";
+        orders.setItemImageName(thumbName);
+
         // 4) 한 번만 최종 저장 (라인은 cascade=persist로 함께 저장)
         OrdersEntity saved = ordersRepository.save(orders);
 
