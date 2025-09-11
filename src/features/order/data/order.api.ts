@@ -5,11 +5,11 @@ import type { OrdersListRes, OrdersSummary } from './order.types';
 
 const BASE = withPrefix('/order'); // 백엔드 컨트롤러 base에 맞춤
 
-/** 회원별 주문 요약 페이지 조회: GET /order?memberId=...&page=&size= */
+/** 회원별 주문 요약 페이지 조회: GET /order/members/{memberId}?page=&size= */
 async function summaryByMember(memberId: string, opts?: { page?: number; size?: number }): Promise<OrdersListRes> {
   const page = Math.max(1, opts?.page ?? 1);
   const size = Math.max(1, opts?.size ?? 10);
-  const { data } = await http.get(`${BASE}`, { params: { memberId, page, size } });
+  const { data } = await http.get(`${BASE}/members/${encodeURIComponent(memberId)}`, { params: { page, size } });
   const result = data?.result ?? data;
   return (result ?? data) as OrdersListRes;
 }
@@ -30,16 +30,15 @@ async function remove(ordersId: number): Promise<{ ok: true }> {
 export const orderApi = { summaryByMember, detail, remove };
 export default orderApi;
 
-// 파일 상단의 공통 import/BASE 정의는 그대로 두고, 아래만 추가
+// 주문 생성(결제 플로우)
 export type CreateOrderReq =
   | { mode: 'ITEM'; itemId: number; quantity: number }
   | { mode: 'CART'; itemIds: number[] };
 
 export type CreateOrderRes = { ordersId: number };
 
-// 주문 생성
 export async function createOrder(body: CreateOrderReq): Promise<CreateOrderRes> {
-  const res = await http.post(withPrefix('/order'), body);
+  const res = await http.post(withPrefix('/order/buy'), body);
   const d = res?.data;
   return (d?.result ?? d) as CreateOrderRes;
 }

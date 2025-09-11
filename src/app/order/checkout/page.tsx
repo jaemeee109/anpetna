@@ -6,7 +6,12 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import RequireLogin from '@/components/auth/RequireLogin';
 import { useCart } from '@/features/cart/hooks/useCart';
 import type { CartItemDTO } from '@/features/cart/data/cart.types';
-import { readMemberMe } from '@/features/member/data/member.api'; // ✅ 공식 API 사용
+import http from '@/shared/data/http';
+import { readMemberMe } from '@/features/member/data/member.api'; 
+import { withPrefix } from '@/lib/api';
+import { createOrder } from '@/features/order/data/order.api';
+
+
 import PawIcon from '@/components/icons/Paw';
 
 /** 1,000 단위 , + 원 표시 없이 숫자만 반환 */
@@ -153,6 +158,8 @@ export default function CheckoutPage() {
   const [buyer, setBuyer] = useState<Buyer>(EMPTY_ADDR);
   const [ship, setShip] = useState<Ship>(EMPTY_ADDR);
   const [shipSame, setShipSame] = useState(false); // ✅ 기본: 체크 해제(=빈칸)
+  // 백엔드 DTO 검증용 memberId
+  const [meId, setMeId] = useState<string>('');
 
   // ✅ 공식 readMemberMe() 사용 — 토큰/세션/베이스URL/헤더를 통합 처리
   useEffect(() => {
@@ -179,6 +186,12 @@ export default function CheckoutPage() {
         ).trim();
 
         setBuyer({ name, phone, zip, road, detail });
+        
+          // 다양한 키 후보에서 memberId 추출
+          const uid = String(
+            me?.memberId ?? (me as any)?.id ?? (me as any)?.memberEmail ?? me?.email ?? ''
+          ).trim();
+          setMeId(uid);
       } catch {
         setBuyer(EMPTY_ADDR);
       }
@@ -211,55 +224,42 @@ export default function CheckoutPage() {
   };
 
   /** ===== 결제하기: 서버에 주문 생성 요청 후 완료 페이지로 이동 ===== */
-  const onPay = async () =>  {
-    // (8) 배송지 입력/동의 검증
-    const required = [ship.name, ship.phone, ship.zip, ship.road, ship.detail];
-    if (required.some(v => !String(v ?? '').trim())) {
-      alert('배송지 정보가 비어 있습니다. (이름/연락처/우편번호/주소/상세주소)');
-      return;
-    }
-    const agree = (document.getElementById('agree-privacy') as HTMLInputElement | null)?.checked;
-    if (!agree) {
-      alert('개인정보 제공에 동의해야 결제할 수 있습니다.');
-      return;
-    }
 
-    if (!orderItems.length) {
-      alert('주문할 상품이 없습니다.');
-      return;
-    }
+const onPay = async () =>  {
+  // (8) 배송지 입력/동의 검증 (기존 로직 유지)
+  const required = [ship.name, ship.phone, ship.zip, ship.road, ship.detail];
+  if (required.some(v => !String(v ?? '').trim())) {
+    alert('배송지 정보가 비어 있습니다. (이름/연락처/우편번호/주소/상세주소)');
+    return;
+  }
+  const agree = (document.getElementById('agree-privacy') as HTMLInputElement | null)?.checked;
+  if (!agree) {
+    alert('개인정보 제공에 동의해야 결제할 수 있습니다.');
+    return;
+  }
+  if (!orderItems.length) {
+    alert('주문할 상품이 없습니다.');
+    return;
+  }
 
-    try {
-      const body =
-        mode === 'item'
-          ? { mode: 'ITEM', itemId: Number(itemIdParam), quantity: qtyParam }
-          : { mode: 'CART', itemIds: orderItems.map((it) => Number(it.itemId)) };
+  try {
+    const body =
+      mode === 'item'
+        ? { mode: 'ITEM', itemId: Number(itemIdParam), quantity: qtyParam }
+        : { mode: 'CART', itemIds: orderItems.map((it) => Number(it.itemId)) };
 
-      const resp = await fetch(`${IMG_BASE}/order`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(body),
-      });
-      const data = await resp.clone().json().catch(() => null as any);
-      if (!resp.ok) throw new Error(data?.message || data?.resMessage || `주문 생성 실패 (HTTP ${resp.status})`);
+    // ✅ axios 인스턴스 사용 (/order/buy) → 토큰/베이스URL/에러처리 일원화
+    const { ordersId } = await createOrder(body as any);
 
-      // (9) ApiResult / 직접본문 양쪽 모두 수용
-      const payload: any = data?.result ?? data;
-      const ordersId =
-        payload?.ordersId ??
-        payload?.id ??
-        payload?.data?.ordersId ??
-        null;
+    if (!ordersId) throw new Error('주문번호를 받지 못했습니다.');
+    router.replace(`/order/complete/${ordersId}`);
+  } catch (e: any) {
+    alert(e?.message || '주문 처리 중 오류가 발생했습니다.');
+  }
+};
 
-      if (!ordersId) throw new Error('주문번호를 받지 못했습니다.');
 
-      // 성공: 완료페이지로
-      router.replace(`/order/complete/${ordersId}`);
-    } catch (e: any) {
-      alert(e?.message || '주문 처리 중 오류가 발생했습니다.');
-    }
-  };
+
 
   const onCancel = () => {
     router.back();
@@ -474,8 +474,11 @@ export default function CheckoutPage() {
             </div>
 
             {/* ▷ 안내문 */}
-            <div className="w-[420px] rural-note mt-[10px] mb-[35px]">
-              ※ 도서,산간 지방의 경우 기본 배송비 (3,000원) 외에 별도의 배송비가 추가 됩니다
+            <div className="w-[420px] rural-note mt-[20px] mb-[25px]">
+              ※&nbsp;총 주문금액이 100,000원 이상일 경우, 배송비는 무료입니다         
+             <br />  ※&nbsp;도서산간지역은 추가 배송비가 발생할 수 있어  판매자가 별도로 안내드립니다
+              <br/>&nbsp;&nbsp;&nbsp;·&nbsp;기본 배송비 3,000원은 결제 시 포함
+              
             </div>
           </div>
         </section>
