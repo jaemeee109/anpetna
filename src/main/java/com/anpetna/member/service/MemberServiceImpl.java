@@ -194,6 +194,7 @@ public class MemberServiceImpl implements MemberService {
         member.setMemberPw(passwordEncoder.encode(modifyMemberReq.getMemberPw()));
         member.setMemberPhone(modifyMemberReq.getMemberPhone());
         member.setMemberEmail(modifyMemberReq.getMemberEmail());
+        member.setMemberDetailAddress(modifyMemberReq.getMemberDetailAddress());
         member.setMemberZipCode(modifyMemberReq.getMemberZipCode());
         member.setMemberRoadAddress(modifyMemberReq.getMemberRoadAddress());
         member.setMemberEtc(modifyMemberReq.getEtc());
