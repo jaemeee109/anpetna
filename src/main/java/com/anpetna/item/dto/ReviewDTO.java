@@ -1,7 +1,10 @@
 package com.anpetna.item.dto;
 
+import lombok.Setter;
+
 import java.time.LocalDateTime;
 
+@Setter
 public class ReviewDTO {
 
     private Long reviewId;

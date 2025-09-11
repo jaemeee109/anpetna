@@ -26,6 +26,7 @@ public class MemberDTO {
     private String memberEmail;//이메일
     private String memberPhone;//전화번호
     private String memberRoadAddress;//주소
+    private String memberDetailAddress;
     private String memberZipCode;//우편번호
     private boolean social;//소셜로그인
     private String memberHasPet;//반려동물유무

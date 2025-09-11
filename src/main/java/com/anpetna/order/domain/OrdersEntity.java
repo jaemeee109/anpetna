@@ -1,20 +1,25 @@
 package com.anpetna.order.domain;
 
+import com.anpetna.order.constant.OrdersStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
 import java.util.ArrayList;
 import java.util.List;
 
+import static jakarta.persistence.CascadeType.MERGE;
+import static jakarta.persistence.CascadeType.PERSIST;
 
- // "주문서(헤더)"를 담는 엔티티
+
+// "주문서(헤더)"를 담는 엔티티
  // 한 건의 주문(영수증 상단 정보) = OrdersEntity 1행
 @Entity
 @Table(name = "anpetna_orders")
-@Data
+@Setter
 @Getter
-@NoArgsConstructor // 기본 생성자
-@AllArgsConstructor // 모든 필드 받는 생성자
+@ToString
+@NoArgsConstructor
+@AllArgsConstructor
 @Builder
 public class OrdersEntity {
 
@@ -29,40 +34,38 @@ public class OrdersEntity {
     @Column(name = "orders_cardId", nullable = false) // 결제 카드 식별자(문자열)
     private String cardId;
 
-    @Column(name = "orders_totalAmount", nullable = false) // 주문 총 금액(헤더 수준 합계)
+    @Column(name = "orders_itemQuantity", nullable = false) // 총 수량
+    private int itemQuantity;
+
+    @Column(name = "orders_totalAmount", nullable = false) // 물건값(= 물건값 + 배송비) -> 최종 결제액
     private int totalAmount;
 
-    @Column(name = "orders_itemImageUrl", nullable = false)
-    private String itemImageUrl;    // 대표이미지 URL
+    @Column(name = "orders_shippingFee", nullable = false) // 배송비(기본 0)
+    private int shippingFee;
 
-     @Column(name = "order_itemImageName", nullable = false)
-     private String itemImageName;   // 파일명
+    @Embedded
+    private AddressEntity shippingAddress;   // 배송지
+
+     @Enumerated(EnumType.STRING)
+     @Column(name = "orders_status", nullable = false, length = 20)
+     private OrdersStatus status;
+
+    @Column(name = "orders_itemImageUrl", nullable = false) // 대표이미지 URL
+    private String itemImageUrl;
+
+    // (추가) DB 실 컬럼명에 맞춰 매핑 — NOT NULL 회피용으로라도 값 채워 저장
+    @Column(name = "order_item_image_name", nullable = false)
+    private String itemImageName;
 
 
      @Builder.Default // 빌더 사용 시에도 빈 리스트로 기본값 세팅 (null 방지)
-    @ToString.Exclude // Lombok toString()에서 제외 → 순환참조/과도한 출력 방지
-    @OneToMany(
-            mappedBy = "orders",              // 반대편(OrderEntity)에서 이 엔티티를 가리키는 필드명
-            cascade = CascadeType.ALL,        // 부모(주문서) 저장/삭제 시 자식(품목)도 함께 전파
-            orphanRemoval = true              // 부모 컬렉션에서 제거된 자식은 고아 객체로 간주 → DB에서도 삭제
-    )
-    private List<OrderEntity> orderItems = new ArrayList<>();
+     @ToString.Exclude // Lombok toString()에서 제외 → 순환참조/과도한 출력 방지
+     @OneToMany(
+             mappedBy = "orders",              // 반대편(OrderEntity)에서 이 엔티티를 가리키는 필드명
+             cascade = {CascadeType.PERSIST, CascadeType.MERGE}
+     )
 
-    // 양방향 편의 메서드
-    public void addOrderItem(OrderEntity item) {
-        // 메모리상의 컬렉션에 자식 추가
-        orderItems.add(item);
-        // 반대편(자식) 연관관계도 함께 맞춰줌 → 둘 다 세팅해야 JPA가 안정적으로 동작
-        item.setOrders(this);
-        // 주의: 가격/수량으로 totalAmount를 계산해 반영하고 싶다면
-        // 별도의 합계 갱신 로직을 여기에 추가하는 방식도 가능
-    }
+     private List<OrderEntity> orderItems = new ArrayList<>(); // null 방지용. 주문에 품목이 없어도 항상 빈 리스트 상태.
 
-    public void removeOrderItem(OrderEntity item) {
-        // 컬렉션에서 제거
-        orderItems.remove(item);
-        // 자식 쪽 연관관계 끊기
-        item.setOrders(null);
-        // orphanRemoval=true 이므로, 영속성 컨텍스트 flush 시 DB에서도 해당 품목(row) 삭제
-    }
+
 }

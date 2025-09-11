@@ -41,14 +41,14 @@ public class ReviewController {
         return new ApiResult<>(res);
     }
 
-    @PutMapping("/{ReviewId}")
-    public ApiResult<ModifyReviewRes> updateReview(@PathVariable Long itemId, @RequestBody ModifyReviewReq req) {
-        var putResult = reviewService.modifyReview(itemId, req.getReviewId(), req);
+    @PutMapping("/{reviewId}")
+    public ApiResult<ModifyReviewRes> updateReview(@PathVariable Long itemId, @PathVariable Long reviewId, @RequestBody ModifyReviewReq req) {
+        var putResult = reviewService.modifyReview(itemId, reviewId, req);
         return new ApiResult<>(putResult);
     }
 
     @DeleteMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("isAuthenticated()")
     public ApiResult<DeleteReviewRes> deleteReview(@PathVariable Long itemId, @RequestBody DeleteReviewReq req) {
         var deleteResult = reviewService.deleteReview(itemId, req);
         return new ApiResult<>(deleteResult);
