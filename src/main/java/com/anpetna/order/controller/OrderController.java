@@ -1,7 +1,9 @@
 package com.anpetna.order.controller;
 
+import com.anpetna.ApiResult;
 import com.anpetna.order.constant.OrdersStatus;
 import com.anpetna.order.dto.createOrderDTO.CreateOrderReq;
+import com.anpetna.order.dto.createOrderDTO.CreateOrderRes;
 import com.anpetna.order.dto.readAllOrderDTO.ReadAllOrdersRes;
 import com.anpetna.order.dto.readOneOrderDTO.ReadOneOrdersRes;
 import com.anpetna.order.service.OrdersService;
@@ -11,16 +13,37 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+
+import java.net.URI;
 
 @Validated // ✅ PathVariable/RequestParam 검증 활성화
 @RestController
 @RequestMapping("/anpetna/order")
 @RequiredArgsConstructor
 public class OrderController {
-
     private final OrdersService ordersService;
+
+
+    // ==============================================================
+
+    /** 주문 생성 (직구/장바구니 겸용) */
+    @PostMapping
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<ApiResult<CreateOrderRes>> create(
+            Authentication authentication,
+            @Valid @RequestBody CreateOrderReq req
+    ) {
+        String memberId = authentication.getName();
+        CreateOrderRes res = ordersService.create(memberId, req);
+
+        return ResponseEntity.ok(new ApiResult<>(res));
+    }
+
 
     // ==============================================================
 
@@ -32,11 +55,11 @@ public class OrderController {
      * Authorization: Bearer <JWT>
      */
     @GetMapping
-    public ReadAllOrdersRes getAllOrders(
+    public ResponseEntity<ReadAllOrdersRes> getAllOrders(
             @PageableDefault(size = 10, sort = "ordersId", direction = Sort.Direction.DESC)
-            Pageable pageable
-    ) {
-        return ordersService.getAllOrders(pageable);
+            Pageable pageable) {
+        ReadAllOrdersRes body = ordersService.getAllOrders(pageable);
+        return ResponseEntity.ok(body); // 200 OK
     }
 
     /**
@@ -46,12 +69,12 @@ public class OrderController {
      * GET /anpetna/order/members/{memberId}?page=0&size=10&sort=ordersId,DESC
      */
     @GetMapping("/members/{memberId}")
-    public ReadAllOrdersRes getOrdersByMember(
+    public ResponseEntity<ReadAllOrdersRes> getOrdersByMember(
             @PathVariable String memberId,
             @PageableDefault(size = 10, sort = "ordersId", direction = Sort.Direction.DESC)
-            Pageable pageable
-    ) {
-        return ordersService.getSummariesByMember(memberId, pageable);
+            Pageable pageable) {
+        ReadAllOrdersRes body = ordersService.getSummariesByMember(memberId, pageable);
+        return ResponseEntity.ok(body); // 200 OK
     }
 
     /**
@@ -61,8 +84,9 @@ public class OrderController {
      * GET /anpetna/order/{ordersId}
      */
     @GetMapping("/{ordersId}")
-    public ReadOneOrdersRes getOrderDetail(@PathVariable @Min(1) Long ordersId) {
-        return ordersService.getDetail(ordersId);
+    public ResponseEntity<ReadOneOrdersRes> getOrderDetail(@PathVariable @Min(1) Long ordersId) {
+        ReadOneOrdersRes body = ordersService.getDetail(ordersId);
+        return ResponseEntity.ok(body); // 200 OK
     }
 
     // ==============================================================
@@ -78,64 +102,44 @@ public class OrderController {
      *   "memberId": "user-001",
      *   "cardId": "card-xyz",
      *   "useSavedAddress": false,
-     *   "shippingAddress": {
-     *     "zipcode": "06236",
-     *     "street": "서울시 강남구 테헤란로 123",
-     *     "detail": "101동 1001호",
-     *     "receiver": "홍길동"
-     *   },
-     *   "items": [
-     *     { "itemId": 10, "quantity": 2 },
-     *     { "itemId": 11, "quantity": 1 }
-     *   ],
+     *   "shippingAddress": {...},
+     *   "items": [ { "itemId": 10, "quantity": 2 }, ... ],
      *   "shippingFee": 3000 // (선택) 프론트에서 직접 전달. 없으면 기본값 사용
      * }
      */
     @PostMapping
-    public ReadOneOrdersRes createOrder(@Valid @RequestBody CreateOrderReq req) {
-        return ordersService.createOrder(req);
+    public ResponseEntity<ReadOneOrdersRes> createOrder(@Valid @RequestBody CreateOrderReq req) {
+        ReadOneOrdersRes created = ordersService.createOrder(req);
+
+        // 201 Created + Location 헤더(/anpetna/order/{ordersId})
+        URI location = URI.create("/anpetna/order/" + created.getOrdersId());
+        return ResponseEntity
+                .created(location) // = status 201 + Location
+                .body(created);
     }
 
     /**
      * 주문 상태 전이
-     * - 허용 전이만 가능(PENDING→PAID/CANCELLED, PAID→SHIPPED/CANCELLED, SHIPPED→DELIVERED)
+     * - 허용 전이만 가능(PENDING→PAID/CANCELLED, PAID→SHIPPED/CANCELLED, SHIPPED→DELIVERED …)
      *
      * 요청 예시:
      * PATCH /anpetna/order/123/status?next=PAID
-     * PATCH /anpetna/order/123/status?next=SHIPPED
-     * PATCH /anpetna/order/123/status?next=DELIVERED
-     * PATCH /anpetna/order/123/status?next=CANCELLED
      */
     @PatchMapping("/{ordersId}/status")
-    public ReadOneOrdersRes changeStatus(
+    public ResponseEntity<ReadOneOrdersRes> changeStatus(
             @PathVariable @Min(1) Long ordersId,
             @RequestParam OrdersStatus next
     ) {
-        return ordersService.updateStatus(ordersId, next);
+        ReadOneOrdersRes body = ordersService.updateStatus(ordersId, next);
+        return ResponseEntity.ok(body); // 200 OK
     }
 
     // ==============================================================
 
-    //    // 주문 상세 조회 (이전 버전 예시)
-    //    @GetMapping("/{ordersId}")
-    //    public OrdersDTO getDetail(@PathVariable @Min(1) Long ordersId) {
-    //        return ordersService.getDetail(ordersId);
-    //    }
-
-    //    // 회원별 주문 요약 페이징 조회 (이전 버전 예시)
-    //    @GetMapping
-    //    public Page<OrdersDTO> getSummariesByMember(
-    //            @RequestParam @NotBlank String memberId,
-    //            @PageableDefault(size = 10, sort = "ordersId", direction = Sort.Direction.DESC)
-    //            Pageable pageable
-    //    ) {
-    //        return ordersService.getSummariesByMember(memberId, pageable);
-    //    }
-
     //    // 주문 삭제 (라인 → 헤더 삭제는 Service에서 처리)
     //    @DeleteMapping("/{ordersId}")
-    //    @ResponseStatus(HttpStatus.NO_CONTENT)
-    //    public void delete(@PathVariable @Min(1) Long ordersId) {
+    //    public ResponseEntity<Void> delete(@PathVariable @Min(1) Long ordersId) {
     //        ordersService.delete(ordersId);
+    //        return ResponseEntity.noContent().build(); // 204 No Content
     //    }
 }

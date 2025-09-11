@@ -13,9 +13,25 @@ import java.util.List;
 @Getter
 @Setter
 @Builder
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class CreateOrderReq {
+
+    // =====================================
+    public enum Mode { ITEM, CART }
+
+    @NotNull
+    private Mode mode;
+
+    // ITEM 모드
+    private Long itemId;
+    private Integer quantity;
+
+    // CART 모드 (선택한 itemId 목록)
+    private List<Long> itemIds;
+
+    // =====================================
 
     // 배송지 선택 방식
     @NotBlank
@@ -49,4 +65,5 @@ public class CreateOrderReq {
         @Min(1) int quantity;
 
     }
+
 }
