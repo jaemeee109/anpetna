@@ -1,5 +1,7 @@
 package com.anpetna.order.service;
 
+import com.anpetna.cart.domain.CartEntity;
+import com.anpetna.cart.repository.CartRepository;
 import com.anpetna.item.domain.ItemEntity;
 import com.anpetna.item.repository.ItemRepository;
 import com.anpetna.order.constant.OrdersStatus;
@@ -9,8 +11,10 @@ import com.anpetna.order.domain.OrdersEntity;
 import com.anpetna.order.dto.AddressDTO;
 import com.anpetna.order.dto.OrderDTO;
 import com.anpetna.order.dto.createOrderDTO.CreateOrderReq;
+import com.anpetna.order.dto.createOrderDTO.CreateOrderRes;
 import com.anpetna.order.dto.readAllOrderDTO.ReadAllOrdersRes;
 import com.anpetna.order.dto.readOneOrderDTO.ReadOneOrdersRes;
+import com.anpetna.order.repository.OrderRepository;
 import com.anpetna.order.repository.OrdersRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -31,11 +35,102 @@ public class OrdersServiceImpl implements OrdersService {
 
     private static final int DEFAULT_SHIPPING_FEE = 3000;   // 기본 배송비 (입력 없을 경우 자동 적용)
     private final ItemRepository itemRepository;
+    private final OrderRepository orderRepository;
+    private final CartRepository cartRepository;
 //    private static final int FREE_SHIPPING_THRESHOLD = 100_000; // 10만원 이상 무료 배송
 
     // 기존에는 임의로 설정한 배송비와 무료배송비용 사용.
     // 이를 DTO에 추가하여 입력한 값을 배송비, 무료배송비용으로 사용하게끔 변경.
     // -> 입력받으면 받은 값을, 안 받으면 기본 배송비 부여
+
+    // 추가=========================================================
+    @Override
+    @Transactional
+    public CreateOrderRes create(String memberId, CreateOrderReq req) {
+
+        // 기본 검증
+        if (memberId == null || memberId.isBlank()) {
+            throw new IllegalArgumentException("memberId는 필수입니다.");
+        }
+        if (req == null || req.getMode() == null) {
+            throw new IllegalArgumentException("주문 모드(mode)는 필수입니다.");
+        }
+
+        // 주문서(헤더) 생성 및 저장
+        OrdersEntity orders = OrdersEntity.builder()
+                .memberId(memberId)
+                .cardId("MANUAL")   // 결제 연동 전이므로 임시값
+                .totalAmount(0)     // 합계는 라인 생성 후 계산/세팅
+                .build();
+        ordersRepository.save(orders);
+
+        int total = 0; // 최종 결제금액(배송비 제외 가정). 배송비가 있으면 마지막에 더해도 됨.
+
+        // 모드별 라인 생성
+        if (req.getMode() == CreateOrderReq.Mode.ITEM) {
+            // 2-1) 단건 직구: itemId + quantity 로 1개의 라인을 생성
+            Long itemId = req.getItemId();
+            if (itemId == null) throw new IllegalArgumentException("itemId는 필수입니다.");
+            int qty = Math.max(1, req.getQuantity() == null ? 1 : req.getQuantity()); // 최소 1
+
+            ItemEntity item = itemRepository.findById(itemId)
+                    .orElseThrow(() -> new IllegalArgumentException("상품이 없습니다. itemId=" + itemId));
+
+            OrderEntity row = OrderEntity.builder()
+                    .orders(orders)                 // 어느 주문서(헤더)에 속하는지
+                    .itemEntity(item)               // 어떤 상품인지
+                    .quantity(qty)                  // 수량
+                    .price(item.getItemPrice())     // 단가
+                    .build();
+
+            // 라인만 저장
+            orderRepository.save(row);
+            // 혹은 cascade(PERSIST)가 걸려 있으면 아래처럼 헤더에 붙이고 헤더만 저장해도 됨
+            // orders.getOrderItems().add(row); ordersRepository.save(orders);
+
+            total += item.getItemPrice() * qty;
+
+        } else {
+            // 장바구니 선택 구매: itemIds 목록을 순회하며 각 장바구니 항목으로 라인 생성
+            List<Long> itemIds = req.getItemIds();
+            if (itemIds == null || itemIds.isEmpty()) {
+                throw new IllegalArgumentException("선택된 장바구니 항목이 없습니다.");
+            }
+
+            for (Long itemId : itemIds) {
+                // 정적 호출 금지: 반드시 주입된 인스턴스 `cartRepository`로 호출
+                CartEntity cart = cartRepository
+                        .findByMember_MemberIdAndItem_ItemId(memberId, itemId)
+                        .orElseThrow(() -> new IllegalArgumentException("장바구니 항목이 없습니다. itemId=" + itemId));
+
+                ItemEntity item = cart.getItem();
+
+                OrderEntity row = OrderEntity.builder()
+                        .orders(orders)
+                        .itemEntity(item)
+                        .quantity(cart.getQuantity())     // 카트에 담긴 수량 사용
+                        .price(item.getItemPrice())       // 단가
+                        .build();
+
+                orderRepository.save(row);
+                total += item.getItemPrice() * cart.getQuantity();
+
+                // 구매 완료 후 장바구니에서 제거 (원치 않으면 주석 처리)
+                // 이것도 정적 호출 금지: 인스턴스로 삭제
+                cartRepository.delete(cart);
+            }
+        }
+
+        // 3) 헤더 합계 업데이트 (필요 시 배송비 등을 포함해서 계산)
+        orders.setTotalAmount(total);
+
+        // 4) 생성 결과 반환 (주문서 PK만 간단히 응답)
+        return new CreateOrderRes(orders.getOrdersId());
+    }
+
+    // =========================================
+
+
 
     // 주문 생성
     @Override

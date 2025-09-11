@@ -2,11 +2,16 @@ package com.anpetna.order.service;
 
 import com.anpetna.order.constant.OrdersStatus;
 import com.anpetna.order.dto.createOrderDTO.CreateOrderReq;
+import com.anpetna.order.dto.createOrderDTO.CreateOrderRes;
 import com.anpetna.order.dto.readAllOrderDTO.ReadAllOrdersRes;
 import com.anpetna.order.dto.readOneOrderDTO.ReadOneOrdersRes;
 import org.springframework.data.domain.Pageable;
 
 public interface OrdersService {
+
+    // 추가 ================================================
+    CreateOrderRes create(String memberId, CreateOrderReq req);
+    // =====================================================
 
     // 주문 생성
     ReadOneOrdersRes createOrder(CreateOrderReq req);
