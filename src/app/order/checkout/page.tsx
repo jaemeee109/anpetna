@@ -73,7 +73,7 @@ export default function CheckoutPage() {
 
   const IMG_BASE = resolveImgBase();
 
-  /** ===== [추가] cart / item 모드 판별 및 파라미터 ===== */
+  /** ===== cart / item 모드 판별 및 파라미터 ===== */
   const mode: 'cart' | 'item' = useMemo(() => {
     if (params.get('mode')) {
       const m = String(params.get('mode')).toLowerCase();
@@ -94,7 +94,7 @@ export default function CheckoutPage() {
       .filter((n) => Number.isFinite(n) && n > 0);
   }, [params]);
 
-  /** ===== [추가] item 모드일 때 단건 아이템을 상세에서 로드해 CartItemDTO로 매핑 ===== */
+  /** ===== item 모드일 때 단건 아이템을 상세에서 로드해 CartItemDTO로 매핑 ===== */
   const [directItem, setDirectItem] = useState<CartItemDTO | null>(null);
   useEffect(() => {
     let alive = true;
@@ -162,7 +162,6 @@ export default function CheckoutPage() {
         const me = await readMemberMe(); // returns member fields (관대 객체)
         if (!mounted) return;
 
-        // ✅ (2) detail 보완: 키 편차 광범위 대응 (실제 응답 중 하나라도 있으면 채움)
         const name = String(me?.memberName ?? me?.name ?? '').trim();
         const phone = String(me?.memberPhone ?? me?.phone ?? '').trim();
         const zip = String(me?.memberZipCode ?? me?.zipCode ?? '').trim();
@@ -189,7 +188,7 @@ export default function CheckoutPage() {
     };
   }, []);
 
-  // ✅ (3)(7) 배송지 = 주문자 동일 토글 (detail 포함 복사)
+  // ✅ 배송지 = 주문자 동일 토글 (detail 포함 복사)
   useEffect(() => {
     if (shipSame) {
       setShip({
@@ -211,8 +210,20 @@ export default function CheckoutPage() {
     return abs || '/file.svg';
   };
 
-  /** ===== [교체] 결제하기: 서버에 주문 생성 요청 후 완료 페이지로 이동 ===== */
-  const onPay = async () => {
+  /** ===== 결제하기: 서버에 주문 생성 요청 후 완료 페이지로 이동 ===== */
+  const onPay = async () =>  {
+    // (8) 배송지 입력/동의 검증
+    const required = [ship.name, ship.phone, ship.zip, ship.road, ship.detail];
+    if (required.some(v => !String(v ?? '').trim())) {
+      alert('배송지 정보가 비어 있습니다. (이름/연락처/우편번호/주소/상세주소)');
+      return;
+    }
+    const agree = (document.getElementById('agree-privacy') as HTMLInputElement | null)?.checked;
+    if (!agree) {
+      alert('개인정보 제공에 동의해야 결제할 수 있습니다.');
+      return;
+    }
+
     if (!orderItems.length) {
       alert('주문할 상품이 없습니다.');
       return;
@@ -233,11 +244,17 @@ export default function CheckoutPage() {
       const data = await resp.clone().json().catch(() => null as any);
       if (!resp.ok) throw new Error(data?.message || data?.resMessage || `주문 생성 실패 (HTTP ${resp.status})`);
 
+      // (9) ApiResult / 직접본문 양쪽 모두 수용
       const payload: any = data?.result ?? data;
-      const ordersId = payload?.ordersId ?? payload?.id ?? null;
+      const ordersId =
+        payload?.ordersId ??
+        payload?.id ??
+        payload?.data?.ordersId ??
+        null;
+
       if (!ordersId) throw new Error('주문번호를 받지 못했습니다.');
 
-      alert('주문에 성공했습니다');
+      // 성공: 완료페이지로
       router.replace(`/order/complete/${ordersId}`);
     } catch (e: any) {
       alert(e?.message || '주문 처리 중 오류가 발생했습니다.');
@@ -251,55 +268,49 @@ export default function CheckoutPage() {
   // (본문 너비 고정 + 중앙정렬)
   return (
     <RequireLogin>
-      <main className="mx-auto w-[750px] px-4">
+      <main className="mx-auto w-[700px] px-4">
         <h1 className="text-2xl font-semibold text-center mt-[30px] mb-[30px]">Order&nbsp;<PawIcon/></h1>
         <hr className="apn-hr mb-[45px]" />
 
-        {/* ===================== (1) 주문자 정보 : 제목은 카드 바깥/왼쪽, 내용은 카드 안 ===================== */}
+        {/* ===================== (1) 주문자 정보 ===================== */}
         <h2 className="text-lg font-semibold mt-[20px] mb-[8px] text-left">주문자 정보</h2>
-        <section className="apn-card p-4">
-          <div className="flex flex-col items-center gap-2">
-            {/* (1) 주문자 정보는 input 대신 글자만 보이도록 변경 */}
-            <div className="flex items-center gap-3 ">
-              <label className="w-[140px] text-right">NAME : </label>
-              <span className="order-plain">{buyer.name || '-'}</span>
+        <section className="apn-card p-4 h-card-buyer">
+          <div className="flex flex-col items-start gap-5 ml-[30px] mt-[20px] mb-[20px]">
+            <div className="flex items-center gap-5 ">
+              <span className="order-plain"><b>Name </b> : {buyer.name || '-'}</span>
             </div>
             <div className="flex items-center gap-5">
-              <label className="w-[140px] text-right">TEL : </label>
-              <span className="order-plain ml-[5px]"> {buyer.phone || '-'}</span>
+              <span className="order-plain ml-[5px]"><b>Tel</b> : {buyer.phone || '-'}</span>
             </div>
             <div className="flex items-center gap-5">
-              <label className="w-[140px] text-right">ZIPCODE : </label>
-              <span className="order-plain ml-[5px]"> {buyer.zip || '-'}</span>
+              <span className="order-plain ml-[5px]"><b>Zipcode</b> : {buyer.zip || '-'}</span>
             </div>
             <div className="flex items-center gap-5">
-              <label className="w-[140px] text-right">Road Address : </label>
-              <span className="order-plain ml-[5px]"> {buyer.road || '-'}</span>
+              <span className="order-plain ml-[5px]"><b>Road Address</b> : {buyer.road || '-'}</span>
             </div>
             <div className="flex items-center gap-5">
-              <label className="w-[140px] text-right">Detail Address : </label>
-              <span className="order-plain ml-[5px]"> {buyer.detail || '-'}</span>
+              <span className="order-plain ml-[5px]"><b>Detail Address</b> :  {buyer.detail || '-'}</span>
             </div>
           </div>
         </section>
 
-        {/* ===================== (3) 배송지 정보 : 제목 옆에 '주문자 정보와 동일' (카드 바깥, 작은 글씨) ===================== */}
-        <div className="flex items-center gap-2 mt-[20px] mb-[8px]">
+        {/* ===================== (3) 배송지 정보 ===================== */}
+        <div className="flex items-center gap-1 mt-[30px] mb-[0px] ">
           <h2 className="text-lg font-semibold text-left">배송지 정보</h2>
-          <label htmlFor="ship-same" className="text-[12px] flex items-center gap-1 select-none">
+          <label htmlFor="ship-same" className="ml-[10px] text-[12px] flex items-center gap-1 select-none">
             <input
               id="ship-same"
               type="checkbox"
               checked={shipSame}
               onChange={(e) => setShipSame(e.target.checked)}
             />
-            주문자 정보와 동일
+            &nbsp;주문자 정보와 동일
           </label>
         </div>
-        <section className="apn-card p-4">
-          <div className="flex flex-col items-center gap-2">
-            <div className="flex items-center gap-3">
-              <label className="w-[140px] text-right">이름</label>
+        <section className="apn-card p-4 h-card-ship ">
+          <div className="flex flex-col items-start gap-2 ml-[45px]">
+            <div className="flex items-center gap-3 mt-[20px]">
+              <label className="w-[140px] text-left">이름</label>
               <input
                 className="order-input"
                 value={ship.name}
@@ -307,7 +318,7 @@ export default function CheckoutPage() {
               />
             </div>
             <div className="flex items-center gap-3">
-              <label className="w-[140px] text-right">연락처</label>
+              <label className="w-[140px] text-left">연락처</label>
               <input
                 className="order-input"
                 value={ship.phone}
@@ -315,7 +326,7 @@ export default function CheckoutPage() {
               />
             </div>
             <div className="flex items-center gap-3">
-              <label className="w-[140px] text-right">Zipcode</label>
+              <label className="w-[140px] text-left">Zipcode</label>
               <input
                 className="order-input"
                 value={ship.zip}
@@ -323,15 +334,15 @@ export default function CheckoutPage() {
               />
             </div>
             <div className="flex items-center gap-3">
-              <label className="w-[140px] text-right">Road Address</label>
+              <label className="w-[140px] text-left">Road Address</label>
               <input
                 className="order-input"
                 value={ship.road}
                 onChange={(e) => setShip((s) => ({ ...s, road: e.target.value }))}
               />
             </div>
-            <div className="flex items-center gap-3">
-              <label className="w-[140px] text-right">Detail address</label>
+            <div className="flex items-center gap-3 mb-[20px]">
+              <label className="w-[140px] text-left">Detail address</label>
               <input
                 className="order-input"
                 value={ship.detail}
@@ -341,152 +352,192 @@ export default function CheckoutPage() {
           </div>
         </section>
 
-        {/* ===================== 주문상품 : 제목 카드 바깥/왼쪽, 행 표현 고정 ===================== */}
-        <h2 className="text-lg font-semibold mt-[20px] mb-[8px] text-left">주문상품</h2>
-        <section className="apn-card p-4">
+        {/* ===================== 주문상품 ===================== */}
+        <h2 className="text-lg font-semibold mt-[50px] mb-[8px] text-left">주문상품</h2>
+        <section className="apn-card p-4 h-card-items">
+          {/*  상단 여백 컨트롤러 */}
+          <div className="items-top-pad" />
+
           {!orderItems.length ? (
             <div className="py-10 text-center text-gray-500">선택된 상품이 없습니다.</div>
           ) : (
-            <div className="flex flex-col gap-3">
+            //  행 간격 컨트롤러
+            <div className="items-list">
               {orderItems.map((it, idx) => {
                 const lineTotal = (Number(it.price) || 0) * (Number(it.quantity) || 0);
                 const key = it.itemId ?? `idx-${idx}`;
                 return (
-                  // ✅ (3) 썸네일+상품명 | n개 | nnnn원 (세로실선)
-                  <div key={key} className="flex items-center px-2">
-                    {/* 왼쪽: 썸네일 + 상품명 */}
-                    <div className="flex items-center gap-2 min-w-0 flex-1">
-                      <div className="order-thumb">
-                        <Image
-                          src={imgSrc(it)}
-                          alt={it?.name ? `${it.name} 썸네일` : '상품 이미지'}
-                          width={60}
-                          height={60}
-                          className="object-cover w-full h-full"
-                          unoptimized
-                        />
+                  // ▷ 각 행 자체 상/하 패딩 컨트롤러
+                  <div key={key} className="items-row flex items-center px-2">
+                    {/* 썸네일 고정폭 */}
+                    <div className="order-thumb mr-2 mt-[20px] ml-[30px] mb-[20px]">
+                      <Image
+                        src={imgSrc(it)}
+                        alt={it?.name ? `${it.name} 썸네일` : '상품 이미지'}
+                        width={100}
+                        height={100}
+                        className="object-cover w-full h-full"
+                        unoptimized
+                      />
+                    </div>
+
+                    {/* 썸네일 제외 나머지 공간 정확히 3등분 + (커스텀 세로실선) */}
+                    <div className="flex-1 grid grid-cols-3">
+                      {/* 상품명 */}
+                      <div className="px-3 flex items-center ml-[25px] min-w-0">
+                        <div className="truncate">{it.name}</div>
                       </div>
-                      <div className="truncate">{it.name}</div>
-                    </div>
-
-                    {/* 가운데: 수량 - 세로 실선 좌측 */}
-                    <div className="w-[90px] text-center border-l border-gray-300 py-2 mx-2">
-                      {Number(it.quantity) || 0}개
-                    </div>
-
-                    {/* 오른쪽: 금액 - 세로 실선 좌측 */}
-                    <div className="w-[140px] text-right border-l border-gray-300 py-2">
-                      {formatKRW(lineTotal)} <span className="text-sm">원</span>
+                      {/* 수량 (⬅ 왼쪽 세로선) */}
+                      <div className="px-3 flex items-center justify-center tabular-nums col-divide">
+                        {Number(it.quantity) || 0}개
+                      </div>
+                      {/* 금액 (⬅ 왼쪽 세로선) */}
+                      <div className="px-3 flex items-center mr-[40px] justify-end tabular-nums col-divide">
+                        {formatKRW(lineTotal)} <span className="text-sm">원</span>
+                      </div>
                     </div>
                   </div>
                 );
               })}
             </div>
           )}
+
+          {/* 하단 여백 컨트롤러  */}
+          <div className="items-bottom-pad" />
         </section>
 
-        {/* ===================== 결제수단 : 제목 카드 바깥/왼쪽, 아이콘 유지 ===================== */}
-        <h2 className="text-lg font-semibold mt-[20px] mb-[8px] text-left">결제수단</h2>
-        <section className="apn-card p-4">
-          <div className="flex items-center justify-center gap-2">
+        {/* ===================== 결제수단 ===================== */}
+        <h2 className="text-lg font-semibold mt-[50px] mb-[8px] text-left">결제수단</h2>
+        <section className="apn-card p-4 h-card-pay">
+          <div className="flex items-center justify-start gap-2 mt-[20px] ml-[15px]">
             <input id="pay-card" type="checkbox" defaultChecked />
-            <label htmlFor="pay-card" className="flex items-center gap-1">
-              카드
+            <label htmlFor="pay-card" className="flex items-center gap-1 ">
               {/* (8) 부트스트랩 카드 아이콘 */}
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
-                   fill="currentColor" viewBox="0 0 16 16" className="inline-block">
+              <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30"
+                   fill="currentColor" viewBox="0 0 16 16" className="inline-block ml-[10px] mr-[10px]">
                 <path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2zm2-1a1 1 0 0 0-1 1v1h14V4a1 1 0 0 0-1-1zm13 4H1v5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1z"/>
                 <path d="M2 10a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v1a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z"/>
-              </svg>
+              </svg> 카드
             </label>
           </div>
         </section>
 
-        {/* ===================== (4) 개인정보 제공 동의 : 체크박스는 카드 바깥 왼쪽정렬 ===================== */}
-        <div className="flex items-center gap-2 mt-[20px] mb-[8px]">
-          <h2 className="text-lg font-semibold text-left"><input id="agree-privacy" type="checkbox" />개인정보 제공 동의</h2>
-          
+        {/* ===================== 개인정보 제공 동의 ===================== */}
+        <div className="flex items-center gap-[5px] mt-[50px] mb-[3px]">
+          <h2 className="text-lg font-semibold text-left  "><input id="agree-privacy" type="checkbox" />&nbsp;개인정보 제공 동의</h2>
         </div>
-        <section className="apn-card p-4">
-          {/* 안내문: 더 작고 옅은 색 (기존 유지) */}
-          <div className="text-[12px] leading-5 text-gray-600">
-            ·개인정보를 제공받는 자: 상품 및 서비스 판매자<br />
-            · 제공하는 개인정보 항목: 이름, 아이디, (휴대)전화번호, 상품 구매정보, 결제수단, 상품 수령인 정보(배송상품:수령인명,
-            주소, 출입방법 및 수령위치(필요 상품 주문 시에만 해당), (휴대)전화번호/ 쿠폰:이름, 네이버 아이디, 휴대전화번호)
-            <br />
-            · 개인정보를 제공받는 자의 이용목적: 판매자와 구매자의 원활한 거래 진행, 본인의사의 확인, 고객상담 및
-            불만처리/부정이용 방지 등의 고객관리, 물품배송, 통관, 새로운 상품/서비스 정보와 고지사항의 안내, 상품/서비스 구매에
+        <section className="apn-card p-4 h-card-priv ">
+          <div className="private-note text-[12px] leading-5 text-gray-600">
+            ·개인정보를 제공받는 자&nbsp;:&nbsp;상품 및 서비스 판매자
+            <br /><p></p>
+            · 제공하는 개인정보 항목: <br/>&nbsp;&nbsp;이름, 아이디, (휴대)전화번호, 상품 구매정보, 결제수단, 
+            <br/>&nbsp;&nbsp;상품 수령인 정보(배송상품:수령인명,
+            주소, 출입방법 및 수령위치(필요 상품 주문 시에만 해당), 
+            <br />&nbsp;&nbsp;(휴대)전화번호/ 쿠폰:이름, 네이버 아이디, 휴대전화번호)
+            <p></p>
+            <br />· 개인정보를 제공받는 자의 이용목적: 판매자와 구매자의 원활한 거래 진행, 본인의사의 확인, 
+            <br />&nbsp;&nbsp;고객상담 및 불만처리/부정이용 방지 등의 고객관리, 물품배송, 통관, 새로운 상품/서비스 정보와 고지사항의 안내, 
+            <br />&nbsp;&nbsp;상품/서비스 구매에
             따른 혜택 제공, 서비스 개선·통계·분석 <br />
-            · 개인정보를 제공받는 자의 개인정보 보유 및 이용기간: 개인정보 이용목적 달성 시까지 보존합니다. 단, 관계 법령의
-            규정에 의하여 일정 기간 보존이 필요한 경우에는 해당 기간만큼 보관 후 삭제합니다. <br />
-            위 개인정보 제공 동의를 거부할 권리가 있으나, 거부 시 상품 구매가 불가능합니다.
+            <p></p>
+            · 개인정보를 제공받는 자의 개인정보 보유 및 이용기간: 
+            <br />&nbsp;&nbsp;개인정보 이용목적 달성 시까지 보존합니다. 
+            <br />&nbsp;&nbsp;단, 관계 법령의 규정에 의하여 일정 기간 보존이 필요한 경우에는 해당 기간만큼 보관 후 삭제합니다. <br />
+            <br />위 개인정보 제공 동의를 거부할 권리가 있으나, 거부 시 상품 구매가 불가능합니다.
           </div>
         </section>
 
         {/* ===================== 합계 ===================== */}
-        <h2 className="text-lg font-semibold mt-[20px] mb-[8px] text-left">합계</h2>
-        <section className="apn-card p-4">
-          <div className="flex flex-col items-center gap-1">
-            <div className="w-[420px] flex justify-between">
+        <h2 className="text-lg font-semibold mt-[50px] mb-[15px] text-left">결제금액</h2>
+        <section className="apn-card p-4 h-card-sum">
+          {/* 가운데 정렬 유지 */}
+          <div className="sum-center-wrap">
+            {/* ▷ 총 주문금액 행 */}
+            <div className="sum-row total w-[420px] flex justify-between mt-[35px]">
               <div>총 주문금액</div>
-              <div>
-                {formatKRW(itemsTotal)} <span className="text-sm">원</span>
-              </div>
+              <div>{formatKRW(itemsTotal)} <span className="text-sm ">원</span></div>
             </div>
-            <div className="w-[420px] flex justify-between">
+
+            {/* ▷ 배송비 행 */}
+            <div className="sum-row shipping w-[420px] flex justify-between">
               <div>+ 배송비</div>
-              <div>
-                {formatKRW(shippingFee)} <span className="text-sm">원</span>
-              </div>
+              <div>{formatKRW(shippingFee)} <span className="text-sm">원</span></div>
             </div>
-            <div className="w-[420px] flex justify-between font-bold mt-1">
+
+            {/* ▷ 배송비 ↔ 결제금액 사이 구분선 */}
+            <div className="sum-divider" />
+
+            {/* ▷ 결제금액 행 */}
+            <div className="sum-row pay w-[420px] flex justify-between font-bold mt-1">
               <div>결제금액</div>
-              <div>
-                {formatKRW(payTotal)} <span className="text-sm">원</span>
-              </div>
+              <div className="pay-amount"><b>{formatKRW(payTotal)} </b><span className="text-sm">원</span></div>
             </div>
-            {/* (5) 결제금액 아래 안내문 */}
-            <div className="w-[420px] text-[12px] text-gray-400 mt-1">
+
+            {/* ▷ 안내문 */}
+            <div className="w-[420px] rural-note mt-[10px] mb-[35px]">
               ※ 도서,산간 지방의 경우 기본 배송비 (3,000원) 외에 별도의 배송비가 추가 됩니다
             </div>
           </div>
         </section>
 
         {/* ===================== 버튼 ===================== */}
-        <div className="flex justify-center gap-[10px] mt-[20px] mb-[30px]">
-          <button type="button" className="btn-3d btn-white w-[120px] px-4 py-2" onClick={onPay}>
+        <div className="flex justify-center gap-[20px] mt-[40px] mb-[150px]">
+          <button type="button" className="btn-3d btn-white w-[200px] px-4 py-2" onClick={onPay}>
             결제하기
           </button>
-          <button type="button" className="btn-3d btn-white w-[120px] px-4 py-2" onClick={onCancel}>
+          <button type="button" className="btn-3d btn-white w-[200px] px-4 py-2" onClick={onCancel}>
             취소하기
           </button>
         </div>
 
-        <hr className="apn-hr" />
-
-        {/* ====== 이 페이지 한정 스타일 (디테일 수정 지점) ====== */}
+        {/* ====== 이 페이지 한정 스타일 ====== */}
         <style jsx global>{`
+          /* =========================
+             전역 CSS 변수 (네가 조절)
+             ========================= */
+          :root {
+            /* 주문상품 카드 여백(상/하) & 행 간격/패딩 */
+            --order-items-card-top-gap: 20px;
+            --order-items-card-bottom-gap: 20px;
+            --order-items-row-gap: 12px;
+            --order-items-row-py: 0px;
+
+            /* (세로실선 색상) */
+            --items-divider-color: #d1d5db;       /* 원하는 색으로 바꿔 */
+
+            /* 결제금액 카드 */
+            --sum-divider-color: #e5e7eb;
+            --sum-rows-gap: 8px;
+            --sum-total-fs: 14px;
+            --sum-total-color: #111111;
+            --sum-shipping-fs: 14px;
+            --sum-shipping-color: #111111;
+            --sum-pay-fs: 18px;
+            --sum-pay-color: #111111;
+          }
+
+          /* 버튼(3D) */
           .btn-3d {
             border: 1px solid #e5e7eb;
-            box-shadow: 0 2px 0 rgba(0, 0, 0, 0.06);
+            box-shadow: 0 2px 0 rgba(0,0,0,0.06);
             border-radius: 12px;
             transition: transform 0.02s ease-in-out;
           }
           .btn-3d:active { transform: translateY(1px); }
           .btn-white { background: #ffffff; }
 
+          /* 카드 공통 */
           .apn-card {
             background: #ffffff;
             border: 1px solid #e5e7eb;
             border-radius: 16px;
-            box-shadow: 0 2px 0 rgba(0, 0, 0, 0.06);
+            box-shadow: 0 2px 0 rgba(0,0,0,0.06);
             overflow: hidden;
-           
           }
 
           .apn-hr { border-color: #f0f0f0ff; }
 
-          /* 입력 공통 (배송지 입력 필드 전용) */
+          /* 배송지 입력 */
           .order-input {
             display: inline-block;
             border: 1px solid #e5e7eb;
@@ -497,30 +548,77 @@ export default function CheckoutPage() {
             color: #111;
             width: 200px;
             background: #fff;
-            margin-top: 15px;
-            margin-bottom: 15px;
+            margin-top: 10px;
+            margin-bottom: 10px;
             margin-left: 15px;
           }
 
-          /* (1) 주문자 정보 표시는 input이 아니라 텍스트만 보이도록 */
+          /* 주문자 텍스트 */
           .order-plain {
             display: inline-block;
-            width: 300px;      /* 입력칸과 같은 폭으로 정렬 유지 */
-            min-height: 28px;  /* 라인 높이 맞춤 */
+            width: 300px;
+            min-height: 28px;
             line-height: 28px;
-            font-size: 13.5px;
+            font-size: 15px;
             color: #111;
-            
           }
 
-          /* 주문상품 썸네일 */
+          /* 썸네일 */
           .order-thumb {
-            width: 60px;
-            height: 60px;
+            width: 100px; height: 100px;
             overflow: hidden;
             border-radius: 8px;
             border: 1px solid #e5e7eb;
             background: #fff;
+          }
+
+          /* 섹션 높이 */
+          .h-card-buyer { min-height: 140px; }
+          .h-card-ship  { min-height: 220px; }
+          .h-card-items { min-height: 150px; }
+          .h-card-pay   { min-height: 80px;  }
+          .h-card-sum   { min-height: 200px; }
+          .h-card-priv  { height: 350px; }
+
+          /* 결제금액 강조 */
+          .pay-amount { font-size: var(--sum-pay-fs); }
+          .rural-note { font-size: 12px; color: #6b7280; }
+          .private-note { font-size: 13px; color: #3f3f3fff; margin-top: 20px; margin-left: 20px; gap: 10px; }
+
+          /* 주문상품 여백/간격 */
+          .items-top-pad { height: var(--order-items-card-top-gap); }
+          .items-list { display: flex; flex-direction: column; row-gap: var(--order-items-row-gap); }
+          .items-row { padding-top: var(--order-items-row-py); padding-bottom: var(--order-items-row-py); }
+          .items-bottom-pad { height: var(--order-items-card-bottom-gap); }
+
+          /* ✅ 세로실선: 2,3번째 칸에만 border-left 지정 (색은 변수) */
+          .col-divide { border-left: 1px solid var(--items-divider-color); }
+
+          /* 결제금액 카드 정렬/간격/타이포 */
+          .sum-center-wrap {
+            display: flex; flex-direction: column; align-items: center;
+            row-gap: var(--sum-rows-gap);
+          }
+          .sum-row.total    { 
+          font-size: 15px(--sum-total-fs);    
+          color: var(--sum-total-color); 
+          }
+          .sum-row.shipping { 
+          font-size: 15px(--sum-shipping-fs); 
+          color: var(--sum-shipping-color); 
+          margin-top: 10px;
+          margin-bottom:5px;
+          }
+          .sum-row.pay      { 
+          font-size: 25px(--sum-pay-fs);      
+          color: var(--sum-pay-color); 
+          }
+
+          /* 배송비 ↔ 결제금액 사이 구분선 (색은 변수) */
+          .sum-divider {
+            width: 420px; height: 1px;
+            background: var(--sum-divider-color);
+            margin: 8px 0;
           }
         `}</style>
       </main>
