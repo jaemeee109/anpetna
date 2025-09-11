@@ -47,87 +47,83 @@ public class OrdersServiceImpl implements OrdersService {
     @Override
     @Transactional
     public CreateOrderRes create(String memberId, CreateOrderReq req) {
-
-        // 기본 검증
-        if (memberId == null || memberId.isBlank()) {
+        if (memberId == null || memberId.isBlank())
             throw new IllegalArgumentException("memberId는 필수입니다.");
-        }
-        if (req == null || req.getMode() == null) {
-            throw new IllegalArgumentException("주문 모드(mode)는 필수입니다.");
-        }
+        if (req == null || req.getMode() == null)
+            throw new IllegalArgumentException("mode는 필수입니다.");
 
-        // 주문서(헤더) 생성 및 저장
+        // 1) 주문 헤더(아직 저장하지 않음)
         OrdersEntity orders = OrdersEntity.builder()
                 .memberId(memberId)
-                .cardId("MANUAL")   // 결제 연동 전이므로 임시값
-                .totalAmount(0)     // 합계는 라인 생성 후 계산/세팅
+                .cardId("MANUAL")
+                .status(OrdersStatus.PENDING)
+                .itemQuantity(0)
+                .totalAmount(0)
                 .build();
-        ordersRepository.save(orders);
 
-        int total = 0; // 최종 결제금액(배송비 제외 가정). 배송비가 있으면 마지막에 더해도 됨.
+        int totalQty = 0;
+        int totalAmt = 0;
 
-        // 모드별 라인 생성
+        // 2) 라인 생성 + 합계 집계
         if (req.getMode() == CreateOrderReq.Mode.ITEM) {
-            // 2-1) 단건 직구: itemId + quantity 로 1개의 라인을 생성
             Long itemId = req.getItemId();
-            if (itemId == null) throw new IllegalArgumentException("itemId는 필수입니다.");
-            int qty = Math.max(1, req.getQuantity() == null ? 1 : req.getQuantity()); // 최소 1
+            int qty = (req.getQuantity() == null ? 1 : Math.max(1, req.getQuantity()));
 
             ItemEntity item = itemRepository.findById(itemId)
-                    .orElseThrow(() -> new IllegalArgumentException("상품이 없습니다. itemId=" + itemId));
+                    .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 상품: " + itemId));
 
-            OrderEntity row = OrderEntity.builder()
-                    .orders(orders)                 // 어느 주문서(헤더)에 속하는지
-                    .itemEntity(item)               // 어떤 상품인지
-                    .quantity(qty)                  // 수량
-                    .price(item.getItemPrice())     // 단가
+            OrderEntity line = OrderEntity.builder()
+                    .itemEntity(item)
+                    .price(item.getItemPrice())
+                    .quantity(qty)
+                    .orders(orders)
                     .build();
 
-            // 라인만 저장
-            orderRepository.save(row);
-            // 혹은 cascade(PERSIST)가 걸려 있으면 아래처럼 헤더에 붙이고 헤더만 저장해도 됨
-            // orders.getOrderItems().add(row); ordersRepository.save(orders);
+            orders.getOrderItems().add(line);
+            totalQty += qty;
+            totalAmt += item.getItemPrice() * qty;
 
-            total += item.getItemPrice() * qty;
-
-        } else {
-            // 장바구니 선택 구매: itemIds 목록을 순회하며 각 장바구니 항목으로 라인 생성
-            List<Long> itemIds = req.getItemIds();
-            if (itemIds == null || itemIds.isEmpty()) {
-                throw new IllegalArgumentException("선택된 장바구니 항목이 없습니다.");
+        } else if (req.getMode() == CreateOrderReq.Mode.CART) {
+            if (req.getItemIds() == null || req.getItemIds().isEmpty()) {
+                throw new IllegalArgumentException("장바구니에서 구매할 itemIds가 비었습니다.");
             }
+            for (Long itemId : req.getItemIds()) {
+                CartEntity c = cartRepository.findByMember_MemberIdAndItem_ItemId(memberId, itemId)
+                        .orElseThrow(() -> new IllegalArgumentException("장바구니에 해당 상품이 없습니다: " + itemId));
 
-            for (Long itemId : itemIds) {
-                // 정적 호출 금지: 반드시 주입된 인스턴스 `cartRepository`로 호출
-                CartEntity cart = cartRepository
-                        .findByMember_MemberIdAndItem_ItemId(memberId, itemId)
-                        .orElseThrow(() -> new IllegalArgumentException("장바구니 항목이 없습니다. itemId=" + itemId));
+                ItemEntity item = c.getItem();
+                int qty = Math.max(1, c.getQuantity());
 
-                ItemEntity item = cart.getItem();
-
-                OrderEntity row = OrderEntity.builder()
-                        .orders(orders)
+                OrderEntity line = OrderEntity.builder()
                         .itemEntity(item)
-                        .quantity(cart.getQuantity())     // 카트에 담긴 수량 사용
-                        .price(item.getItemPrice())       // 단가
+                        .price(item.getItemPrice())
+                        .quantity(qty)
+                        .orders(orders)
                         .build();
 
-                orderRepository.save(row);
-                total += item.getItemPrice() * cart.getQuantity();
+                orders.getOrderItems().add(line);
+                totalQty += qty;
+                totalAmt += item.getItemPrice() * qty;
 
-                // 구매 완료 후 장바구니에서 제거 (원치 않으면 주석 처리)
-                // 이것도 정적 호출 금지: 인스턴스로 삭제
-                cartRepository.delete(cart);
+                // 구매 완료 후 장바구니에서 제거
+                cartRepository.delete(c);
             }
+        } else {
+            throw new IllegalArgumentException("지원하지 않는 mode: " + req.getMode());
         }
 
-        // 3) 헤더 합계 업데이트 (필요 시 배송비 등을 포함해서 계산)
-        orders.setTotalAmount(total);
+        // 3) 헤더 집계값 + 대표 이미지 설정 (대표 이미지가 없으면 빈 문자열로 보정해 NOT NULL 회피)
+        orders.setItemQuantity(totalQty);
+        orders.setTotalAmount(totalAmt);
+        String thumb = firstImageUrlFromHeader(orders); // 동일 클래스에 이미 존재하는 보조 메소드
+        orders.setItemImageUrl(thumb != null ? thumb : "");
 
-        // 4) 생성 결과 반환 (주문서 PK만 간단히 응답)
-        return new CreateOrderRes(orders.getOrdersId());
+        // 4) 한 번만 최종 저장 (라인은 cascade=persist로 함께 저장)
+        OrdersEntity saved = ordersRepository.save(orders);
+
+        // 5) 응답
+        return new CreateOrderRes(saved.getOrdersId());
     }
-
     // =========================================
 
 
