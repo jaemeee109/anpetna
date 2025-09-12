@@ -36,7 +36,7 @@ const BASE =
         window.location.port ? `:${window.location.port === '3000' ? '8000' : window.location.port}` : ''
       }`.replace(/:$/, '')
     : '');
-const API_PREFIX = (process.env.NEXT_PUBLIC_API_PREFIX as string | undefined) ?? '/anpetna';
+const API_PREFIX = (process.env.NEXT_PUBLIC_API_PREFIX as string | undefined) ?? '';
 function apiURL(path: string) {
   const normalized = path.startsWith('/') ? path : `/${path}`;
   return new URL(`${API_PREFIX}${normalized}`, BASE).toString();

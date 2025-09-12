@@ -1,10 +1,10 @@
 // src/features/order/data/order.api.ts
 import http from '@/shared/data/http';
-import { withPrefix } from '@/lib/api';
-import type { OrdersListRes, OrdersSummary } from './order.types';
+import { withPrefix, ORDER } from '@/lib/api';
+import type { OrdersListRes, OrdersSummary, OrdersDetail } from './order.types';
 
 /** 백엔드 표준 엔드포인트 */
-const BASE = withPrefix('/order'); // 컨트롤러 base에 맞춤
+const BASE = ORDER.ROOT;
 
 /** 주문 생성: 요청 바디 (기존 호출부 호환) */
 export type CreateOrderBody = {
@@ -68,14 +68,21 @@ export async function buyCart(itemIds: number[]): Promise<CreateOrderRes> {
 }
 
 /** 회원별 주문 요약: GET /order/members/{memberId}?page=&size= */
-async function summaryByMember(memberId: string, opts?: { page?: number; size?: number; sort?: string }): Promise<OrdersListRes> {
-  const page = Math.max(1, opts?.page ?? 1);
-  const size = Math.max(1, opts?.size ?? 10);
-  const sort = encodeURIComponent(opts?.sort ?? 'ordersId,desc');
-  const { data } = await http.get(`${BASE}/members/${encodeURIComponent(memberId)}?page=${page}&size=${size}&sort=${sort}`);
-  // 컨트롤러는 ReadAllOrdersRes를 그대로 200 OK로 반환함 (ApiResult 아님) :contentReference[oaicite:3]{index=3}
+async function summaryByMember(
+  memberId: string,
+  opts?: { page?: number; size?: number; sort?: string }
+): Promise<OrdersListRes> {
+  // ✅ 서버는 0-base 페이지 → 그대로 0-base로 전달
+  const page0 = Math.max(0, Number(opts?.page ?? 0));
+  const size = Math.max(1, Number(opts?.size ?? 10));
+  const sort = String(opts?.sort ?? 'ordersId,desc');
+
+  const { data } = await http.get(`${BASE}/members/${encodeURIComponent(memberId)}`, {
+    params: { page: page0, size, sort },
+  });
   return (data?.result ?? data) as OrdersListRes;
 }
+
 
 /** 주문 상세: GET /order/{ordersId} */
 async function detail(ordersId: number): Promise<OrdersSummary> {
