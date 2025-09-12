@@ -8,7 +8,7 @@ import RequireLogin from '@/components/auth/RequireLogin';
 import orderApi from '@/features/order/data/order.api';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect } from 'react';
-
+import PawIcon from '@/components/icons/Paw';
 /** ===== 이미지 베이스/절대경로 (checkout과 동일 로직) ===== */
 function resolveImgBase(): string {
   const envBase =
@@ -96,7 +96,7 @@ export default function OrderDetailPage() {
     <RequireLogin>
       {/* ▶ 체크아웃과 동일한 폭/레이아웃 */}
       <main className="mx-auto w-[700px] px-4">
-        <h1 className="text-2xl font-semibold text-center mt-[30px] mb-[20px]">Order Detail</h1>
+        <h1 className="text-2xl font-semibold text-center mt-[30px] mb-[20px]">My Orders&nbsp;<PawIcon/></h1>
         <p className="text-center mb-[24px]">
           <span className="font-semibold">주문번호:&nbsp;</span>
           <span className="font-bold text-emerald-600">{id}</span>
@@ -147,14 +147,16 @@ export default function OrderDetailPage() {
                 onChange={(e) => setAddr((s) => ({ ...s, detail: e.target.value }))}
               />
             </div>
-
-            <div className="mt-2">
-              <button className="btn-3d btn-white !px-4 !py-2" onClick={() => mUpdate.mutate(addr)}>
-                배송지변경 저장
-              </button>
-            </div>
+ 
           </div>
         </section>
+
+        <div className="mt-[15px] flex justify-end mr-[15px]">
+  <button className="btn-3d btn-white !px-4 !py-2" onClick={() => mUpdate.mutate(addr)}>
+    배송지 변경
+  </button>
+</div>
+
 
         {/* (2) 결제수단 — 체크박스 체크 고정 + 수정불가 (주문페이지 디자인 유지) */}
         <h2 className="text-lg font-semibold mt-[24px] mb-[8px] text-left">결제수단</h2>
