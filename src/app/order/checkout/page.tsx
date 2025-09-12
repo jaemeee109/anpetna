@@ -1,3 +1,4 @@
+// src/app/order/checkout/page.tsx
 'use client';
 
 import Image from 'next/image';
@@ -9,7 +10,8 @@ import type { CartItemDTO } from '@/features/cart/data/cart.types';
 import http from '@/shared/data/http';
 import { readMemberMe } from '@/features/member/data/member.api'; 
 import { withPrefix } from '@/lib/api';
-import { createOrder } from '@/features/order/data/order.api';
+import { createOrder, type CreateOrderBody } from '@/features/order/data/order.api';
+
 
 
 import PawIcon from '@/components/icons/Paw';
@@ -225,8 +227,10 @@ export default function CheckoutPage() {
 
   /** ===== 결제하기: 서버에 주문 생성 요청 후 완료 페이지로 이동 ===== */
 
-const onPay = async () =>  {
-  // (8) 배송지 입력/동의 검증 (기존 로직 유지)
+
+// src/app/order/checkout/page.tsx  안의 onPay 함수 전체교체
+const onPay = async () => {
+  // (1) 입력 검증 (기존 유지)
   const required = [ship.name, ship.phone, ship.zip, ship.road, ship.detail];
   if (required.some(v => !String(v ?? '').trim())) {
     alert('배송지 정보가 비어 있습니다. (이름/연락처/우편번호/주소/상세주소)');
@@ -243,20 +247,46 @@ const onPay = async () =>  {
   }
 
   try {
-    const body =
+    // (2) 백엔드 CreateOrderReq.items 스키마로 정규화
+    const items =
       mode === 'item'
-        ? { mode: 'ITEM', itemId: Number(itemIdParam), quantity: qtyParam }
-        : { mode: 'CART', itemIds: orderItems.map((it) => Number(it.itemId)) };
+        ? [{ itemId: Number(itemIdParam), quantity: qtyParam }]
+        : orderItems.map(it => ({ itemId: Number(it.itemId), quantity: Number(it.quantity ?? 1) }));
 
-    // ✅ axios 인스턴스 사용 (/order/buy) → 토큰/베이스URL/에러처리 일원화
-    const { ordersId } = await createOrder(body as any);
+    // (3) 배송지 AddressDTO (Back AddressEntity ↔ AddressDTO 매핑과 동일)
+    const shippingAddress = {
+      zipcode: String(ship.zip),
+      street: String(ship.road),
+      detail: String(ship.detail),
+      receiver: String(ship.name),
+    };
 
+    // (4) memberId/cardId 생성
+    const me = await readMemberMe();
+    const memberId = String(me?.memberId ?? me?.id ?? me?.loginId ?? '').trim();
+
+    const body = {
+      memberId,
+      cardId: 'CARD-' + memberId,
+      useSavedAddress: false,
+      shippingAddress,
+      items,
+      // shippingFee: 3000, // 보내면 그 값을, 안 보내면 백엔드 기본 3000 적용(설명 주석 참조)
+    };
+
+    // (5) 주문 생성 (POST /order)
+    const created = await createOrder(body);
+    const ordersId = (created as any)?.ordersId ?? (created as any)?.result?.ordersId;
     if (!ordersId) throw new Error('주문번호를 받지 못했습니다.');
+
+    // (6) 완료 페이지로 이동
     router.replace(`/order/complete/${ordersId}`);
   } catch (e: any) {
     alert(e?.message || '주문 처리 중 오류가 발생했습니다.');
   }
 };
+
+
 
 
 

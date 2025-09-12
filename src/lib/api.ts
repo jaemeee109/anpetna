@@ -30,3 +30,11 @@ export const ENDPOINT = {
     BASE: withPrefix("/comment"),
   },
 } as const;
+
+export const ORDER = {
+  ROOT: withPrefix('/order'),
+  BY_MEMBER: (memberId: string) => withPrefix(`/order/members/${memberId}`),
+  DETAIL: (ordersId: number) => withPrefix(`/order/${ordersId}`),
+  STATUS: (ordersId: number) => withPrefix(`/order/${ordersId}/status`),
+};
+
