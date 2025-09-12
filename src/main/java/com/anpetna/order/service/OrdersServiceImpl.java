@@ -19,8 +19,10 @@ import com.anpetna.order.repository.OrdersRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
@@ -60,6 +62,17 @@ public class OrdersServiceImpl implements OrdersService {
                 .itemQuantity(0)
                 .totalAmount(0)
                 .build();
+
+        // [ADDED] 배송비: 프론트에서 값을 넘겨주면 사용, 없으면 기본 배송비 부여
+        final int shippingFee =
+                (req.getShippingFee() == null ? DEFAULT_SHIPPING_FEE : req.getShippingFee());
+        orders.setShippingFee(shippingFee); // [ADDED]
+
+        // [ADDED] 배송지: checkout 페이지에서 입력한 배송지 정보 반영
+        // (createOrder() 경로와 동일한 방식. 기존 메서드에는 누락되어 있던 부분)
+        orders.setShippingAddress(toAddressEntity(req.getShippingAddress())); // [ADDED]
+        // ※ useSavedAddress(true) 같은 회원 프로필 재사용 로직은 이 메서드에서는 처리하지 않고,
+        //   프론트가 shippingAddress를 채워 보내도록 통일. (필요하면 이후 memberRepository 주입 후 분기 추가 가능)
 
         int totalQty = 0;
         int totalAmt = 0;
@@ -114,7 +127,10 @@ public class OrdersServiceImpl implements OrdersService {
 
         // 3) 헤더 집계값 + 대표 이미지 설정 (대표 이미지가 없으면 빈 문자열로 보정해 NOT NULL 회피)
         orders.setItemQuantity(totalQty);
-        orders.setTotalAmount(totalAmt);
+
+        // [OLD] orders.setTotalAmount(totalAmt);
+        orders.setTotalAmount(totalAmt + shippingFee); // [CHANGED] 총 금액 = 소계 + 배송비 (createOrder와 일치)
+
         String thumb = firstImageUrlFromHeader(orders); // 동일 클래스에 이미 존재하는 보조 메소드
         orders.setItemImageUrl(thumb != null ? thumb : "");
 
@@ -130,6 +146,7 @@ public class OrdersServiceImpl implements OrdersService {
         // 5) 응답
         return new CreateOrderRes(saved.getOrdersId());
     }
+
     // =========================================
 
 
@@ -375,6 +392,7 @@ public class OrdersServiceImpl implements OrdersService {
         return OrderDTO.builder()
                 .orderId(e.getOrderId())
                 .itemId(e.getItemEntity() != null ? e.getItemEntity().getItemId() : null)
+                .name(e.getItemEntity() != null ? e.getItemEntity().getItemName() : null) // ★ 추가
                 .price(e.getPrice())
                 .quantity(e.getQuantity())
                 .thumbnailUrl(firstImageUrl(e))
@@ -395,4 +413,18 @@ public class OrdersServiceImpl implements OrdersService {
         if (orders.getOrderItems() == null || orders.getOrderItems().isEmpty()) return null;
         return firstImageUrl(orders.getOrderItems().get(0));
     }
+
+
+
+// 배송지변경 추가★
+    @Override
+    @Transactional
+    public ReadOneOrdersRes updateAddress(Long ordersId, AddressDTO address) {
+        OrdersEntity orders = ordersRepository.findByOrdersId(ordersId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "주문을 찾을 수 없습니다."));
+        orders.setShippingAddress(toAddressEntity(address));
+        ordersRepository.save(orders);
+        return toReadOneOrdersRes(orders);
+    }
+
 }

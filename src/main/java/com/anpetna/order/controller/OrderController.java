@@ -2,6 +2,7 @@ package com.anpetna.order.controller;
 
 import com.anpetna.ApiResult;
 import com.anpetna.order.constant.OrdersStatus;
+import com.anpetna.order.dto.AddressDTO;
 import com.anpetna.order.dto.createOrderDTO.CreateOrderReq;
 import com.anpetna.order.dto.createOrderDTO.CreateOrderRes;
 import com.anpetna.order.dto.readAllOrderDTO.ReadAllOrdersRes;
@@ -142,4 +143,17 @@ public class OrderController {
     //        ordersService.delete(ordersId);
     //        return ResponseEntity.noContent().build(); // 204 No Content
     //    }
+
+    // 배송지변경
+    @PatchMapping("/{ordersId}/address")
+    public ResponseEntity<ReadOneOrdersRes> updateAddress(
+            @PathVariable @Min(1) Long ordersId,
+            @Valid @RequestBody AddressDTO address
+    ) {
+        ReadOneOrdersRes body = ordersService.updateAddress(ordersId, address);
+        return ResponseEntity.ok(body);
+    }
+
+
+
 }

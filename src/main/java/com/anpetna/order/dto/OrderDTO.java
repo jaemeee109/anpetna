@@ -15,6 +15,8 @@ public class OrderDTO {
 
     private Long itemId;    // ItemEntity PK
 
+    private String name;      // ★추가
+
     private int price;  // 단가
 
     private int quantity;   // 주문 수량

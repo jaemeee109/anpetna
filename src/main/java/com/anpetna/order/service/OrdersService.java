@@ -1,6 +1,7 @@
 package com.anpetna.order.service;
 
 import com.anpetna.order.constant.OrdersStatus;
+import com.anpetna.order.dto.AddressDTO;
 import com.anpetna.order.dto.createOrderDTO.CreateOrderReq;
 import com.anpetna.order.dto.createOrderDTO.CreateOrderRes;
 import com.anpetna.order.dto.readAllOrderDTO.ReadAllOrdersRes;
@@ -28,5 +29,6 @@ public interface OrdersService {
     // 특정 회원의 계산서 목록 요약 보기
     ReadAllOrdersRes getSummariesByMember(String memberId, Pageable pageable);
 
-
+    // 배송지 변경 추가
+    ReadOneOrdersRes updateAddress(Long ordersId, AddressDTO address);
 }
