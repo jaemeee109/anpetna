@@ -9,6 +9,7 @@ import orderApi from '@/features/order/data/order.api';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect } from 'react';
 import PawIcon from '@/components/icons/Paw';
+
 /** ===== 이미지 베이스/절대경로 (checkout과 동일 로직) ===== */
 function resolveImgBase(): string {
   const envBase =
@@ -106,16 +107,16 @@ export default function OrderDetailPage() {
         <h2 className="text-lg font-semibold mt-[20px] mb-[8px] text-left">배송지 정보</h2>
         <section className="apn-card p-4 h-card-ship">
           <div className="flex flex-col items-start gap-2 ml-[45px]">
-            <div className="flex items-center gap-3 mt>[20px]">
-              <label className="w-[140px] text-left">이름</label>
+            <div className="flex items-center gap-3 mt-[20px]">
+              <label className="w-[140px] text-center mt-[20ox]">Name</label>
               <input
                 className="order-input"
                 value={addr.receiver}
                 onChange={(e) => setAddr((s) => ({ ...s, receiver: e.target.value }))}
               />
             </div>
-            <div className="flex items-center gap-3">
-              <label className="w-[140px] text-left">연락처</label>
+            <div className="flex items-center gap-3 ">
+              <label className="w-[140px] text-center">Tel</label>
               <input
                 className="order-input"
                 value={'' as any}
@@ -124,7 +125,7 @@ export default function OrderDetailPage() {
               />
             </div>
             <div className="flex items-center gap-3">
-              <label className="w-[140px] text-left">Zipcode</label>
+              <label className="w-[140px] text-center">Zipcode</label>
               <input
                 className="order-input"
                 value={addr.zipcode}
@@ -132,31 +133,37 @@ export default function OrderDetailPage() {
               />
             </div>
             <div className="flex items-center gap-3">
-              <label className="w-[140px] text-left">Road Address</label>
+              <label className="w-[140px] text-center">Road Address</label>
               <input
                 className="order-input"
                 value={addr.street}
                 onChange={(e) => setAddr((s) => ({ ...s, street: e.target.value }))}
               />
             </div>
-            <div className="flex items-center gap-3 mb-[10px]">
-              <label className="w-[140px] text-left">Detail address</label>
+            <div className="flex items-center gap-3 mb-[30px]">
+              <label className="w-[140px] text-center">Detail address</label>
               <input
                 className="order-input"
                 value={addr.detail}
                 onChange={(e) => setAddr((s) => ({ ...s, detail: e.target.value }))}
               />
             </div>
- 
           </div>
         </section>
 
-        <div className="mt-[15px] flex justify-end mr-[15px]">
-  <button className="btn-3d btn-white !px-4 !py-2" onClick={() => mUpdate.mutate(addr)}>
-    배송지 변경
-  </button>
-</div>
+        <div className="mt-[25px] flex justify-end mr-[15px]">
+          <button className="btn-3d btn-white !px-4 !py-2" onClick={() => mUpdate.mutate(addr)}>
+            배송지 변경
+          </button>
+        </div>
 
+        {/* (1-1) 배송조회 */}
+        <h2 className="text-lg font-semibold mt-[24px] mb-[8px] text-left">배송조회</h2>
+        <section className="apn-card p-4 h-card-track">
+          <div className="track-note ml-[30px] mt-[25px]">
+            현재 상품준비중으로 조회가 불가능합니다
+          </div>
+        </section>
 
         {/* (2) 결제수단 — 체크박스 체크 고정 + 수정불가 (주문페이지 디자인 유지) */}
         <h2 className="text-lg font-semibold mt-[24px] mb-[8px] text-left">결제수단</h2>
@@ -308,7 +315,7 @@ export default function OrderDetailPage() {
           ※ 교환 및 환불신청은 Q&amp;A에서 상담 후 가능합니다
         </p>
 
-        {/* ===== 이 페이지 한정 스타일: 주문페이지와 동일 세트 + 안내문 커스텀 변수 ===== */}
+        {/* ===== 이 페이지 한정 스타일: 주문페이지와 동일 세트 + 안내문/배송조회 커스텀 변수 ===== */}
         <style jsx global>{`
           :root {
             /* 주문상품 카드 여백/간격 */
@@ -333,6 +340,10 @@ export default function OrderDetailPage() {
             /* 하단 안내문(요청: 폰트/색 조절 가능) */
             --after-note-fs: 13px;
             --after-note-color: #6b7280; /* gray-500 */
+
+            /* 배송조회 카드 텍스트 커스텀 */
+            --track-note-fs: 14px;
+            --track-note-color: #6b7280;
           }
 
           /* 버튼(3D) */
@@ -393,6 +404,7 @@ export default function OrderDetailPage() {
           .h-card-pay { min-height: 80px; }
           .h-card-sum { min-height: 200px; }
           .h-card-priv { height: 350px; }
+          .h-card-track { min-height: 70px; } /* ▶ 새로 추가: 배송조회 카드 높이 */
 
           /* 주문상품 여백/간격 */
           .items-top-pad { height: var(--order-items-card-top-gap); }
@@ -415,6 +427,9 @@ export default function OrderDetailPage() {
 
           /* 하단 안내문 커스터마이즈 */
           .after-note { font-size: var(--after-note-fs); color: var(--after-note-color); margin-bottom: 120px; }
+
+          /* ▶ 배송조회 카드 문구 (위치/폰트/색 네가 조절 가능) */
+          .track-note { font-size: 14px; color: #b6b6b6ff(--track-note-color); }
         `}</style>
       </main>
     </RequireLogin>

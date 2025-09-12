@@ -1,8 +1,10 @@
+// src/app/member/info/page.tsx
 'use client';
 
 import { useEffect, useMemo, useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import PawIcon from '@/components/icons/Paw';
+
 type GM = '양력' | '음력';
 type YesNo = 'Y' | 'N';
 
@@ -15,6 +17,7 @@ interface MemberForm {
   memberBirthD: string;
   memberBirthGM: GM;
   memberEmail: string;
+  memberPhone: string;
   memberZipCode: string;
   memberRoadAddress: string;
   memberDetailAddress: string;
@@ -46,6 +49,7 @@ export default function MemberInfoPage() {
     memberBirthD: '',
     memberBirthGM: '양력',
     memberEmail: '',
+    memberPhone: '',
     memberZipCode: '',
     memberRoadAddress: '',
     memberDetailAddress: '',
@@ -171,6 +175,7 @@ export default function MemberInfoPage() {
                   ? '음력'
                   : '양력') as GM,
                 memberEmail: nz(src.memberEmail || src.email),
+                memberPhone: nz(src.memberPhone || src.phone || src.tel), // ✅ src로 수정
                 memberZipCode: nz(src.memberZipCode || src.zipCode),
                 memberRoadAddress: nz(src.memberRoadAddress || src.roadAddress),
                 memberDetailAddress: nz(src.memberDetailAddress || src.detailAddress),
@@ -181,7 +186,7 @@ export default function MemberInfoPage() {
           }
         }
 
-        // 2) 토큰/LS에서 못 얻었거나 실패하면'/member/readOne'로 보조 조회
+        // 2) 토큰/LS에서 못 얻었거나 실패하면 '/member/readOne'로 보조 조회
         const meRes = await fetch(api('/member/readOne'), {
           method: 'GET',
           credentials: 'include',
@@ -233,6 +238,7 @@ export default function MemberInfoPage() {
               ? '음력'
               : '양력') as GM,
             memberEmail: nz(src2.memberEmail || src2.email),
+            memberPhone: nz(src2.memberPhone || src2.phone || src2.tel),
             memberZipCode: nz(src2.memberZipCode || src2.zipCode),
             memberRoadAddress: nz(src2.memberRoadAddress || src2.roadAddress),
             memberDetailAddress: nz(src2.memberDetailAddress || src2.detailAddress),
@@ -294,7 +300,7 @@ export default function MemberInfoPage() {
   return (
     <main className="mx-auto max-w-[720px] px-4 py-8 text-center">
       <h1 className="text-2xl font-semibold mb-6">My Information&nbsp;<PawIcon/></h1>
-      <hr className="border-gray-200 mb-8" />
+      <hr className="border-gray-200 mb-[40px]" />
 
       <form onSubmit={onSubmit}>
         <Row label="ID"><input className="input" value={form.memberId} disabled /></Row>
@@ -307,7 +313,18 @@ export default function MemberInfoPage() {
             onChange={(e) => set('memberPw', e.target.value)}
           />
         </Row>
+
         <Row label="NAME"><input className="input" value={form.memberName} disabled /></Row>
+
+        {/* NAME 바로 아래 TEL 추가 (디자인 동일: className="input") */}
+        <Row label="TEL">
+          <input
+            className="input"
+            value={form.memberPhone}
+            onChange={(e) => set('memberPhone', e.target.value)}
+            placeholder="연락처"
+          />
+        </Row>
 
         <Row label="Birthday">
           <select className="input input--xs" value={form.memberBirthY} onChange={(e) => set('memberBirthY', e.target.value)}>
@@ -347,9 +364,11 @@ export default function MemberInfoPage() {
           <label><input type="radio" checked={form.memberHasPet === 'Y'} onChange={() => set('memberHasPet', 'Y')} /> Yes</label>
           <label className="ml-4"><input type="radio" checked={form.memberHasPet === 'N'} onChange={() => set('memberHasPet', 'N')} /> No</label>
         </Row>
-        <br></br>
+
+        <br />
         <hr className="border-gray-200 mb-8" />
-  <br></br>
+        <br />
+
         <div className="mt-8 flex justify-center">
           <button type="submit" disabled={submitting} className="btn-3d btn-white min-w-[140px]">
             {submitting ? '처리 중…' : '수정하기'}
@@ -359,9 +378,11 @@ export default function MemberInfoPage() {
         {ok && <p className="text-green-600 mt-4">{ok}</p>}
         {err && <p className="text-red-600 mt-4 whitespace-pre-wrap">{err}</p>}
       </form>
-  <br></br>
-    <br></br>
-      <br></br>
+
+      <br />
+      <br />
+      <br />
+
       <style jsx global>{`
         .row{display:flex;align-items:center;justify-content:center;gap:12px;margin:14px 0;}
         .label{width:120px;text-align:right;font-weight:500;}
