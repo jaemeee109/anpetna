@@ -12,10 +12,15 @@ services:
     hostname: app-blue
     expose: ["8080"]
     environment:
-      SPRING_DATASOURCE_URL: jdbc:mariadb://100.116.163.33:3306/anpetnadb
+      TZ: Asia/Seoul
+      SPRING_DATASOURCE_URL: jdbc:mariadb://100.116.163.33:3306/anpetnadb?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Seoul&connectTimeout=30000&socketTimeout=60000&tcpKeepAlive=true
       SPRING_DATASOURCE_USERNAME: anpetnaitem
       SPRING_DATASOURCE_PASSWORD: anpetna220
       SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      # (선택) Hikari 튜닝
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: "10"
+      SPRING_DATASOURCE_HIKARI_INITIALIZATION_FAIL_TIMEOUT: "0"  # DB 늦게 열려도 부팅 지속
+    restart: unless-stopped
     networks: [vpc]
 
   app-green:
@@ -24,22 +29,26 @@ services:
     hostname: app-green
     expose: ["8080"]
     environment:
-      SPRING_DATASOURCE_URL: jdbc:mariadb://100.116.163.33:3306/anpetnadb
-      SPRING_DATASOURCE_USERNAME: aanpetnitem
+      TZ: Asia/Seoul
+      SPRING_DATASOURCE_URL: jdbc:mariadb://100.116.163.33:3306/anpetnadb?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Seoul&connectTimeout=30000&socketTimeout=60000&tcpKeepAlive=true
+      SPRING_DATASOURCE_USERNAME: anpetnaitem
       SPRING_DATASOURCE_PASSWORD: anpetna220
       SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: "10"
+      SPRING_DATASOURCE_HIKARI_INITIALIZATION_FAIL_TIMEOUT: "0"
+    restart: unless-stopped
     networks: [vpc]
 
   api-gateway:
     image: nginx:alpine
     container_name: api-gateway
     hostname: api-gateway
-    ports:
-      - "80:80"
+    ports: ["80:80"]
     volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx-conf/active-upstream.var:/etc/nginx/conf.d/active-upstream.var:ro
+      - ${APP_DIR}/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ${APP_DIR}/nginx-conf/active-upstream.var:/etc/nginx/conf.d/active-upstream.var:ro
     depends_on:
       - app-blue
       - app-green
+    restart: unless-stopped
     networks: [vpc]
