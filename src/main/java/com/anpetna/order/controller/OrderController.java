@@ -23,7 +23,7 @@ import java.net.URI;
 
 @Validated // ✅ PathVariable/RequestParam 검증 활성화
 @RestController
-@RequestMapping("/order")
+@RequestMapping("/anpetna/order")
 @RequiredArgsConstructor
 public class OrderController {
     private final OrdersService ordersService;

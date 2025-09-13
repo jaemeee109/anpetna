@@ -20,7 +20,7 @@ public class CreateOrderReq {
 
     // =====================================
     public enum Mode { ITEM, CART }
-
+    // 주문 방식 (아이템에서 바로인지, 카트에서인지)
     @NotNull
     private Mode mode;
 
@@ -33,7 +33,7 @@ public class CreateOrderReq {
 
     // =====================================
 
-    // 배송지 선택 방식
+    // 결제자 정보
     @NotBlank
     private String memberId;
 
