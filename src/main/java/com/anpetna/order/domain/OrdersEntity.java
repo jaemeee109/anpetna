@@ -1,5 +1,7 @@
 package com.anpetna.order.domain;
 
+import com.anpetna.member.domain.MemberEntity;
+import com.anpetna.member.domain.QMemberEntity;
 import com.anpetna.order.constant.OrdersStatus;
 import jakarta.persistence.*;
 import lombok.*;
@@ -28,8 +30,10 @@ public class OrdersEntity {
     @Column(name = "orders_id", nullable = false) // 실제 컬럼명과 제약
     private Long ordersId;
 
-    @Column(name = "orders_memberId", nullable = false) // 주문한 회원 식별자(문자열)
-    private String memberId;
+    @ManyToOne(fetch = FetchType.LAZY) // 다대일 연결
+    @ToString.Exclude
+    @JoinColumn(name = "orders_memberId", nullable = false) // 주문한 회원 식별자(문자열)
+    private MemberEntity memberId;
 
     @Column(name = "orders_cardId", nullable = false) // 결제 카드 식별자(문자열)
     private String cardId;
