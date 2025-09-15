@@ -148,80 +148,6 @@ public class OrdersServiceImpl implements OrdersService {
     }
     // =========================================
 
-
-
-    // 주문 생성
-    @Override
-    @Transactional
-    public ReadOneOrdersRes createOrder(CreateOrderReq req) {
-        if (req == null) throw new IllegalArgumentException("요청이 비었습니다.");
-
-        if (req.getMemberId() == null || req.getMemberId().isBlank())
-            throw new IllegalArgumentException("memberId는 필수입니다.");
-        // 주문 식별자 검증
-        if (req.getCardId() == null || req.getCardId().isBlank())
-            throw new IllegalArgumentException("cardId는 필수입니다.");
-        // 결제 식별자 검증
-
-        if (req.getItems() == null || req.getItems().isEmpty())
-            throw new IllegalArgumentException("주문 품목이 비었습니다.");
-        // 최소 1개 이상의 주문 라인이 있어야 함
-
-
-        // 배송비: 프론트에서 값을 넘겨주면 사용, 없으면 기본 배송비 부여
-        int shippingFee = (req.getShippingFee() == null ? DEFAULT_SHIPPING_FEE : req.getShippingFee());
-        if (shippingFee < 0) throw new IllegalArgumentException("shippingFee는 0 이상이어야 합니다."); // 배송비 음수 방지
-
-        // 배송지 정보
-        AddressEntity shippingAddr = toAddressEntity(req.getShippingAddress());
-
-        // 주문 헤더 생성
-        OrdersEntity orders = OrdersEntity.builder()
-                .memberId(req.getMemberId())    // 주문자
-                .cardId(req.getCardId())    // 결제 카드 ID
-                .shippingAddress(shippingAddr)  // 배송지
-                .status(OrdersStatus.PENDING) // 배송 상태, 최초 생성 시 상태는 PENDING
-                .shippingFee(shippingFee)     // 배송비, 입력받은 값(없으면 기본값) 저장
-                .itemQuantity(0)              // 총 수량, 합계는 아래에서 계산
-                .totalAmount(0)               // 총 금액, 합계는 아래에서 계산
-                .itemImageUrl(null)           // 이미지, 대표 이미지도 아래에서 설정
-                .build();
-
-        // 주문 품목 라인 생성 + 합계 계산
-        int totalQty = 0;
-        int subtotal = 0;
-
-        for (var line : req.getItems()) {
-            ItemEntity item = itemRepository.findById(line.getItemId())
-                    .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 상품: " + line.getItemId()));
-            // 상품 ID로 실제 상품을 조회. 없으면 예외(잘못된 요청 방지)
-
-            int unitPrice = item.getItemPrice(); // ItemEntity의 가격 필드 사용
-            int lineTotal = unitPrice * line.getQuantity();
-
-            OrderEntity orderLine = OrderEntity.builder()
-                    .itemEntity(item)
-                    .price(unitPrice)
-                    .quantity(line.getQuantity())
-                    .orders(orders)
-                    .build();
-
-            orders.getOrderItems().add(orderLine);
-            totalQty += line.getQuantity();
-            subtotal += lineTotal;
-        }
-
-        // 총 수량 + 총 금액(소계 + 배송비) 저장
-        orders.setItemQuantity(totalQty);
-        orders.setTotalAmount(subtotal + shippingFee); // 헤더의 총 금액 = 소계 + 배송비
-
-        // 대표 썸네일: 첫 라인의 첫 이미지 사용
-        orders.setItemImageUrl(firstImageUrlFromHeader(orders));
-
-        OrdersEntity saved = ordersRepository.save(orders);
-        return toReadOneOrdersRes(saved);
-    }
-
     // 주문 상태 전이
     @Override
     @Transactional
@@ -241,6 +167,18 @@ public class OrdersServiceImpl implements OrdersService {
         orders.setStatus(nextStatus);
         return toReadOneOrdersRes(orders);
     }
+
+    // 배송지변경 추가★
+    @Override
+    @Transactional
+    public ReadOneOrdersRes updateAddress(Long ordersId, AddressDTO address) {
+        OrdersEntity orders = ordersRepository.findByOrdersId(ordersId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "주문을 찾을 수 없습니다."));
+        orders.setShippingAddress(toAddressEntity(address));
+        ordersRepository.save(orders);
+        return toReadOneOrdersRes(orders);
+    }
+
 
     // 주문 상태 전이 허용 규칙 정의
     private boolean isValidTransition(OrdersStatus from, OrdersStatus to) {
@@ -413,32 +351,5 @@ public class OrdersServiceImpl implements OrdersService {
         return firstImageUrl(orders.getOrderItems().get(0));
     }
 
-    // 배송지
-    private AddressEntity toAddressEntity(AddressDTO dto) {
-        if (dto == null) return null;
-        return AddressEntity.builder()
-                .zipcode(dto.getZipcode())
-                .street(dto.getStreet())
-                .detail(dto.getDetail())
-                .receiver(dto.getReceiver())
-                .build();
-    }
-
-    // 상세 DTO (헤더 + 라인)
-    private ReadOneOrdersRes toReadOneOrdersRes(OrdersEntity o) {
-        // 주문 품목을 DTO로 변환
-        List<OrderDTO> lines = (o.getOrderItems() == null) ? List.of()
-                : o.getOrderItems().stream().map(this::toOrderLineDTO).toList();
-
-// 배송지변경 추가★
-    @Override
-    @Transactional
-    public ReadOneOrdersRes updateAddress(Long ordersId, AddressDTO address) {
-        OrdersEntity orders = ordersRepository.findByOrdersId(ordersId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "주문을 찾을 수 없습니다."));
-        orders.setShippingAddress(toAddressEntity(address));
-        ordersRepository.save(orders);
-        return toReadOneOrdersRes(orders);
-    }
 
 }

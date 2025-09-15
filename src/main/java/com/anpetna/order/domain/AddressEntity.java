@@ -19,4 +19,6 @@ public class AddressEntity {
 
     private String receiver;  // 수령인
 
+
+
 }
