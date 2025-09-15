@@ -1,5 +1,6 @@
 package com.anpetna.order.dto.readAllOrderDTO;
 
+import com.anpetna.member.domain.MemberEntity;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -14,7 +15,7 @@ public class ReadAllOrdersReq {
 
 
     @NotBlank
-    private String memberId;     // 조회할 회원 ID
+    private MemberEntity memberId;     // 조회할 회원 ID
 
     @Min(0)
     @Builder.Default

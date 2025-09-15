@@ -1,5 +1,6 @@
 package com.anpetna.order.service;
 
+import com.anpetna.member.domain.MemberEntity;
 import com.anpetna.order.constant.OrdersStatus;
 import com.anpetna.order.dto.AddressDTO;
 import com.anpetna.order.dto.createOrderDTO.CreateOrderReq;
@@ -7,11 +8,14 @@ import com.anpetna.order.dto.createOrderDTO.CreateOrderRes;
 import com.anpetna.order.dto.readAllOrderDTO.ReadAllOrdersRes;
 import com.anpetna.order.dto.readOneOrderDTO.ReadOneOrdersRes;
 import org.springframework.data.domain.Pageable;
+import org.springframework.transaction.annotation.Transactional;
 
 public interface OrdersService {
 
-    // 배송 시작~!
-    CreateOrderRes create(String memberId, CreateOrderReq req);
+    // 추가=========================================================
+    @Transactional
+    CreateOrderRes create(MemberEntity memberId, CreateOrderReq req);
+    // =====================================================
 
 
     // 배송 상태 변경
@@ -29,6 +33,8 @@ public interface OrdersService {
     ReadAllOrdersRes getAllOrders(Pageable pageable);
 
     // 특정 회원의 계산서 목록 요약 보기
-    ReadAllOrdersRes getSummariesByMember(String memberId, Pageable pageable);
+    ReadAllOrdersRes getSummariesByMember(MemberEntity memberId, Pageable pageable);
 
+    // 배송지 변경 추가
+    ReadOneOrdersRes updateAddress(Long ordersId, AddressDTO address);
 }

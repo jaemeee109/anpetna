@@ -17,4 +17,6 @@ public class AddressDTO {
 
     private String receiver;  // 수령인
 
+    private String phone; // 연락처
+
 }

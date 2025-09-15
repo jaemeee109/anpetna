@@ -1,5 +1,7 @@
 package com.anpetna.order.repository;
 
+import com.anpetna.member.domain.MemberEntity;
+import com.anpetna.order.constant.OrdersStatus;
 import com.anpetna.order.domain.OrdersEntity;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -17,7 +19,7 @@ public interface OrdersRepository extends JpaRepository<OrdersEntity, Long> {
     Optional<OrdersEntity> findByOrdersId(Long ordersId);
 
     // 특정 회원의 주문 페이징 처리로
-    Page<OrdersEntity> findByMemberId(String memberId, Pageable pageable);
+    Page<OrdersEntity> findByMemberId(MemberEntity memberId, Pageable pageable);
 
 
 //    @EntityGraph(attributePaths = { "orderItems", "orderItems.itemEntity" })

@@ -1,5 +1,6 @@
 package com.anpetna.order.dto.readAllOrderDTO;
 
+import com.anpetna.member.domain.MemberEntity;
 import com.anpetna.order.constant.OrdersStatus;
 import com.anpetna.order.dto.AddressDTO;
 import lombok.Builder;
@@ -27,7 +28,7 @@ public class ReadAllOrdersRes {
 
         private Long ordersId;        // 주문 ID
 
-        private String memberId;      // 회원 ID
+        private MemberEntity memberId;      // 회원 ID
 
         private int itemQuantity;     // 주문 총 수량
 

@@ -1,5 +1,6 @@
 package com.anpetna.order.dto.createOrderDTO;
 
+import com.anpetna.member.domain.MemberEntity;
 import com.anpetna.order.dto.AddressDTO;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
@@ -35,7 +36,7 @@ public class CreateOrderReq {
 
     // 배송지 선택 방식
     @NotBlank
-    private String memberId;
+    private MemberEntity memberId;
 
     @NotBlank
     private String cardId;

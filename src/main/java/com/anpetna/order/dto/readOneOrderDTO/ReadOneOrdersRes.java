@@ -1,5 +1,6 @@
 package com.anpetna.order.dto.readOneOrderDTO;
 
+import com.anpetna.member.domain.MemberEntity;
 import com.anpetna.order.constant.OrdersStatus;
 import com.anpetna.order.dto.AddressDTO;
 import com.anpetna.order.dto.OrderDTO;
@@ -14,7 +15,7 @@ public class ReadOneOrdersRes {
 
     private Long ordersId;  // 주문서 ID
 
-    private String memberId;    // 주문자 ID
+    private MemberEntity memberId;    // 주문자 ID
 
     private String cardId;   // 카드 ID
 
