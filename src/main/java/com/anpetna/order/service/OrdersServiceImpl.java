@@ -42,7 +42,7 @@ public class OrdersServiceImpl implements OrdersService {
     private final OrderRepository orderRepository;
     private final CartRepository cartRepository;
     //    private static final int FREE_SHIPPING_THRESHOLD = 100_000; // 10만원 이상 무료 배송
-    private final MemberRepository memberRepository;          // ✅ ADDED
+    private final MemberRepository memberRepository;
 
     // 기존에는 임의로 설정한 배송비와 무료배송비용 사용.
     // 이를 DTO에 추가하여 입력한 값을 배송비, 무료배송비용으로 사용하게끔 변경.
@@ -59,21 +59,21 @@ public class OrdersServiceImpl implements OrdersService {
 
         // 1) 주문 헤더(아직 저장하지 않음)
         OrdersEntity orders = OrdersEntity.builder()
-                .memberId(memberId)                 // ✅ CHANGED: .memberId(...) -> .member(...)
+                .memberId(memberId)
                 .cardId("MANUAL")
                 .status(OrdersStatus.PENDING)
                 .itemQuantity(0)
                 .totalAmount(0)
                 .build();
 
-        // [ADDED] 배송비: 프론트에서 값을 넘겨주면 사용, 없으면 기본 배송비 부여
+        //  배송비: 프론트에서 값을 넘겨주면 사용, 없으면 기본 배송비 부여
         final int shippingFee =
                 (req.getShippingFee() == null ? DEFAULT_SHIPPING_FEE : req.getShippingFee());
-        orders.setShippingFee(shippingFee); // [ADDED]
+        orders.setShippingFee(shippingFee);
 
-        // [ADDED] 배송지: checkout 페이지에서 입력한 배송지 정보 반영
+        // 배송지: checkout 페이지에서 입력한 배송지 정보 반영
         // (createOrder() 경로와 동일한 방식. 기존 메서드에는 누락되어 있던 부분)
-        orders.setShippingAddress(toAddressEntity(req.getShippingAddress())); // [ADDED]
+        orders.setShippingAddress(toAddressEntity(req.getShippingAddress()));
         // ※ useSavedAddress(true) 같은 회원 프로필 재사용 로직은 이 메서드에서는 처리하지 않고,
         //   프론트가 shippingAddress를 채워 보내도록 통일. (필요하면 이후 memberRepository 주입 후 분기 추가 가능)
 
@@ -90,7 +90,8 @@ public class OrdersServiceImpl implements OrdersService {
 
             OrderEntity line = OrderEntity.builder()
                     .item(item)
-                    .price(item.getItemPrice())
+                    .price(item.getItemPrice())          // ★ NOTE: 현재 라인 price는 "단가"를 저장합니다.
+                    // (주석엔 총액처럼 보이지만 로직은 단가 기준입니다)
                     .quantity(qty)
                     .orders(orders)
                     .build();
@@ -113,7 +114,7 @@ public class OrdersServiceImpl implements OrdersService {
 
                 OrderEntity line = OrderEntity.builder()
                         .item(item)
-                        .price(item.getItemPrice())
+                        .price(item.getItemPrice())      // ★ NOTE: 단가 저장
                         .quantity(qty)
                         .orders(orders)
                         .build();
@@ -136,7 +137,7 @@ public class OrdersServiceImpl implements OrdersService {
         orders.setTotalAmount(totalAmt + shippingFee); // [CHANGED] 총 금액 = 소계 + 배송비 (createOrder와 일치)
 
         String thumb = firstImageUrlFromHeader(orders); // 동일 클래스에 이미 존재하는 보조 메소드
-        orders.setOrdersThumbnail(thumb != null ? thumb : "");
+        orders.setOrdersThumbnail(thumb != null ? thumb : ""); // 대표 이미지가 없으면 빈 문자열
 
         // 4) 한 번만 최종 저장 (라인은 cascade=persist로 함께 저장)
         OrdersEntity saved = ordersRepository.save(orders);
@@ -236,7 +237,6 @@ public class OrdersServiceImpl implements OrdersService {
         if (pageable == null)
             throw new IllegalArgumentException("pageable은 비워둘 수 없습니다.");
 
-        // ✅ CHANGED: OrdersRepository도 연관 필드명 기준으로 변경 필요
         Page<OrdersEntity> page = ordersRepository.findByMemberId(memberId, pageable);
 
         // DTO로 변환
@@ -267,6 +267,7 @@ public class OrdersServiceImpl implements OrdersService {
                 .street(a.getStreet())
                 .detail(a.getDetail())
                 .receiver(a.getReceiver())
+                .phone(a.getPhone())
                 .build();
     }
 
@@ -284,12 +285,12 @@ public class OrdersServiceImpl implements OrdersService {
 
         return ReadOneOrdersRes.builder()
                 .ordersId(o.getOrdersId())  // 주문 ID
-                .memberId(o.getMemberId() != null ? o.getMemberId() : null)  // ✅ CHANGED
+                .memberId(o.getMemberId() != null ? o.getMemberId() : null)  // 엔티티 대신 회원ID만 노출
                 .cardId(o.getCardId())      // 카드 ID
                 .itemsSubtotal(itemsSubtotal)   // 물건값
                 .shippingFee(shippingFee)       // 배송비
                 .totalAmount(totalAmount)       // 총 금액
-                .status(OrdersStatus.valueOf(o.getStatus().name()))   // 주문 상태
+                .status(o.getStatus())
                 .shippingAddress(toAddressDTO(o.getShippingAddress()))  // 배송지
                 .ordersItems(lines) // 품목 리스트
                 .build();
@@ -303,13 +304,13 @@ public class OrdersServiceImpl implements OrdersService {
         int subtotal   = grandTotal - shipping;
 
         return ReadAllOrdersRes.Line.builder()
-                .ordersId(o.getOrdersId())      // 주문 ID
-                .memberId(o.getMemberId() != null ? o.getMemberId() : null) // ✅ CHANGED
+                .ordersId(o.getOrdersId())
+                .memberId(o.getMemberId() != null ? o.getMemberId() : null)
                 .itemQuantity(itemQty)          // 총 수량
                 .itemsSubtotal(subtotal)        // 물건값
                 .shippingFee(shipping)          // 배송비
                 .totalAmount(grandTotal)        // 총 금액
-                .status(OrdersStatus.valueOf(o.getStatus().name()))   // 배송상태
+                .status(o.getStatus())
                 .build();
     }
 
@@ -336,8 +337,13 @@ public class OrdersServiceImpl implements OrdersService {
 
     // 주문 헤더 기준 첫 번째 라인의 첫 이미지 반환
     private String firstImageUrlFromHeader(OrdersEntity orders) {
+        // ★ CHANGED: 첫 라인만 보지 말고, 이미지가 있는 첫 라인을 순회 탐색
         if (orders.getOrderItems() == null || orders.getOrderItems().isEmpty()) return null;
-        return firstImageUrl(orders.getOrderItems().get(0));
+        for (OrderEntity li : orders.getOrderItems()) {
+            String u = firstImageUrl(li);
+            if (u != null && !u.isBlank()) return u;
+        }
+        return null;
     }
 
     // 배송지
@@ -348,6 +354,7 @@ public class OrdersServiceImpl implements OrdersService {
                 .street(dto.getStreet())
                 .detail(dto.getDetail())
                 .receiver(dto.getReceiver())
+                .phone(dto.getPhone())
                 .build();
     }
 
