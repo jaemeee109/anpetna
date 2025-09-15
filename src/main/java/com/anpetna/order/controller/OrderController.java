@@ -37,7 +37,7 @@ public class OrderController {
     /** 주문 생성 (직구/장바구니 겸용) */
     @PostMapping("/buy")
     @PreAuthorize("hasRole('USER')")
-    public ResponseEntity<ApiResult<CreateOrderRes>> create(
+    public ApiResult<CreateOrderRes> create(
             Authentication authentication,
             @RequestBody CreateOrderReq req //@Valid 제거
     ) {
@@ -47,7 +47,7 @@ public class OrderController {
         // 참고) 존재 확인까지 하고 싶으면 findById(loginId).orElseThrow(...) 사용
 
         CreateOrderRes res = ordersService.create(member, req);
-        return ResponseEntity.ok(new ApiResult<>(res));
+        return new ApiResult<>(res);
     }
 
     // ==============================================================
@@ -99,33 +99,6 @@ public class OrderController {
     }
 
     // ==============================================================
-
-    /**
-     * 주문 생성
-     * - 배송비는 프론트에서 넘겨주면 그 값을 사용
-     * - 배송비를 안 넘기면 기본 3,000원 적용
-     *
-     * 요청 예시:
-     * POST /anpetna/order
-     * {
-     *   "memberId": "user-001",
-     *   "cardId": "card-xyz",
-     *   "useSavedAddress": false,
-     *   "shippingAddress": {...},
-     *   "items": [ { "itemId": 10, "quantity": 2 }, ... ],
-     *   "shippingFee": 3000 // (선택) 프론트에서 직접 전달. 없으면 기본값 사용
-     * }
-     */
-    @PostMapping
-    public ResponseEntity<ReadOneOrdersRes> createOrder(@Valid @RequestBody CreateOrderReq req) {
-        ReadOneOrdersRes created = ordersService.createOrder(req);
-
-        // 201 Created + Location 헤더(/anpetna/order/{ordersId})
-        URI location = URI.create("/anpetna/order/" + created.getOrdersId());
-        return ResponseEntity
-                .created(location) // = status 201 + Location
-                .body(created);
-    }
 
     /**
      * 주문 상태 전이

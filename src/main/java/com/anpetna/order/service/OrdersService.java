@@ -13,7 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 public interface OrdersService {
 
     // 추가=========================================================
-    @Transactional
+
     CreateOrderRes create(MemberEntity memberId, CreateOrderReq req);
     // =====================================================
 
@@ -35,6 +35,4 @@ public interface OrdersService {
     // 특정 회원의 계산서 목록 요약 보기
     ReadAllOrdersRes getSummariesByMember(MemberEntity memberId, Pageable pageable);
 
-    // 배송지 변경 추가
-    ReadOneOrdersRes updateAddress(Long ordersId, AddressDTO address);
 }

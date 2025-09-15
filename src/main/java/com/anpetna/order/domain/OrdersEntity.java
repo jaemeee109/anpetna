@@ -57,6 +57,8 @@ public class OrdersEntity {
     @Column(name = "orders_status", nullable = false, length = 20)
     private OrdersStatus status;
 
+    @Column(name = "orders_thumb", nullable = false)
+    private String ordersThumbnail;
 
     @Builder.Default // 빌더 사용 시에도 빈 리스트로 기본값 세팅 (null 방지)
     @ToString.Exclude // Lombok toString()에서 제외 → 순환참조/과도한 출력 방지

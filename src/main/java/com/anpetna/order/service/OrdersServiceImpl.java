@@ -89,7 +89,7 @@ public class OrdersServiceImpl implements OrdersService {
                     .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 상품: " + itemId));
 
             OrderEntity line = OrderEntity.builder()
-                    .itemEntity(item)
+                    .item(item)
                     .price(item.getItemPrice())
                     .quantity(qty)
                     .orders(orders)
@@ -112,7 +112,7 @@ public class OrdersServiceImpl implements OrdersService {
                 int qty = Math.max(1, c.getQuantity());
 
                 OrderEntity line = OrderEntity.builder()
-                        .itemEntity(item)
+                        .item(item)
                         .price(item.getItemPrice())
                         .quantity(qty)
                         .orders(orders)
@@ -136,13 +136,7 @@ public class OrdersServiceImpl implements OrdersService {
         orders.setTotalAmount(totalAmt + shippingFee); // [CHANGED] 총 금액 = 소계 + 배송비 (createOrder와 일치)
 
         String thumb = firstImageUrlFromHeader(orders); // 동일 클래스에 이미 존재하는 보조 메소드
-        orders.setItemImageUrl(thumb != null ? thumb : "");
-
-        // ImageName이 없는 오류 수정
-        String thumbName = (thumb != null && !thumb.isBlank())
-                ? thumb.substring(thumb.lastIndexOf('/') + 1)
-                : "";
-        orders.setItemImageName(thumbName);
+        orders.setOrdersThumbnail(thumb != null ? thumb : "");
 
         // 4) 한 번만 최종 저장 (라인은 cascade=persist로 함께 저장)
         OrdersEntity saved = ordersRepository.save(orders);
@@ -152,80 +146,6 @@ public class OrdersServiceImpl implements OrdersService {
     }
     // =========================================
 
-
-    // 주문 생성
-    @Override
-    @Transactional
-    public ReadOneOrdersRes createOrder(CreateOrderReq req) {
-        if (req == null) throw new IllegalArgumentException("요청이 비었습니다.");
-
-        if (req.getMemberId() == null)
-            throw new IllegalArgumentException("memberId는 필수입니다.");
-        // 주문 식별자 검증
-        if (req.getCardId() == null || req.getCardId().isBlank())
-            throw new IllegalArgumentException("cardId는 필수입니다.");
-        // 결제 식별자 검증
-
-        if (req.getItems() == null || req.getItems().isEmpty())
-            throw new IllegalArgumentException("주문 품목이 비었습니다.");
-        // 최소 1개 이상의 주문 라인이 있어야 함
-
-        // ✅ ADDED: MemberEntity 로드 (연관관계 저장용)
-        MemberEntity memberRef = memberRepository.getReferenceById(req.getMemberId().getMemberId());
-
-        // 배송비: 프론트에서 값을 넘겨주면 사용, 없으면 기본 배송비 부여
-        int shippingFee = (req.getShippingFee() == null ? DEFAULT_SHIPPING_FEE : req.getShippingFee());
-        if (shippingFee < 0) throw new IllegalArgumentException("shippingFee는 0 이상이어야 합니다."); // 배송비 음수 방지
-
-        // 배송지 정보
-        AddressEntity shippingAddr = toAddressEntity(req.getShippingAddress());
-
-        // 주문 헤더 생성
-        OrdersEntity orders = OrdersEntity.builder()
-                .memberId(memberRef)             // ✅ CHANGED: String -> MemberEntity
-                .cardId(req.getCardId())    // 결제 카드 ID
-                .shippingAddress(shippingAddr)  // 배송지
-                .status(OrdersStatus.PENDING) // 배송 상태, 최초 생성 시 상태는 PENDING
-                .shippingFee(shippingFee)     // 배송비, 입력받은 값(없으면 기본값) 저장
-                .itemQuantity(0)              // 총 수량, 합계는 아래에서 계산
-                .totalAmount(0)               // 총 금액, 합계는 아래에서 계산
-                .itemImageUrl(null)           // 이미지, 대표 이미지도 아래에서 설정
-                .build();
-
-        // 주문 품목 라인 생성 + 합계 계산
-        int totalQty = 0;
-        int subtotal = 0;
-
-        for (var line : req.getItems()) {
-            ItemEntity item = itemRepository.findById(line.getItemId())
-                    .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 상품: " + line.getItemId()));
-            // 상품 ID로 실제 상품을 조회. 없으면 예외(잘못된 요청 방지)
-
-            int unitPrice = item.getItemPrice(); // ItemEntity의 가격 필드 사용
-            int lineTotal = unitPrice * line.getQuantity();
-
-            OrderEntity orderLine = OrderEntity.builder()
-                    .itemEntity(item)
-                    .price(unitPrice)
-                    .quantity(line.getQuantity())
-                    .orders(orders)
-                    .build();
-
-            orders.getOrderItems().add(orderLine);
-            totalQty += line.getQuantity();
-            subtotal += lineTotal;
-        }
-
-        // 총 수량 + 총 금액(소계 + 배송비) 저장
-        orders.setItemQuantity(totalQty);
-        orders.setTotalAmount(subtotal + shippingFee); // 헤더의 총 금액 = 소계 + 배송비
-
-        // 대표 썸네일: 첫 라인의 첫 이미지 사용
-        orders.setItemImageUrl(firstImageUrlFromHeader(orders));
-
-        OrdersEntity saved = ordersRepository.save(orders);
-        return toReadOneOrdersRes(saved);
-    }
 
     // 주문 상태 전이
     @Override
@@ -257,7 +177,6 @@ public class OrdersServiceImpl implements OrdersService {
         ordersRepository.save(orders);
         return toReadOneOrdersRes(orders);
     }
-
 
     // 주문 상태 전이 허용 규칙 정의
     private boolean isValidTransition(OrdersStatus from, OrdersStatus to) {
@@ -334,16 +253,6 @@ public class OrdersServiceImpl implements OrdersService {
                 .build();
     }
 
-    // 배송지변경 추가★
-    @Override
-    @Transactional
-    public ReadOneOrdersRes updateAddress(Long ordersId, AddressDTO address) {
-        OrdersEntity orders = ordersRepository.findByOrdersId(ordersId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "주문을 찾을 수 없습니다."));
-        orders.setShippingAddress(toAddressEntity(address));
-        ordersRepository.save(orders);
-        return toReadOneOrdersRes(orders);
-    }
 
     /* =========================
        매핑 헬퍼
@@ -380,7 +289,6 @@ public class OrdersServiceImpl implements OrdersService {
                 .itemsSubtotal(itemsSubtotal)   // 물건값
                 .shippingFee(shippingFee)       // 배송비
                 .totalAmount(totalAmount)       // 총 금액
-                .thumbnailUrl(o.getItemImageUrl())  // 대표 이미지
                 .status(OrdersStatus.valueOf(o.getStatus().name()))   // 주문 상태
                 .shippingAddress(toAddressDTO(o.getShippingAddress()))  // 배송지
                 .ordersItems(lines) // 품목 리스트
@@ -401,7 +309,6 @@ public class OrdersServiceImpl implements OrdersService {
                 .itemsSubtotal(subtotal)        // 물건값
                 .shippingFee(shipping)          // 배송비
                 .totalAmount(grandTotal)        // 총 금액
-                .thumbnailUrl(o.getItemImageUrl())  // 이미지
                 .status(OrdersStatus.valueOf(o.getStatus().name()))   // 배송상태
                 .build();
     }
@@ -410,8 +317,8 @@ public class OrdersServiceImpl implements OrdersService {
     private OrderDTO toOrderLineDTO(OrderEntity e) {
         return OrderDTO.builder()
                 .orderId(e.getOrderId())
-                .itemId(e.getItemEntity() != null ? e.getItemEntity().getItemId() : null)
-                .name(e.getItemEntity() != null ? e.getItemEntity().getItemName() : null) // ★ 추가
+                .itemId(e.getItem() != null ? e.getItem().getItemId() : null)
+                .name(e.getItem() != null ? e.getItem().getItemName() : null) // ★ 추가
                 .price(e.getPrice())
                 .quantity(e.getQuantity())
                 .thumbnailUrl(firstImageUrl(e))
@@ -420,8 +327,8 @@ public class OrdersServiceImpl implements OrdersService {
 
     // 라인 아이템의 첫 번째 이미지 URL 반환
     private String firstImageUrl(OrderEntity line) {
-        if (line == null || line.getItemEntity() == null) return null;
-        var images = line.getItemEntity().getImages();
+        if (line == null || line.getItem() == null) return null;
+        var images = line.getItem().getImages();
         if (images == null || images.isEmpty()) return null;
 
         return images.get(0).getUrl();
