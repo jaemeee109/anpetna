@@ -1,7 +1,10 @@
 package com.anpetna.order.domain;
 
 import com.anpetna.member.domain.MemberEntity;
+<<<<<<< HEAD
 import com.anpetna.member.domain.QMemberEntity;
+=======
+>>>>>>> parent of c49a2d6 (Revert "OrdersServiceImpl 오류 수정, AddressEntity/DTO 에 phone(연락처) 추가")
 import com.anpetna.order.constant.OrdersStatus;
 import jakarta.persistence.*;
 import lombok.*;
@@ -14,7 +17,11 @@ import static jakarta.persistence.CascadeType.PERSIST;
 
 
 // "주문서(헤더)"를 담는 엔티티
+<<<<<<< HEAD
  // 한 건의 주문(영수증 상단 정보) = OrdersEntity 1행
+=======
+// 한 건의 주문(영수증 상단 정보) = OrdersEntity 1행
+>>>>>>> parent of c49a2d6 (Revert "OrdersServiceImpl 오류 수정, AddressEntity/DTO 에 phone(연락처) 추가")
 @Entity
 @Table(name = "anpetna_orders")
 @Setter
@@ -30,9 +37,15 @@ public class OrdersEntity {
     @Column(name = "orders_id", nullable = false) // 실제 컬럼명과 제약
     private Long ordersId;
 
+<<<<<<< HEAD
     @ManyToOne(fetch = FetchType.LAZY) // 다대일 연결
     @ToString.Exclude
     @JoinColumn(name = "orders_memberId", nullable = false) // 주문한 회원 식별자(문자열)
+=======
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "orders_memberId", nullable = false)
+    @ToString.Exclude // LAZY 연관관계 출력 시 순환/지연로딩 이슈 방지
+>>>>>>> parent of c49a2d6 (Revert "OrdersServiceImpl 오류 수정, AddressEntity/DTO 에 phone(연락처) 추가")
     private MemberEntity memberId;
 
     @Column(name = "orders_cardId", nullable = false) // 결제 카드 식별자(문자열)
@@ -48,11 +61,27 @@ public class OrdersEntity {
     private int shippingFee;
 
     @Embedded
+<<<<<<< HEAD
     private AddressEntity shippingAddress;   // 배송지
 
      @Enumerated(EnumType.STRING)
      @Column(name = "orders_status", nullable = false, length = 20)
      private OrdersStatus status;
+=======
+    @AttributeOverrides({
+            // 배송지
+            @AttributeOverride(name = "zipcode",  column = @Column(name = "orders_zipcode")),
+            @AttributeOverride(name = "street",   column = @Column(name = "orders_street")),
+            @AttributeOverride(name = "detail",   column = @Column(name = "orders_detail")),
+            @AttributeOverride(name = "receiver", column = @Column(name = "orders_receiver")),
+            @AttributeOverride(name = "phone",    column = @Column(name = "orders_receiver_phone"))
+    })
+    private AddressEntity shippingAddress;   // 배송지
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "orders_status", nullable = false, length = 20)
+    private OrdersStatus status;
+>>>>>>> parent of c49a2d6 (Revert "OrdersServiceImpl 오류 수정, AddressEntity/DTO 에 phone(연락처) 추가")
 
     @Column(name = "orders_itemImageUrl", nullable = false) // 대표이미지 URL
     private String itemImageUrl;
@@ -62,6 +91,7 @@ public class OrdersEntity {
     private String itemImageName;
 
 
+<<<<<<< HEAD
      @Builder.Default // 빌더 사용 시에도 빈 리스트로 기본값 세팅 (null 방지)
      @ToString.Exclude // Lombok toString()에서 제외 → 순환참조/과도한 출력 방지
      @OneToMany(
@@ -73,3 +103,13 @@ public class OrdersEntity {
 
 
 }
+=======
+    @Builder.Default // 빌더 사용 시에도 빈 리스트로 기본값 세팅 (null 방지)
+    @ToString.Exclude // Lombok toString()에서 제외 → 순환참조/과도한 출력 방지
+    @OneToMany(
+            mappedBy = "orders",              // 반대편(OrderEntity)에서 이 엔티티를 가리키는 필드명
+            cascade = {CascadeType.PERSIST, CascadeType.MERGE}
+    )
+    private List<OrderEntity> orderItems = new ArrayList<>(); // null 방지용. 주문에 품목이 없어도 항상 빈 리스트 상태.
+}
+>>>>>>> parent of c49a2d6 (Revert "OrdersServiceImpl 오류 수정, AddressEntity/DTO 에 phone(연락처) 추가")

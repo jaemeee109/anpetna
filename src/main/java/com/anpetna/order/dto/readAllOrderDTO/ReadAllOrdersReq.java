@@ -1,5 +1,9 @@
 package com.anpetna.order.dto.readAllOrderDTO;
 
+<<<<<<< HEAD
+=======
+import com.anpetna.member.domain.MemberEntity;
+>>>>>>> parent of c49a2d6 (Revert "OrdersServiceImpl 오류 수정, AddressEntity/DTO 에 phone(연락처) 추가")
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -14,7 +18,11 @@ public class ReadAllOrdersReq {
 
 
     @NotBlank
+<<<<<<< HEAD
     private String memberId;     // 조회할 회원 ID
+=======
+    private MemberEntity memberId;     // 조회할 회원 ID
+>>>>>>> parent of c49a2d6 (Revert "OrdersServiceImpl 오류 수정, AddressEntity/DTO 에 phone(연락처) 추가")
 
     @Min(0)
     @Builder.Default
