@@ -17,9 +17,6 @@ public class AddressDTO {
 
     private String receiver;  // 수령인
 
-<<<<<<< HEAD
-=======
     private String phone; // 연락처
 
->>>>>>> parent of c49a2d6 (Revert "OrdersServiceImpl 오류 수정, AddressEntity/DTO 에 phone(연락처) 추가")
 }

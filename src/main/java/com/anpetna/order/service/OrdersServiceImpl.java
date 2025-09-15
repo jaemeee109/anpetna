@@ -4,13 +4,8 @@ import com.anpetna.cart.domain.CartEntity;
 import com.anpetna.cart.repository.CartRepository;
 import com.anpetna.item.domain.ItemEntity;
 import com.anpetna.item.repository.ItemRepository;
-<<<<<<< HEAD
-import com.anpetna.member.domain.MemberEntity;                   // ✅ 연관 회원 엔티티
-import com.anpetna.member.repository.MemberRepository;           // ✅ 회원 리포지토리
-=======
 import com.anpetna.member.domain.MemberEntity;
 import com.anpetna.member.repository.MemberRepository;            // ✅ ADDED
->>>>>>> parent of c49a2d6 (Revert "OrdersServiceImpl 오류 수정, AddressEntity/DTO 에 phone(연락처) 추가")
 import com.anpetna.order.constant.OrdersStatus;
 import com.anpetna.order.domain.AddressEntity;
 import com.anpetna.order.domain.OrderEntity;
@@ -32,10 +27,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
-<<<<<<< HEAD
-import java.util.Optional;   // ✅ 추가
-=======
->>>>>>> parent of c49a2d6 (Revert "OrdersServiceImpl 오류 수정, AddressEntity/DTO 에 phone(연락처) 추가")
 
 @Service
 @RequiredArgsConstructor
@@ -43,20 +34,13 @@ import java.util.Optional;   // ✅ 추가
 public class OrdersServiceImpl implements OrdersService {
 
     private final OrdersRepository ordersRepository;
-<<<<<<< HEAD
-    //    private final OrderRepository orderRepository; // 집계용
-=======
 //    private final OrderRepository orderRepository; // 집계용
     // 계산 로직을 Entity에 컬럼을 두고 DB에서 계산하는 형식으로 바꾸면서 주석 처리.
 
->>>>>>> parent of c49a2d6 (Revert "OrdersServiceImpl 오류 수정, AddressEntity/DTO 에 phone(연락처) 추가")
     private static final int DEFAULT_SHIPPING_FEE = 3000;   // 기본 배송비 (입력 없을 경우 자동 적용)
     private final ItemRepository itemRepository;
     private final OrderRepository orderRepository;
     private final CartRepository cartRepository;
-<<<<<<< HEAD
-    private final MemberRepository memberRepository;
-=======
     //    private static final int FREE_SHIPPING_THRESHOLD = 100_000; // 10만원 이상 무료 배송
     private final MemberRepository memberRepository;          // ✅ ADDED
 
@@ -168,201 +152,6 @@ public class OrdersServiceImpl implements OrdersService {
     }
     // =========================================
 
->>>>>>> parent of c49a2d6 (Revert "OrdersServiceImpl 오류 수정, AddressEntity/DTO 에 phone(연락처) 추가")
-
-    // 추가=========================================================
-    @Override
-<<<<<<< HEAD
-    @Transactional
-    public CreateOrderRes create(String memberId, CreateOrderReq req) {
-        if (memberId == null || memberId.isBlank())
-            throw new IllegalArgumentException("memberId는 필수입니다.");
-        if (req == null || req.getMode() == null)
-            throw new IllegalArgumentException("mode는 필수입니다.");
-
-        // 0) 회원 참조
-        MemberEntity memberRef = memberRepository.getReferenceById(memberId);
-
-        // 1) 배송비 결정 (요청값 없으면 기본값)
-        int shippingFee = (req.getShippingFee() == null ? DEFAULT_SHIPPING_FEE : req.getShippingFee());
-        if (shippingFee < 0) throw new IllegalArgumentException("shippingFee는 0 이상이어야 합니다.");
-
-        // 2) 배송지 결정 (저장된 기본 배송지 vs 직접 입력)
-        AddressEntity shippingAddr;
-        if (req.isUseSavedAddress()) {
-            shippingAddr = addressFromMember(memberRef);
-            if (isEmptyAddress(shippingAddr)) {
-                shippingAddr = toAddressEntity(req.getShippingAddress());
-            }
-        } else {
-            shippingAddr = toAddressEntity(req.getShippingAddress());
-        }
-        if (isEmptyAddress(shippingAddr)) {
-            throw new IllegalArgumentException("배송지 정보가 없습니다. (useSavedAddress 또는 shippingAddress 확인)");
-        }
-
-        // 3) 주문 헤더(아직 저장 X)
-        OrdersEntity orders = OrdersEntity.builder()
-                .memberId(memberRef)
-                .cardId((req.getCardId() == null || req.getCardId().isBlank()) ? "MANUAL" : req.getCardId())
-                .status(OrdersStatus.PENDING)
-                .itemQuantity(0)
-                .totalAmount(0)
-                .shippingFee(shippingFee)
-                .shippingAddress(shippingAddr)
-                .build();
-
-        int totalQty = 0;
-        int itemsSubtotal = 0;
-
-        // 4) 라인 생성 + 합계
-        if (req.getMode() == CreateOrderReq.Mode.ITEM) {
-            Long itemId = req.getItemId();
-            int qty = (req.getQuantity() == null ? 1 : Math.max(1, req.getQuantity()));
-
-            ItemEntity item = itemRepository.findById(itemId)
-                    .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 상품: " + itemId));
-
-            OrderEntity line = OrderEntity.builder()
-                    .itemEntity(item)
-                    .price(item.getItemPrice())
-                    .quantity(qty)
-                    .orders(orders)
-                    .build();
-
-            orders.getOrderItems().add(line);
-            totalQty += qty;
-            itemsSubtotal += item.getItemPrice() * qty;
-
-        } else if (req.getMode() == CreateOrderReq.Mode.CART) {
-            if (req.getItemIds() == null || req.getItemIds().isEmpty()) {
-                throw new IllegalArgumentException("장바구니에서 구매할 itemIds가 비었습니다.");
-            }
-            for (Long itemId : req.getItemIds()) {
-                CartEntity c = cartRepository.findByMember_MemberIdAndItem_ItemId(memberId, itemId)
-                        .orElseThrow(() -> new IllegalArgumentException("장바구니에 해당 상품이 없습니다: " + itemId));
-
-                ItemEntity item = c.getItem();
-                int qty = Math.max(1, c.getQuantity());
-
-                OrderEntity line = OrderEntity.builder()
-                        .itemEntity(item)
-                        .price(item.getItemPrice())
-                        .quantity(qty)
-                        .orders(orders)
-                        .build();
-
-                orders.getOrderItems().add(line);
-                totalQty += qty;
-                itemsSubtotal += item.getItemPrice() * qty;
-
-                // 구매 후 장바구니 제거
-                cartRepository.delete(c);
-            }
-        } else {
-            throw new IllegalArgumentException("지원하지 않는 mode: " + req.getMode());
-        }
-
-        // 5) 헤더 집계 설정
-        orders.setItemQuantity(totalQty);
-        orders.setTotalAmount(itemsSubtotal + shippingFee);        // 총액 = 소계 + 배송비
-
-        // 6) 대표 썸네일/파일명 (NOT NULL 회피)
-        String thumb = firstImageUrlFromHeader(orders);
-        orders.setItemImageUrl(thumb != null ? thumb : "");
-        String thumbName = (thumb != null && !thumb.isBlank())
-                ? thumb.substring(thumb.lastIndexOf('/') + 1) : "";
-        orders.setItemImageName(thumbName);
-
-        // 7) 저장 (라인은 cascade=persist)
-        OrdersEntity saved = ordersRepository.save(orders);
-
-        // 8) 응답
-        return new CreateOrderRes(saved.getOrdersId());
-    }
-    // =========================================
-
-    // 주문 생성 (결제 플로우용)
-    @Override
-    @Transactional
-    public ReadOneOrdersRes createOrder(CreateOrderReq req) {
-        // (필요시 유효성 검증 추가 가능)
-
-        MemberEntity memberRef = memberRepository.getReferenceById(req.getMemberId());
-
-        int shippingFee = (req.getShippingFee() == null ? DEFAULT_SHIPPING_FEE : req.getShippingFee());
-        if (shippingFee < 0) throw new IllegalArgumentException("shippingFee는 0 이상이어야 합니다.");
-
-
-        // 주소 폴백 로직을 넣어서 주소창이 비지 않도록 수정
-        // 1) 요청으로 온 주소
-        AddressEntity shippingAddr = toAddressEntity(req.getShippingAddress());
-
-        // 2) 비어 있으면 → 최근 PENDING 주문 주소로 폴백 (람다/레퍼런스 사용하지 않고 명령형으로)
-        if (isEmptyAddress(shippingAddr)) {
-            Optional<OrdersEntity> recentOpt =
-                    ordersRepository.findTopByMember_MemberIdAndStatusOrderByOrdersIdDesc(
-                            req.getMemberId(), OrdersStatus.PENDING);
-
-            if (recentOpt.isPresent()) {
-                AddressEntity prev = recentOpt.get().getShippingAddress();
-                if (!isEmptyAddress(prev)) {
-                    shippingAddr = AddressEntity.builder()
-                            .zipcode(prev.getZipcode())
-                            .street(prev.getStreet())
-                            .detail(prev.getDetail())
-                            .receiver(prev.getReceiver())
-                            .build();
-                }
-            }
-        }
-
-        // 3) (선택) 저장된 기본주소 사용 옵션
-        if (isEmptyAddress(shippingAddr) && req.isUseSavedAddress()) {
-            shippingAddr = addressFromMember(memberRef);
-        }
-
-        // 4) 최종 검증
-        if (isEmptyAddress(shippingAddr)) {
-            throw new IllegalArgumentException("배송지 정보가 없습니다. (useSavedAddress 또는 shippingAddress 확인)");
-        }
-
-        // === 기존 로직 ===
-        OrdersEntity orders = OrdersEntity.builder()
-                .memberId(memberRef)
-                .cardId(req.getCardId())
-                .shippingAddress(shippingAddr)
-                .status(OrdersStatus.PENDING)
-                .shippingFee(shippingFee)
-                .itemQuantity(0)
-                .totalAmount(0)
-                .itemImageUrl(null)
-                .build();
-
-        int totalQty = 0;
-        int subtotal = 0;
-        for (var line : req.getItems()) {
-            var item = itemRepository.findById(line.getItemId())
-                    .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 상품: " + line.getItemId()));
-            int unitPrice = item.getItemPrice();
-            orders.getOrderItems().add(OrderEntity.builder()
-                    .itemEntity(item).price(unitPrice).quantity(line.getQuantity()).orders(orders).build());
-            totalQty += line.getQuantity();
-            subtotal += unitPrice * line.getQuantity();
-        }
-
-        orders.setItemQuantity(totalQty);
-        orders.setTotalAmount(subtotal + shippingFee);
-
-        String thumb = firstImageUrlFromHeader(orders);
-        orders.setItemImageUrl(thumb);
-        String thumbName = (thumb != null && !thumb.isBlank())
-                ? thumb.substring(thumb.lastIndexOf('/') + 1) : "";
-        orders.setItemImageName(thumbName);
-=======
-    public CreateOrderRes create(String memberId, CreateOrderReq req) {
-        return null;
-    }
 
     // 주문 생성
     @Override
@@ -433,7 +222,6 @@ public class OrdersServiceImpl implements OrdersService {
 
         // 대표 썸네일: 첫 라인의 첫 이미지 사용
         orders.setItemImageUrl(firstImageUrlFromHeader(orders));
->>>>>>> parent of c49a2d6 (Revert "OrdersServiceImpl 오류 수정, AddressEntity/DTO 에 phone(연락처) 추가")
 
         OrdersEntity saved = ordersRepository.save(orders);
         return toReadOneOrdersRes(saved);
@@ -454,25 +242,13 @@ public class OrdersServiceImpl implements OrdersService {
             throw new IllegalStateException("잘못된 상태 전이: " + current + " -> " + nextStatus);
         }
 
-<<<<<<< HEAD
-=======
         // 상태 변경
->>>>>>> parent of c49a2d6 (Revert "OrdersServiceImpl 오류 수정, AddressEntity/DTO 에 phone(연락처) 추가")
         orders.setStatus(nextStatus);
         return toReadOneOrdersRes(orders);
     }
 
     // 주문 상태 전이 허용 규칙 정의
     private boolean isValidTransition(OrdersStatus from, OrdersStatus to) {
-<<<<<<< HEAD
-        if (from == to) return true;
-        return switch (from) {
-            case PENDING   -> (to == OrdersStatus.PAID || to == OrdersStatus.CANCELLED);
-            case PAID      -> (to == OrdersStatus.SHIPPED || to == OrdersStatus.CANCELLED || to == OrdersStatus.REFUNDED);
-            case SHIPPED   -> (to == OrdersStatus.DELIVERED || to == OrdersStatus.REFUNDED);
-            case DELIVERED -> (to == OrdersStatus.REFUNDED);
-            case CANCELLED, REFUNDED -> false;
-=======
         if (from == to) return true; // 같은 상태는 허용
         return switch (from) {
             case PENDING   -> (to == OrdersStatus.PAID
@@ -484,7 +260,6 @@ public class OrdersServiceImpl implements OrdersService {
                     || to == OrdersStatus.REFUNDED);     // 발송 후도 환불 허용
             case DELIVERED -> (to == OrdersStatus.REFUNDED);     // 배송완료 후 환불 허용(반품 환불 등)
             case CANCELLED, REFUNDED -> false;      // 종단 상태: 더 이상 전이 불가
->>>>>>> parent of c49a2d6 (Revert "OrdersServiceImpl 오류 수정, AddressEntity/DTO 에 phone(연락처) 추가")
         };
     }
 
@@ -496,31 +271,21 @@ public class OrdersServiceImpl implements OrdersService {
         OrdersEntity e = ordersRepository.findByOrdersId(ordersId)
                 .orElseThrow(() -> new IllegalArgumentException("주문을 찾을 수 없습니다: " + ordersId));
 
-<<<<<<< HEAD
-        return toReadOneOrdersRes(e);
-=======
         return toReadOneOrdersRes(e); // toReadOneOrdersRes에서 DTO 변환 작업
->>>>>>> parent of c49a2d6 (Revert "OrdersServiceImpl 오류 수정, AddressEntity/DTO 에 phone(연락처) 추가")
     }
 
     // 계산서 전체 보기
     @Override
     public ReadAllOrdersRes getAllOrders(Pageable pageable) {
-<<<<<<< HEAD
-=======
         // 페이징 메타데이터(전체 건수/페이지수/현재 페이지/사이즈)와 함께 각 행은 toSummaryLine으로 요약 DTO로 매핑.
 
         // 주문을 요약 DTO(line)으로 변환
->>>>>>> parent of c49a2d6 (Revert "OrdersServiceImpl 오류 수정, AddressEntity/DTO 에 phone(연락처) 추가")
         Page<OrdersEntity> page = ordersRepository.findAll(pageable);
         var rows = page.getContent().stream()
                 .map(this::toSummaryLine)
                 .toList();
 
-<<<<<<< HEAD
-=======
         // 페이징 메타데이터 + 변환된 요약행 반환
->>>>>>> parent of c49a2d6 (Revert "OrdersServiceImpl 오류 수정, AddressEntity/DTO 에 phone(연락처) 추가")
         return ReadAllOrdersRes.builder()
                 .totalElements(page.getTotalElements())
                 .totalPages(page.getTotalPages())
@@ -532,26 +297,14 @@ public class OrdersServiceImpl implements OrdersService {
 
     // 특정 회원의 계산서(주문서) 목록 요약 보기
     @Override
-<<<<<<< HEAD
-    public ReadAllOrdersRes getSummariesByMember(String memberId, Pageable pageable) {
-        if (memberId == null || memberId.isBlank())
-=======
     public ReadAllOrdersRes getSummariesByMember(MemberEntity memberId, Pageable pageable) {
         // findByMemberId로 해당 회원의 주문서들만 페이징 조회.
         // 나머지 구성은 전체 목록과 동일(요약 라인 매핑 + 페이징 메타).
         if (memberId == null)
->>>>>>> parent of c49a2d6 (Revert "OrdersServiceImpl 오류 수정, AddressEntity/DTO 에 phone(연락처) 추가")
             throw new IllegalArgumentException("memberId는 비워둘 수 없습니다.");
         if (pageable == null)
             throw new IllegalArgumentException("pageable은 비워둘 수 없습니다.");
 
-<<<<<<< HEAD
-        Page<OrdersEntity> page = ordersRepository.findByMember_MemberId(memberId, pageable);
-        var rows = page.getContent().stream()
-                .map(this::toSummaryLine)
-                .toList();
-
-=======
         // ✅ CHANGED: OrdersRepository도 연관 필드명 기준으로 변경 필요
         Page<OrdersEntity> page = ordersRepository.findByMember(memberId, pageable);
 
@@ -560,7 +313,6 @@ public class OrdersServiceImpl implements OrdersService {
                 .map(this::toSummaryLine)
                 .toList();
 
->>>>>>> parent of c49a2d6 (Revert "OrdersServiceImpl 오류 수정, AddressEntity/DTO 에 phone(연락처) 추가")
         return ReadAllOrdersRes.builder()
                 .totalElements(page.getTotalElements())
                 .totalPages(page.getTotalPages())
@@ -570,8 +322,6 @@ public class OrdersServiceImpl implements OrdersService {
                 .build();
     }
 
-<<<<<<< HEAD
-=======
     // 배송지변경 추가★
     @Override
     @Transactional
@@ -583,52 +333,11 @@ public class OrdersServiceImpl implements OrdersService {
         return toReadOneOrdersRes(orders);
     }
 
->>>>>>> parent of c49a2d6 (Revert "OrdersServiceImpl 오류 수정, AddressEntity/DTO 에 phone(연락처) 추가")
     /* =========================
        매핑 헬퍼
        ========================= */
 
-    // 회원 엔티티로부터 기본 배송지 구성
-    private AddressEntity addressFromMember(MemberEntity m) {
-        if (m == null) return null;
 
-<<<<<<< HEAD
-        String zipcode  = safe(m.getMemberZipCode());
-        String street   = safe(m.getMemberRoadAddress());
-        String detail   = safe(m.getMemberDetailAddress());
-        String receiver = safe(m.getMemberName());
-
-        if (zipcode.isBlank() && street.isBlank() && detail.isBlank() && receiver.isBlank()) {
-            return null;
-        }
-        return AddressEntity.builder()
-                .zipcode(zipcode)
-                .street(street)
-                .detail(detail)
-                .receiver(receiver)
-=======
-    // Entity -> DTO 변환
-    private AddressDTO toAddressDTO(AddressEntity a) {
-        if (a == null) return null;
-        return AddressDTO.builder()
-                .zipcode(a.getZipcode())
-                .street(a.getStreet())
-                .detail(a.getDetail())
-                .receiver(a.getReceiver())
->>>>>>> parent of c49a2d6 (Revert "OrdersServiceImpl 오류 수정, AddressEntity/DTO 에 phone(연락처) 추가")
-                .build();
-    }
-
-    private String safe(String s) { return (s == null ? "" : s.trim()); }
-    private boolean isEmptyAddress(AddressEntity a) {
-        return a == null
-                || (safe(a.getZipcode()).isBlank()
-                && safe(a.getStreet()).isBlank()
-                && safe(a.getDetail()).isBlank()
-                && safe(a.getReceiver()).isBlank());
-    }
-
-<<<<<<< HEAD
     // Entity -> DTO 변환
     private AddressDTO toAddressDTO(AddressEntity a) {
         if (a == null) return null;
@@ -640,23 +349,7 @@ public class OrdersServiceImpl implements OrdersService {
                 .build();
     }
 
-    // DTO -> Entity
-    private AddressEntity toAddressEntity(AddressDTO dto) {
-        if (dto == null) return null;
-        return AddressEntity.builder()
-                .zipcode(dto.getZipcode())
-                .street(dto.getStreet())
-                .detail(dto.getDetail())
-                .receiver(dto.getReceiver())
-                .build();
-    }
 
-    // 상세 DTO (헤더 + 라인)
-    private ReadOneOrdersRes toReadOneOrdersRes(OrdersEntity o) {
-        List<OrderDTO> lines = (o.getOrderItems() == null) ? List.of()
-                : o.getOrderItems().stream().map(this::toOrderLineDTO).toList();
-
-=======
     // 상세 DTO (헤더 + 라인)
     private ReadOneOrdersRes toReadOneOrdersRes(OrdersEntity o) {
         // 주문 품목을 DTO로 변환
@@ -664,24 +357,11 @@ public class OrdersServiceImpl implements OrdersService {
                 : o.getOrderItems().stream().map(this::toOrderLineDTO).toList();
 
         // DB 집계로 금액 계산
->>>>>>> parent of c49a2d6 (Revert "OrdersServiceImpl 오류 수정, AddressEntity/DTO 에 phone(연락처) 추가")
         int shippingFee = o.getShippingFee();
         int totalAmount = o.getTotalAmount();
         int itemsSubtotal = totalAmount - shippingFee;
 
         return ReadOneOrdersRes.builder()
-<<<<<<< HEAD
-                .ordersId(o.getOrdersId())
-                .memberId(o.getMemberId() != null ? o.getMemberId().getMemberId() : null)
-                .cardId(o.getCardId())
-                .itemsSubtotal(itemsSubtotal)
-                .shippingFee(shippingFee)
-                .totalAmount(totalAmount)
-                .thumbnailUrl(o.getItemImageUrl())
-                .status(OrdersStatus.valueOf(o.getStatus().name()))
-                .shippingAddress(toAddressDTO(o.getShippingAddress()))
-                .ordersItems(lines)
-=======
                 .ordersId(o.getOrdersId())  // 주문 ID
                 .memberId(o.getMemberId() != null ? o.getMemberId() : null)  // ✅ CHANGED
                 .cardId(o.getCardId())      // 카드 ID
@@ -692,7 +372,6 @@ public class OrdersServiceImpl implements OrdersService {
                 .status(OrdersStatus.valueOf(o.getStatus().name()))   // 주문 상태
                 .shippingAddress(toAddressDTO(o.getShippingAddress()))  // 배송지
                 .ordersItems(lines) // 품목 리스트
->>>>>>> parent of c49a2d6 (Revert "OrdersServiceImpl 오류 수정, AddressEntity/DTO 에 phone(연락처) 추가")
                 .build();
     }
 
@@ -704,16 +383,6 @@ public class OrdersServiceImpl implements OrdersService {
         int subtotal   = grandTotal - shipping;
 
         return ReadAllOrdersRes.Line.builder()
-<<<<<<< HEAD
-                .ordersId(o.getOrdersId())
-                .memberId(o.getMemberId() != null ? o.getMemberId().getMemberId() : null)
-                .itemQuantity(itemQty)
-                .itemsSubtotal(subtotal)
-                .shippingFee(shipping)
-                .totalAmount(grandTotal)
-                .thumbnailUrl(o.getItemImageUrl())
-                .status(OrdersStatus.valueOf(o.getStatus().name()))
-=======
                 .ordersId(o.getOrdersId())      // 주문 ID
                 .memberId(o.getMemberId() != null ? o.getMemberId() : null) // ✅ CHANGED
                 .itemQuantity(itemQty)          // 총 수량
@@ -722,7 +391,6 @@ public class OrdersServiceImpl implements OrdersService {
                 .totalAmount(grandTotal)        // 총 금액
                 .thumbnailUrl(o.getItemImageUrl())  // 이미지
                 .status(OrdersStatus.valueOf(o.getStatus().name()))   // 배송상태
->>>>>>> parent of c49a2d6 (Revert "OrdersServiceImpl 오류 수정, AddressEntity/DTO 에 phone(연락처) 추가")
                 .build();
     }
 
@@ -731,10 +399,7 @@ public class OrdersServiceImpl implements OrdersService {
         return OrderDTO.builder()
                 .orderId(e.getOrderId())
                 .itemId(e.getItemEntity() != null ? e.getItemEntity().getItemId() : null)
-<<<<<<< HEAD
-=======
                 .name(e.getItemEntity() != null ? e.getItemEntity().getItemName() : null) // ★ 추가
->>>>>>> parent of c49a2d6 (Revert "OrdersServiceImpl 오류 수정, AddressEntity/DTO 에 phone(연락처) 추가")
                 .price(e.getPrice())
                 .quantity(e.getQuantity())
                 .thumbnailUrl(firstImageUrl(e))
@@ -755,8 +420,6 @@ public class OrdersServiceImpl implements OrdersService {
         if (orders.getOrderItems() == null || orders.getOrderItems().isEmpty()) return null;
         return firstImageUrl(orders.getOrderItems().get(0));
     }
-<<<<<<< HEAD
-=======
 
     // 배송지
     private AddressEntity toAddressEntity(AddressDTO dto) {
@@ -769,5 +432,4 @@ public class OrdersServiceImpl implements OrdersService {
                 .build();
     }
 
->>>>>>> parent of c49a2d6 (Revert "OrdersServiceImpl 오류 수정, AddressEntity/DTO 에 phone(연락처) 추가")
 }

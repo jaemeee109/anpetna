@@ -1,9 +1,6 @@
 package com.anpetna.order.dto.readAllOrderDTO;
 
-<<<<<<< HEAD
-=======
 import com.anpetna.member.domain.MemberEntity;
->>>>>>> parent of c49a2d6 (Revert "OrdersServiceImpl 오류 수정, AddressEntity/DTO 에 phone(연락처) 추가")
 import com.anpetna.order.constant.OrdersStatus;
 import com.anpetna.order.dto.AddressDTO;
 import lombok.Builder;
@@ -29,23 +26,6 @@ public class ReadAllOrdersRes {
     @Builder
     public static class Line {
 
-<<<<<<< HEAD
-        private Long ordersId;             // 주문 ID
-
-        private String memberId;           // 회원 ID
-
-        private int itemQuantity;         // 주문 총 수량
-
-        private int itemsSubtotal;        // 아이템 합계(배송비 제외)
-
-        private int shippingFee;         // 배송비
-
-        private int totalAmount;         // 결제 총액(소계+배송비)
-
-        private OrdersStatus status;     // 주문 상태
-
-        private String thumbnailUrl;     // 대표 썸네일 (주문 헤더용)
-=======
         private Long ordersId;        // 주문 ID
 
         private MemberEntity memberId;      // 회원 ID
@@ -61,7 +41,6 @@ public class ReadAllOrdersRes {
         private OrdersStatus status;          // 주문 상태
 
         private String thumbnailUrl;  // 대표 썸네일 (주문 헤더용)
->>>>>>> parent of c49a2d6 (Revert "OrdersServiceImpl 오류 수정, AddressEntity/DTO 에 phone(연락처) 추가")
     }
 
 }

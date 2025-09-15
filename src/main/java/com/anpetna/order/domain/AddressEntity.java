@@ -1,10 +1,7 @@
 package com.anpetna.order.domain;
 
 import jakarta.persistence.Embeddable;
-<<<<<<< HEAD
-=======
 import jakarta.validation.constraints.Size;
->>>>>>> parent of c49a2d6 (Revert "OrdersServiceImpl 오류 수정, AddressEntity/DTO 에 phone(연락처) 추가")
 import lombok.*;
 
 @Embeddable
@@ -23,10 +20,7 @@ public class AddressEntity {
 
     private String receiver;  // 수령인
 
-<<<<<<< HEAD
-=======
     @Size(max = 20)
     private String phone;     // 연락처
 
->>>>>>> parent of c49a2d6 (Revert "OrdersServiceImpl 오류 수정, AddressEntity/DTO 에 phone(연락처) 추가")
 }

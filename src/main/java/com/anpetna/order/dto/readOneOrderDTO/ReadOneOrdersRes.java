@@ -1,9 +1,6 @@
 package com.anpetna.order.dto.readOneOrderDTO;
 
-<<<<<<< HEAD
-=======
 import com.anpetna.member.domain.MemberEntity;
->>>>>>> parent of c49a2d6 (Revert "OrdersServiceImpl 오류 수정, AddressEntity/DTO 에 phone(연락처) 추가")
 import com.anpetna.order.constant.OrdersStatus;
 import com.anpetna.order.dto.AddressDTO;
 import com.anpetna.order.dto.OrderDTO;
@@ -18,11 +15,7 @@ public class ReadOneOrdersRes {
 
     private Long ordersId;  // 주문서 ID
 
-<<<<<<< HEAD
-    private String memberId;    // 주문자 ID
-=======
     private MemberEntity memberId;    // 주문자 ID
->>>>>>> parent of c49a2d6 (Revert "OrdersServiceImpl 오류 수정, AddressEntity/DTO 에 phone(연락처) 추가")
 
     private String cardId;   // 카드 ID
 

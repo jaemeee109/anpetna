@@ -1,9 +1,6 @@
 package com.anpetna.order.dto.createOrderDTO;
 
-<<<<<<< HEAD
-=======
 import com.anpetna.member.domain.MemberEntity;
->>>>>>> parent of c49a2d6 (Revert "OrdersServiceImpl 오류 수정, AddressEntity/DTO 에 phone(연락처) 추가")
 import com.anpetna.order.dto.AddressDTO;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
@@ -24,11 +21,7 @@ public class CreateOrderReq {
 
     // =====================================
     public enum Mode { ITEM, CART }
-<<<<<<< HEAD
-    // 주문 방식 (아이템에서 바로인지, 카트에서인지)
-=======
 
->>>>>>> parent of c49a2d6 (Revert "OrdersServiceImpl 오류 수정, AddressEntity/DTO 에 phone(연락처) 추가")
     @NotNull
     private Mode mode;
 
@@ -41,15 +34,9 @@ public class CreateOrderReq {
 
     // =====================================
 
-<<<<<<< HEAD
-    // 결제자 정보
-    @NotBlank
-    private String memberId;
-=======
     // 배송지 선택 방식
     @NotBlank
     private MemberEntity memberId;
->>>>>>> parent of c49a2d6 (Revert "OrdersServiceImpl 오류 수정, AddressEntity/DTO 에 phone(연락처) 추가")
 
     @NotBlank
     private String cardId;

@@ -2,10 +2,7 @@ package com.anpetna.order.controller;
 
 import com.anpetna.ApiResult;
 import com.anpetna.order.constant.OrdersStatus;
-<<<<<<< HEAD
-=======
 import com.anpetna.order.dto.AddressDTO;
->>>>>>> parent of c49a2d6 (Revert "OrdersServiceImpl 오류 수정, AddressEntity/DTO 에 phone(연락처) 추가")
 import com.anpetna.order.dto.createOrderDTO.CreateOrderReq;
 import com.anpetna.order.dto.createOrderDTO.CreateOrderRes;
 import com.anpetna.order.dto.readAllOrderDTO.ReadAllOrdersRes;
@@ -40,11 +37,7 @@ public class OrderController {
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<ApiResult<CreateOrderRes>> create(
             Authentication authentication,
-<<<<<<< HEAD
-            @Valid @RequestBody CreateOrderReq req
-=======
              @RequestBody CreateOrderReq req //@Valid 제거
->>>>>>> parent of c49a2d6 (Revert "OrdersServiceImpl 오류 수정, AddressEntity/DTO 에 phone(연락처) 추가")
     ) {
         String memberId = authentication.getName();
         CreateOrderRes res = ordersService.create(memberId, req);
@@ -150,8 +143,6 @@ public class OrderController {
     //        ordersService.delete(ordersId);
     //        return ResponseEntity.noContent().build(); // 204 No Content
     //    }
-<<<<<<< HEAD
-=======
 
     // 배송지변경
     @PatchMapping("/{ordersId}/address")
@@ -262,5 +253,4 @@ public class OrderController {
     //        ordersService.delete(ordersId);
     //        return ResponseEntity.noContent().build(); // 204 No Content
     //    }
->>>>>>> parent of c49a2d6 (Revert "OrdersServiceImpl 오류 수정, AddressEntity/DTO 에 phone(연락처) 추가")
 }
