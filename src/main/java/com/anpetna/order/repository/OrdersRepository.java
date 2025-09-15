@@ -19,9 +19,7 @@ public interface OrdersRepository extends JpaRepository<OrdersEntity, Long> {
     Optional<OrdersEntity> findByOrdersId(Long ordersId);
 
     // 특정 회원의 주문 페이징 처리로
-    Page<OrdersEntity> findByMember(MemberEntity member, Pageable pageable);
-    Optional<OrdersEntity> findTopByMemberAndStatusOrderByOrdersIdDesc(
-            MemberEntity member, OrdersStatus status);
+    Page<OrdersEntity> findByMemberId(MemberEntity memberId, Pageable pageable);
 
 
 //    @EntityGraph(attributePaths = { "orderItems", "orderItems.itemEntity" })

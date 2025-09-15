@@ -306,7 +306,7 @@ public class OrdersServiceImpl implements OrdersService {
             throw new IllegalArgumentException("pageable은 비워둘 수 없습니다.");
 
         // ✅ CHANGED: OrdersRepository도 연관 필드명 기준으로 변경 필요
-        Page<OrdersEntity> page = ordersRepository.findByMember(memberId, pageable);
+        Page<OrdersEntity> page = ordersRepository.findByMemberId(memberId, pageable);
 
         // DTO로 변환
         var rows = page.getContent().stream()

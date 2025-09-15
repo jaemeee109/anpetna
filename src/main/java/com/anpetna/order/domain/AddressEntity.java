@@ -1,8 +1,10 @@
 package com.anpetna.order.domain;
 
 import jakarta.persistence.Embeddable;
+import jakarta.persistence.Entity;
 import jakarta.validation.constraints.Size;
 import lombok.*;
+
 
 @Embeddable
 @Getter
