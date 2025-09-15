@@ -16,38 +16,39 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
-
-import java.net.URI;
 
 @Validated // ✅ PathVariable/RequestParam 검증 활성화
 @RestController
 @RequestMapping("/order")
 @RequiredArgsConstructor
 public class OrderController {
+
     private final OrdersService ordersService;
-    private final MemberRepository memberRepository; // member 매핑하며 추가
+    private final MemberRepository memberRepository; // ★ CHANGED: member 매핑을 위해 주입
 
     // ==============================================================
 
-    /** 주문 생성 (직구/장바구니 겸용) */
+    /** 주문 생성 (직구/장바구니 겸용)
+     *  - 인증 사용자 ID(String) → MemberEntity 로드 후 Service에 전달
+     *  - @Valid는 프론트 단계에서 검증 중이라면 생략 가능(필요시 부활)
+     */
     @PostMapping("/buy")
     @PreAuthorize("hasRole('USER')")
-    public ResponseEntity<ApiResult<CreateOrderRes>> create(
+    public ApiResult<CreateOrderRes> create(
             Authentication authentication,
-            @RequestBody CreateOrderReq req //@Valid 제거
+            @RequestBody CreateOrderReq req // @Valid 제거 (★ 유지)
     ) {
-        // ★ CHANGED: 로그인한 사용자 id(String) → MemberEntity 로드
+        // ★ CHANGED: 로그인한 사용자 id(String) → MemberEntity 로드(연관관계 지연 로딩 안전)
         String loginId = authentication.getName();
         MemberEntity member = memberRepository.getReferenceById(loginId);
-        // 참고) 존재 확인까지 하고 싶으면 findById(loginId).orElseThrow(...) 사용
+        // 참고) 존재 보장 필요하면 findById(loginId).orElseThrow(...) 사용
 
-        CreateOrderRes res = ordersService.create(member, req);
-        return ResponseEntity.ok(new ApiResult<>(res));
+        CreateOrderRes body = ordersService.create(member, req);
+        return new ApiResult<>(body);
     }
 
     // ==============================================================
@@ -60,11 +61,12 @@ public class OrderController {
      * Authorization: Bearer <JWT>
      */
     @GetMapping
-    public ResponseEntity<ReadAllOrdersRes> getAllOrders(
+    public ApiResult<ReadAllOrdersRes> getAllOrders(
             @PageableDefault(size = 10, sort = "ordersId", direction = Sort.Direction.DESC)
-            Pageable pageable) {
+            Pageable pageable
+    ) {
         ReadAllOrdersRes body = ordersService.getAllOrders(pageable);
-        return ResponseEntity.ok(body); // 200 OK
+        return new ApiResult<>(body); // 200 OK
     }
 
     /**
@@ -74,16 +76,16 @@ public class OrderController {
      * GET /anpetna/order/members/{memberId}?page=0&size=10&sort=ordersId,DESC
      */
     @GetMapping("/members/{memberId}")
-    public ResponseEntity<ReadAllOrdersRes> getOrdersByMember(
+    public ApiResult<ReadAllOrdersRes> getOrdersByMember(
             @PathVariable("memberId") String memberId,   // ★ CHANGED: 문자열로 받고
             @PageableDefault(size = 10, sort = "ordersId", direction = Sort.Direction.DESC)
-            Pageable pageable) {
-
-        // ★ CHANGED: MemberEntity 로 변환
+            Pageable pageable
+    ) {
+        // ★ CHANGED: memberId(String) → MemberEntity 변환
         MemberEntity member = memberRepository.getReferenceById(memberId);
 
         ReadAllOrdersRes body = ordersService.getSummariesByMember(member, pageable);
-        return ResponseEntity.ok(body); // 200 OK
+        return new ApiResult<>(body); // 200 OK
     }
 
     /**
@@ -93,39 +95,14 @@ public class OrderController {
      * GET /anpetna/order/{ordersId}
      */
     @GetMapping("/{ordersId}")
-    public ResponseEntity<ReadOneOrdersRes> getOrderDetail(@PathVariable @Min(1) Long ordersId) {
+    public ApiResult<ReadOneOrdersRes> getOrderDetail(
+            @PathVariable @Min(1) Long ordersId
+    ) {
         ReadOneOrdersRes body = ordersService.getDetail(ordersId);
-        return ResponseEntity.ok(body); // 200 OK
+        return new ApiResult<>(body); // 200 OK
     }
 
     // ==============================================================
-
-    /**
-     * 주문 생성
-     * - 배송비는 프론트에서 넘겨주면 그 값을 사용
-     * - 배송비를 안 넘기면 기본 3,000원 적용
-     *
-     * 요청 예시:
-     * POST /anpetna/order
-     * {
-     *   "memberId": "user-001",
-     *   "cardId": "card-xyz",
-     *   "useSavedAddress": false,
-     *   "shippingAddress": {...},
-     *   "items": [ { "itemId": 10, "quantity": 2 }, ... ],
-     *   "shippingFee": 3000 // (선택) 프론트에서 직접 전달. 없으면 기본값 사용
-     * }
-     */
-    @PostMapping
-    public ResponseEntity<ReadOneOrdersRes> createOrder(@Valid @RequestBody CreateOrderReq req) {
-        ReadOneOrdersRes created = ordersService.createOrder(req);
-
-        // 201 Created + Location 헤더(/anpetna/order/{ordersId})
-        URI location = URI.create("/anpetna/order/" + created.getOrdersId());
-        return ResponseEntity
-                .created(location) // = status 201 + Location
-                .body(created);
-    }
 
     /**
      * 주문 상태 전이
@@ -135,23 +112,23 @@ public class OrderController {
      * PATCH /anpetna/order/123/status?next=PAID
      */
     @PatchMapping("/{ordersId}/status")
-    public ResponseEntity<ReadOneOrdersRes> changeStatus(
+    public ApiResult<ReadOneOrdersRes> changeStatus(
             @PathVariable @Min(1) Long ordersId,
             @RequestParam OrdersStatus next
     ) {
         ReadOneOrdersRes body = ordersService.updateStatus(ordersId, next);
-        return ResponseEntity.ok(body); // 200 OK
+        return new ApiResult<>(body); // 200 OK
     }
 
     // ==============================================================
 
-    // 배송지변경
+    /** 배송지 변경 */
     @PatchMapping("/{ordersId}/address")
-    public ResponseEntity<ReadOneOrdersRes> updateAddress(
+    public ApiResult<ReadOneOrdersRes> updateAddress(
             @PathVariable @Min(1) Long ordersId,
             @Valid @RequestBody AddressDTO address
     ) {
         ReadOneOrdersRes body = ordersService.updateAddress(ordersId, address);
-        return ResponseEntity.ok(body);
+        return new ApiResult<>(body);
     }
 }
