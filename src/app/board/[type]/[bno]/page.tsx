@@ -31,6 +31,59 @@ function absUrl(p?: string) {
   return `${API_BASE}/${p}`;
 }
 
+/** ===== 비밀글 차단 전용 뷰 ===== */
+/** 아래 값들만 바꿔서 즉시 화면에서 확인할 수 있습니다 */
+const SECRET_UI = {
+  lineColor: '#e8e8e9ff',   // 위/아래 선 색상 (예: #e5e7eb=gray-200, #d1d5db=gray-300, #9ca3af=gray-400)
+  marginY: 40,            // 선과 문구 블록의 위/아래 여백(px) - 예: 40 => 40px
+  paddingY: 64,           // 블록 내부 위/아래 패딩(px)
+  textColor: '#7d7f81ff',   // 문구 색상 (예: #6b7280=gray-600, #374151=gray-700, #111827=gray-900)
+  fontSize: 16,           // 문구 폰트 크기(px)
+  buttonClass: 'btn-3d btn-white', // 목록 버튼 클래스(페이지 공통 스타일)
+};
+
+function ForbiddenSecretView({ onBack }: { onBack: () => void }) {
+  return (
+    <main className="mx-auto w-full max-w-[600px] px-4">
+      {/* 위/아래 선 + 여백/패딩: 인라인 스타일로 강제 적용 */}
+      <div
+        className="border-t border-b text-center"
+        style={{
+          marginTop: SECRET_UI.marginY,
+          marginBottom: SECRET_UI.marginY,
+          paddingTop: SECRET_UI.paddingY,
+          paddingBottom: SECRET_UI.paddingY,
+          borderTopColor: SECRET_UI.lineColor,
+          borderBottomColor: SECRET_UI.lineColor,
+        }}
+      >
+        <span
+          style={{
+            color: SECRET_UI.textColor,
+            fontSize: SECRET_UI.fontSize,
+            fontWeight: 500,
+          }}
+        >
+          비밀글은 열람이 불가능합니다
+        </span>
+      </div>
+
+      {/* 목록 버튼: 페이지 공통 버튼 스타일 사용 */}
+      <div className="text-center" style={{ paddingTop: 24, paddingBottom: 24 }}>
+        <button
+          type="button"
+          onClick={onBack}
+          className={SECRET_UI.buttonClass}
+        >
+          목록으로
+        </button>
+      </div>
+    </main>
+  );
+}
+
+
+
 /** 프록시로 보내면서 로컬 토큰을 ?t= 로 붙여줌 (이미지 X박스/401 회피) */
 function proxiedFileUrl(p?: string) {
   const absolute = absUrl(p);
@@ -78,47 +131,87 @@ export default function BoardDetailPage({
   const likeCommMut = useLikeComment(id);
   const updateCommMut = useUpdateComment(id);
 
-  const [commWriter, setCommWriter] = useState(() =>
-    typeof window !== "undefined" ? localStorage.getItem("memberId") || "" : ""
-  );
   const [commContent, setCommContent] = useState("");
   const [editingCno, setEditingCno] = useState<number | null>(null);
   const [editText, setEditText] = useState("");
 
   if (isLoading) return <div className={WRAP}>로딩중…</div>;
-  if (error) return <div className={WRAP}>에러가 발생했어요</div>;
+
+  // ===== 403 응답 시: 전용 “비밀글 차단” 화면 =====
+  if (error) {
+    const status = (error as any)?.status ?? (error as any)?.response?.status;
+    const msg = (error as any)?.message ?? "";
+    const isForbidden = Number(status) === 403 || /403/.test(String(msg));
+    if (isForbidden) {
+      return (
+        <ForbiddenSecretView onBack={() => router.push(`/board/${type}`)} />
+      );
+    }
+  }
+
   if (!board) return <div className={WRAP}>글이 존재하지 않습니다</div>;
 
+  /** ================== 중요: 응답 표준화 ==================
+   * hooks/useBoards.ts는 fetch 원본을 그대로 주고,
+   * app/useBoards.ts는 { readOneBoard } 형태를 씁니다.
+   * ⇒ 어떤 경우든 아래 ‘view’가 실제 게시글 객체가 되도록 통일합니다.
+   */
+  const view: any = (board as any)?.readOneBoard ?? board; // ← 핵심 수정 (중첩 해제)
+
+  /** JWT payload 디코딩(실패 시 null) */
+  function decodeJwtPayload(t: string) {
+    try {
+      const [, payload] = t.replace(/^Bearer\s+/i, '').split('.');
+      const json = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
+      return JSON.parse(json);
+    } catch { return null; }
+  }
+
+  /** 토큰 payload에서 ADMIN 여부 판별 */
+  function isAdminFromToken(raw?: string | null): boolean {
+    if (!raw) return false;
+    const p = decodeJwtPayload(raw);
+    if (!p) return false;
+
+    const bag: string[] = [];
+    const push = (v: any) => {
+      if (!v) return;
+      if (Array.isArray(v)) bag.push(...v.map(String));
+      else if (typeof v === 'string') bag.push(v);
+    };
+    push(p.roles);
+    push(p.authorities);
+    push(typeof p.auth === 'string' ? p.auth.split(',') : p.auth);
+    push(p.role);
+    push(p.memberRole);
+
+    return bag.map(s => s.toUpperCase()).some(s => s.includes('ROLE_ADMIN') || s === 'ADMIN');
+  }
+
+  const rawToken =
+    typeof window !== "undefined"
+      ? (localStorage.getItem("accessToken") || localStorage.getItem("Authorization") || "")
+      : "";
+  const admin = isAdminFromToken(rawToken);
+
+  // 서버가 내려준 비밀글 여부(백엔드 ReadOneBoardRes에 포함)
+  const secretFlag = !!view?.isSecret; // ← 핵심: 중첩 해제 후 확인
+
+  // 글 작성자/표시값 계산도 view 기준으로 모두 통일
   const title =
-    (board as any).bTitle ??
-    (board as any).title ??
-    (board as any).btitle ??
-    "(제목 없음)";
+    view.bTitle ?? view.title ?? view.btitle ?? "(제목 없음)";
   const writer =
-    (board as any).bWriter ??
-    (board as any).writer ??
-    (board as any).bwriter ??
-    "-";
+    view.bWriter ?? view.writer ?? view.bwriter ?? "-";
   const rawCreated =
-    (board as any).createDate ??
-    (board as any).createdAt ??
-    (board as any).regDate;
+    view.createDate ?? view.createdAt ?? view.regDate;
   const createdText = rawCreated ? safeDate(rawCreated) : "-";
   const bodyContent =
-    (board as any).bContent ??
-    (board as any).content ??
-    (board as any).bcontent ??
-    "";
+    view.bContent ?? view.content ?? view.bcontent ?? "";
   const likeCount =
-    (board as any).bLikeCount ??
-    (board as any).likeCount ??
-    (board as any).blikeCount ??
-    0;
+    view.bLikeCount ?? view.likeCount ?? view.blikeCount ?? 0;
 
-  /** 첨부 이미지: 프록시 URL 사용(+토큰) */
-  const images: any[] = Array.isArray((board as any).images)
-    ? (board as any).images
-    : [];
+  // 첨부 이미지
+  const images: any[] = Array.isArray(view.images) ? view.images : [];
   const displayImages = images
     .map((img: any, i: number) => {
       const raw =
@@ -131,10 +224,16 @@ export default function BoardDetailPage({
     })
     .filter((x) => x.src);
 
-  const iAmWriter = me && writer && me === String(writer);
+  const iAmWriter = !!me && !!writer && me === String(writer);
 
-  const { dtoList: commentList } = normalizeCommentPage(comm);
+  // ===== 서버가 200을 주는 특이 케이스 대비: isSecret 보조 가드 =====
+  if (secretFlag && !iAmWriter && !admin) {
+    return (
+      <ForbiddenSecretView onBack={() => router.push(`/board/${type}`)} />
+    );
+  }
 
+  // ===== 여기부터 정상 상세 화면 (기존 UI 그대로) =====
   return (
     <section className={WRAP}>
       {/* ===== 기존 UI 유지 ===== */}
@@ -147,7 +246,6 @@ export default function BoardDetailPage({
 
         {iAmWriter && (
           <>
-            {/* ⬇️ 수정: 버튼 → 순수 <a href> (항상 이동 보장, UI 그대로) */}
             <a
               href={`/board/${type}/${bno}/edit`}
               className="btn-3d btn-white"
@@ -185,14 +283,14 @@ export default function BoardDetailPage({
 
       {/* 첨부 이미지 (있을 때만) */}
       {displayImages.length > 0 && (
-        <div className="mt-6 flex flex-wrap justify-center gap-4">
+        <div className="mt-6 flex flex-col items-center gap-4">
           {displayImages.map((img) => (
-            <div key={img.key} className="p-1">
+            <div key={img.key} className="w-full max-w-[720px] p-1">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={img.src}
                 alt={img.alt}
-                className="max-w-[300px] h-auto object-contain mx-auto"
+                className="w-full h-auto object-contain"
               />
             </div>
           ))}
@@ -216,29 +314,20 @@ export default function BoardDetailPage({
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          if (!commWriter.trim() || !commContent.trim()) return;
+          if (!commContent.trim()) return;
           if (!me) {
             alert("로그인 후 이용해주세요.");
             return;
           }
+          // 서버가 토큰의 사용자로 작성자 설정
           createMut.mutate(
-            { bno: id, cWriter: commWriter.trim(), cContent: commContent.trim() },
+            { bno: id, cContent: commContent.trim() },
             { onSuccess: () => setCommContent("") }
           );
         }}
         className="py-6 mt-[20px] mb-[12px]"
       >
         <div className="space-y-[12px]">
-          <div className="flex items-center gap-5">
-            <span className="text-sm text-gray-700">작성자&nbsp;:&nbsp; </span>
-            <input
-              value={commWriter}
-              onChange={(e) => setCommWriter(e.target.value)}
-              placeholder="ID를 입력해주세요"
-              className="h-9 w-24 bg-transparent px-0 text-base outline-none border-0 focus:ring-0"
-            />
-          </div>
-
           <div className="relative">
             <textarea
               value={commContent}
@@ -261,12 +350,12 @@ export default function BoardDetailPage({
       <div className="mt-[10px] mb-10">
         {commLoading ? (
           <div className="py-8 text-center text-sm text-gray-500">댓글 로딩중…</div>
-        ) : commentList.length === 0 ? (
+        ) : normalizeCommentPage(comm).dtoList.length === 0 ? (
           <div className="py-8 text-center text-sm text-gray-500 mb-[40px]">
             댓글이 없습니다
           </div>
         ) : (
-          commentList.map((c: any) => {
+          normalizeCommentPage(comm).dtoList.map((c: any) => {
             const cw = c.cWriter ?? c.cwriter ?? "anonymous";
             const cc = c.cContent ?? c.ccontent ?? "";
             const lk = c.cLikeCount ?? c.clikeCount ?? 0;

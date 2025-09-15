@@ -1,10 +1,30 @@
 // src/features/board/ui/NoticeList.tsx
 "use client";
 import Link from "next/link";
+import PinIcon from '@/components/icons/Pin';
+import LockIcon from '@/components/icons/Lock';
 
 type Props = {
   type: string; page: number; size: number; total: number; items: any[]; isLoading: boolean;
 };
+
+// 🔽 번호 셀 전용 컴포넌트 (공지/비밀 우선 아이콘, 아니면 번호 표시)
+function NumCell({ row }: { row: any }) {
+  // 다양한 필드명을 포괄해서 고정글 여부 판단
+  const isPinned = !!(row?.pinned || row?.noticeFlag || row?.topFix || row?.isPinned || row?.pinYn === "Y");
+  // 다양한 필드명을 포괄해서 비밀글 여부 판단
+  const isSecret = !!(row?.isSecret || row?.secret || row?.secretYn === "Y");
+
+  if (isPinned) {
+    return <PinIcon className="inline-block align-baseline w-[1em] h-[1em]" title="고정" />;
+  }
+  if (isSecret) {
+    return <LockIcon className="inline-block align-baseline w-[1em] h-[1em]" title="비밀글" />;
+  }
+  // 둘 다 아니면 번호 출력 (상위에서 계산된 no가 있으면 우선)
+  return <>{row?.no ?? row?.bno ?? "-"}</>;
+}
+
 
 /* ===== 권한 판별 유틸 (파일 내부 정의) ===== */
 function decodeJwt(token?: string | null): any | null {
@@ -157,9 +177,9 @@ export function NoticeList({ type, page, size, total, items, isLoading }: Props)
 
                   return (
                     <tr key={(n.bno ?? idx) as number} className="text-sm border-b" style={{ borderColor: "#E5E7EB" }}>
-                      <td className="px-4 py-[12px] text-center tabular-nums">
-                        {no}
-                      </td>
+                   <td className="px-4 py-[12px] text-center tabular-nums">
+  <NumCell row={{ ...n, no, isSecret: n.raw?.isSecret }} />
+</td>
                       <td className="px-4 py-[12px]">
                         {canLink ? (
                           <Link

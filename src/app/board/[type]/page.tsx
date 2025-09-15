@@ -1,7 +1,7 @@
 // src/app/board/[type]/page.tsx
 "use client";
 
-import { use } from "react";
+import { use, useMemo } from "react"; // ✅ useMemo 추가
 import { useSearchParams, useRouter } from "next/navigation";
 import { useBoardList } from "@/features/board/hooks/useBoards";
 import { BoardViewSwitcher } from "@/features/board/ui/BoardViewSwitcher";
@@ -162,19 +162,13 @@ export default function BoardListPage({
 
   const safeTotal = reportedTotal > 0 ? reportedTotal : safeItems.length;
 
-  // ✅ 공지(noticeFlag) 우선 정렬 + 공지는 번호를 '*' 로 가공 (UI 구조 변경 없음)
-  const itemsSorted = [...safeItems]
-    .sort((a: any, b: any) => {
-      const an = a?.noticeFlag ? 1 : 0;
-      const bn = b?.noticeFlag ? 1 : 0;
-      if (an !== bn) return bn - an; // 공지 먼저
-      // 나머지는 bno 내림차순(최신 추정)
-      return (b?.bno ?? 0) - (a?.bno ?? 0);
-    })
-    .map((it: any) => ({
-      ...it,
-      bno: it?.noticeFlag ? "*" : it?.bno,
-    }));
+  // ✅ 공지(noticeFlag) 우선 정렬 (bno는 변형하지 않음)
+  const itemsSorted = useMemo(() => {
+    const list = Array.isArray(safeItems) ? safeItems : [];
+    const notices = list.filter((b: any) => !!b?.noticeFlag);
+    const normals = list.filter((b: any) => !b?.noticeFlag);
+    return [...notices, ...normals];
+  }, [safeItems]);
 
   if (error) return <div className={WRAP}>에러가 발생했어요</div>;
 

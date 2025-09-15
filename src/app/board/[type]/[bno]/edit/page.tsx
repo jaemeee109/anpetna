@@ -101,15 +101,38 @@ export default function BoardEditPage({
     setDeleteSet(new Set());
   }, [board]);
 
-  const previewAdd = useMemo(
-    () => addFiles.map((f) => URL.createObjectURL(f)),
-    [addFiles]
-  );
+  /** ✅ 추가 파일 미리보기 (교체용 파일은 여기서 자동 제외해 중복 방지) */
+  const replacementFilesSet = useMemo(() => {
+    const s = new Set<File>();
+    replaceMap.forEach((f) => s.add(f));
+    return s;
+  }, [replaceMap]);
+
+  const previewAdd = useMemo(() => {
+    const onlyPureAdds = addFiles.filter((f) => !replacementFilesSet.has(f));
+    return onlyPureAdds.map((f) => URL.createObjectURL(f));
+  }, [addFiles, replacementFilesSet]);
+
   useEffect(() => {
     return () => {
       previewAdd.forEach((u) => URL.revokeObjectURL(u));
     };
   }, [previewAdd]);
+
+  /** ✅ 교체 파일 미리보기: uuid -> objectURL 매핑 */
+  const previewReplaceMap = useMemo(() => {
+    const m = new Map<number, string>();
+    replaceMap.forEach((file, uuid) => {
+      m.set(uuid, URL.createObjectURL(file));
+    });
+    return m;
+  }, [replaceMap]);
+
+  useEffect(() => {
+    return () => {
+      previewReplaceMap.forEach((u) => URL.revokeObjectURL(u));
+    };
+  }, [previewReplaceMap]);
 
   if (isLoading) return <div className={WRAP}>로딩중…</div>;
   if (error || !board) return <div className={WRAP}>글을 불러오지 못했어요.</div>;
@@ -133,6 +156,7 @@ export default function BoardEditPage({
           n.set(uuid, file);
           return n;
         });
+        // 교체 시: 원본 uuid는 삭제 대상으로 표시 + 업로드 파일 목록에 추가(서버 업로드용)
         setDeleteSet((prev) => new Set(prev).add(uuid));
         setAddFiles((prev) => [...prev, file]);
       }
@@ -246,7 +270,7 @@ export default function BoardEditPage({
         />
       </div>
 
-      {/* ✅ 첨부 이미지(기존) — 프록시 URL로 미리보기 */}
+      {/* ✅ 첨부 이미지(기존) — 프록시 URL로 미리보기, 교체 시 즉시 반영 */}
       {origImages.length > 0 && (
         <div className="mt-6">
           <div className="mb-2 text-sm text-gray-700">첨부 이미지</div>
@@ -259,7 +283,9 @@ export default function BoardEditPage({
                 (img as any).imageUrl ??
                 (img as any).src ??
                 '';
-              const src = proxiedFileUrl(raw);
+              // 교체 선택된 경우: 교체 파일의 미리보기 URL을 우선 사용
+              const swapped = uuid != null ? previewReplaceMap.get(uuid) : undefined;
+              const src = swapped || proxiedFileUrl(raw);
               return (
                 <div key={uuid ?? src} className="border rounded p-2">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -309,6 +335,18 @@ export default function BoardEditPage({
           이미지 추가
         </button>
       </div>
+
+      {/* ✅ 새로 추가한 파일 미리보기 (교체용 파일은 제외하여 중복 방지) */}
+      {previewAdd.length > 0 && (
+        <div className="mt-3 grid grid-cols-2 md:grid-cols-3 gap-3">
+          {previewAdd.map((src, i) => (
+            <div key={`add-${i}`} className="relative border border-gray-200 rounded p-1">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={src} alt={`p-${i}`} className="w-full h-28 object-cover rounded" />
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* 고정글 / 비밀글 */}
       <div className="mt-[20px] mb-[50px] flex justify-center gap-[10px]">

@@ -1,3 +1,4 @@
+// src/app/board/QNA/[bno]/page.tsx
 'use client';
 
 import { useEffect, useMemo, useState, FormEvent } from 'react';
@@ -52,8 +53,7 @@ export default function QnaDetailPage() {
   const [comments, setComments] = useState<Cmt[]>([]);
   const [loadingCmt, setLoadingCmt] = useState(true);
 
-  // 댓글 입력
-  const [cWriter, setCWriter] = useState('');
+  // 댓글 입력(작성자 인풋 제거 → 내용만)
   const [cContent, setCContent] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -61,7 +61,7 @@ export default function QnaDetailPage() {
     process.env.NEXT_PUBLIC_API_BASE ||
     (typeof window !== 'undefined' ? window.location.origin : '');
 
-
+  // 글 조회
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -70,7 +70,7 @@ export default function QnaDetailPage() {
         const url = new URL(`/board/readOne/${bno}`, base).toString();
         const resp = await fetch(url, {
           credentials: 'include',
-          headers: authHeaders(), // ★ 여기
+          headers: authHeaders(),
         });
         if (!resp.ok) {
           const msg = `글을 불러오지 못했습니다. (HTTP ${resp.status})`;
@@ -105,7 +105,7 @@ export default function QnaDetailPage() {
 
       const resp = await fetch(url.toString(), {
         credentials: 'include',
-        headers: authHeaders(), // ★ 인증 첨부
+        headers: authHeaders(),
       });
       if (!resp.ok) {
         console.warn(`댓글을 불러오지 못했습니다. (HTTP ${resp.status})`);
@@ -155,7 +155,7 @@ export default function QnaDetailPage() {
     const resp = await fetch(new URL(`/board/delete/${post.bno}`, base), {
       method: 'POST',
       credentials: 'include',
-      headers: authHeaders(), // ★ 인증 첨부
+      headers: authHeaders(),
     });
     if (resp.ok) {
       router.push('/board/QNA?view=mine');
@@ -164,22 +164,21 @@ export default function QnaDetailPage() {
     }
   }
 
-  // 댓글 등록
+  // 댓글 등록 (작성자 필드 전송 없음)
   async function onSubmitCmt(e: FormEvent) {
     e.preventDefault();
     if (submitting) return;
-    if (!cWriter.trim() || !cContent.trim()) return;
+    if (!cContent.trim()) return;
 
     try {
       setSubmitting(true);
       const resp = await fetch(new URL('/comment/create', base), {
         method: 'POST',
         credentials: 'include',
-        headers: authHeaders({ 'Content-Type': 'application/json' }), // ★ 인증 + JSON
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           bno,
-          cWriter, cwriter: cWriter, memberId: cWriter,
-          cContent, ccontent: cContent, content: cContent,
+          cContent, // ★ 서버가 토큰 사용자로 작성자 설정
         }),
       });
       if (!resp.ok) throw new Error(String(resp.status));
@@ -202,7 +201,7 @@ export default function QnaDetailPage() {
       const resp = await fetch(new URL(`/comment/${cno}/delete`, base), {
         method: 'POST',
         credentials: 'include',
-        headers: authHeaders(), // ★ 인증 첨부
+        headers: authHeaders(),
       });
       if (!resp.ok) throw new Error(String(resp.status));
       await fetchComments();
@@ -295,19 +294,8 @@ export default function QnaDetailPage() {
         )}
       </section>
 
-      {/* 댓글 작성 — 기존 UI 유지 */}
+      {/* 댓글 작성 — 작성자 입력칸 제거, 내용만 */}
       <form onSubmit={onSubmitCmt} style={{ maxWidth: 820, margin: '0 auto', textAlign: 'left' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr', gap: 10, alignItems: 'center', marginBottom: 10 }}>
-          <label htmlFor="cwriter" style={{ fontWeight: 600, textAlign: 'left' }}>작성자</label>
-          <input
-            id="cwriter"
-            value={cWriter}
-            onChange={(e) => setCWriter(e.target.value)}
-            style={{ height: 36, padding: '0 10px', border: '1px solid #ddd', borderRadius: 8, maxWidth: 280, textAlign: 'left' }}
-            placeholder="작성자 ID"
-          />
-        </div>
-
         <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr', gap: 10, alignItems: 'start' }}>
           <label htmlFor="ccontent" style={{ fontWeight: 500, marginTop: 8, textAlign: 'left' }}>답변</label>
           <textarea

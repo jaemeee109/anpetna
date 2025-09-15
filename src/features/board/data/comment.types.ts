@@ -19,7 +19,7 @@ export type PageRes<T> = {
 
 export type CreateCommentReq = {
   bno: number;
-  cWriter: string;
+ // cWriter: string;
   cContent: string;
 };
 
