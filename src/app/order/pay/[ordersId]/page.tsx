@@ -1,0 +1,92 @@
+// src/app/order/pay/[ordersId]/page.tsx
+'use client';
+
+import { useEffect } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+
+function resolveApiBase(): string {
+  const envBase =
+    (process.env.NEXT_PUBLIC_API_BASE as string | undefined) ||
+    (process.env.NEXT_PUBLIC_API_BASE_URL as string | undefined) ||
+    '';
+  if (envBase) return envBase.replace(/\/+$/, '');
+  if (typeof window === 'undefined') return '';
+  const { protocol, hostname, port } = window.location;
+  const guessPort = port ? (port === '3000' ? '8000' : port) : '';
+  return `${protocol}//${hostname}${guessPort ? `:${guessPort}` : ''}`.replace(/\/+$/, '');
+}
+
+async function loadToss(clientKey: string): Promise<any> {
+  // 이미 로드 됐으면 바로 사용
+  // @ts-ignore
+  if (typeof window !== 'undefined' && (window as any).TossPayments) {
+    // @ts-ignore
+    // eslint-disable-next-line no-undef
+    return (window as any).TossPayments(clientKey);
+  }
+  // 스크립트 로드
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://js.tosspayments.com/v1'; // 토스 JS SDK
+    s.onload = () => {
+      try {
+        // @ts-ignore
+        // eslint-disable-next-line no-undef
+        const tp = (window as any).TossPayments(clientKey);
+        resolve(tp);
+      } catch (e) {
+        reject(e);
+      }
+    };
+    s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
+
+export default function OrderPayPage() {
+  const { ordersId } = useParams<{ ordersId: string }>();
+  const router = useRouter();
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const id = Number(Array.isArray(ordersId) ? ordersId[0] : ordersId);
+        if (!Number.isFinite(id) || id <= 0) throw new Error('유효하지 않은 주문번호');
+
+        // 1) 결제 준비 호출
+        const base = resolveApiBase();
+        const r = await fetch(`${base}/api/pay/toss/prepare`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderNo: id, method: 'CARD' }),
+        });
+        const j = await r.json();
+        const prep = j?.result ?? j;
+        const orderId = prep?.orderId;
+        const amount = prep?.totalAmount;
+        const orderName = prep?.orderName || `주문 ${id}`;
+        if (!orderId || !amount) throw new Error('결제 준비 정보가 없습니다.');
+
+        // 2) 토스 SDK 로드 → 결제창 오픈
+        const clientKey = process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY as string | undefined;
+        if (!clientKey) throw new Error('NEXT_PUBLIC_TOSS_CLIENT_KEY 환경변수가 설정되어 있지 않습니다.');
+
+        const tp = await loadToss(clientKey);
+        const origin = window.location.origin;
+        await tp.requestPayment('카드', {
+          amount,
+          orderId,
+          orderName,
+          successUrl: `${origin}/order/pay/success?orderId=${encodeURIComponent(orderId)}&amount=${encodeURIComponent(String(amount))}&ordersId=${id}`,
+          failUrl: `${origin}/order/pay/fail?ordersId=${id}`,
+        });
+      } catch (e: any) {
+        alert(e?.message || '결제 페이지 이동에 실패했습니다.');
+        // 실패 시 주문완료로 보내지 않고, 이전 페이지로
+        router.back();
+      }
+    })();
+  }, [ordersId, router]);
+
+  return <div className="px-4 py-10 text-center">결제 페이지로 이동 중…</div>;
+}

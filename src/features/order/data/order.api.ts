@@ -99,10 +99,15 @@ async function changeStatus(ordersId: number, next: string) {
 }
 
 /** 주소 수정: PATCH /order/{ordersId}/address */
-async function updateAddress(ordersId: number, address: { zipcode: string; street: string; detail: string; receiver: string }) {
+// (교체) 주소 수정: PATCH /order/{ordersId}/address
+async function updateAddress(
+  ordersId: number,
+  address: { zipcode: string; street: string; detail: string; receiver: string; phone?: string } // phone 허용
+) {
   const { data } = await http.patch(`${BASE}/${ordersId}/address`, address);
   return data?.result ?? data;
 }
+
 
 /** (선택) 삭제: DELETE /order/{ordersId}
  *  ─ 백엔드 삭제 엔드포인트는 현재 주석처리되어 있어 404가 날 수 있습니다. (컨트롤러 주석 참고) :contentReference[oaicite:6]{index=6}

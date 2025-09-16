@@ -4,6 +4,7 @@ export type AddressDTO = {
   street: string;
   detail: string;
   receiver: string;
+  phone: string; 
 };
 
 export type CreateOrderItem = { itemId: number; quantity: number };

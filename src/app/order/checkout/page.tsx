@@ -259,6 +259,7 @@ const onPay = async () => {
       street: String(ship.road),
       detail: String(ship.detail),
       receiver: String(ship.name),
+       phone: String(ship.phone), 
     };
 
     // (4) memberId/cardId 생성
@@ -271,7 +272,8 @@ const onPay = async () => {
       useSavedAddress: false,
       shippingAddress,
       items,
-      // shippingFee: 3000, // 보내면 그 값을, 안 보내면 백엔드 기본 3000 적용(설명 주석 참조)
+      shippingFee: itemsTotal < 100000 ? 3000 : 0, // ← 규칙 적용(10만원 미만 3000, 이상 0)
+      
     };
 
     // (5) 주문 생성 (POST /order)
@@ -280,7 +282,7 @@ const onPay = async () => {
     if (!ordersId) throw new Error('주문번호를 받지 못했습니다.');
 
     // (6) 완료 페이지로 이동
-    router.replace(`/order/complete/${ordersId}`);
+    router.replace(`/order/pay/${ordersId}`);
   } catch (e: any) {
     alert(e?.message || '주문 처리 중 오류가 발생했습니다.');
   }
@@ -447,7 +449,7 @@ const onPay = async () => {
                    fill="currentColor" viewBox="0 0 16 16" className="inline-block ml-[10px] mr-[10px]">
                 <path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2zm2-1a1 1 0 0 0-1 1v1h14V4a1 1 0 0 0-1-1zm13 4H1v5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1z"/>
                 <path d="M2 10a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v1a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z"/>
-              </svg> 카드
+              </svg> TOSS
             </label>
           </div>
         </section>
