@@ -45,4 +45,6 @@ public class OrderEntity {
     // 이 품목이 어떤 주문서에 속하는지 외래키 설정
 
 
+
+
 }
