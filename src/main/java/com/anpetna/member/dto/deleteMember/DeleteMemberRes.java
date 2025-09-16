@@ -2,6 +2,7 @@ package com.anpetna.member.dto.deleteMember;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Getter
