@@ -50,4 +50,10 @@ public interface TokenRepository extends JpaRepository<TokenEntity, Long> {
                                @Param("refresh") String refresh,
                                @Param("expiresAt") Instant expiresAt);
 
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Transactional
+    @Query("delete from TokenEntity t where t.memberId = :memberId")
+    void deleteByMemberId(@Param("memberId") String memberId);
+
 }
