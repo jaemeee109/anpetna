@@ -1,5 +1,6 @@
 package com.anpetna.auth.config;
 
+import com.anpetna.adminPage.repository.AdminBlacklistJpaRepository;
 import com.anpetna.auth.service.BlacklistServiceImpl;
 import com.anpetna.member.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
@@ -60,6 +61,7 @@ public class SecurityConfig {
             JwtProvider jwtProvider,                               // JWT 파서/검증기
             BlacklistServiceImpl blacklistService,                 // Access 블랙리스트 조회 서비스
             CorsConfigurationSource corsConfigurationSource,       // CORS 설정 빈 (주입만 받음)
+            AdminBlacklistJpaRepository adminBlacklistJpaRepository, // ★추가: 계정 블랙리스트
             MemberRepository memberRepository) throws Exception {
         http
                 // ===== CORS / CSRF / 세션 전략 =====
@@ -136,7 +138,7 @@ public class SecurityConfig {
                 //JWT 검증 필터를 UsernamePasswordAuthenticationFilter 앞에 넣어서, 세션 없이 요청마다 토큰 인증 수행.
                 //blacklistService 활용해 강제 차단된 토큰 처리 가능
                 .addFilterBefore(
-                        new JwtAuthenticationFilter(jwtProvider, blacklistService, memberRepository), // 커스텀 JWT 인증 필터
+                        new JwtAuthenticationFilter(jwtProvider, blacklistService, memberRepository, adminBlacklistJpaRepository), // 커스텀 JWT 인증 필터
                         UsernamePasswordAuthenticationFilter.class                                   // 위치 지정만, 폼 로그인은 사용 안함
                 );
         return http.build();

@@ -1,5 +1,6 @@
 package com.anpetna.auth.config;
 
+import com.anpetna.adminPage.repository.AdminBlacklistJpaRepository;
 import com.anpetna.auth.service.BlacklistServiceImpl;
 import com.anpetna.auth.dto.TokenRequest;
 import com.anpetna.member.constant.MemberRole;
@@ -23,7 +24,10 @@ import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.web.filter.OncePerRequestFilter;
+
 import java.io.IOException;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -43,6 +47,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtProvider jwtProvider;
     private final BlacklistServiceImpl blacklistService;   // 토큰 블랙리스트(로그아웃 등)
     private final MemberRepository memberRepository;       // 사용자 상태(BLACKLISTED) 확인
+    private final AdminBlacklistJpaRepository adminBlacklistJpaRepository;    // ★추가
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain) throws IOException, ServletException {
@@ -63,7 +68,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         // 토큰 파싱========================================================================
         String access = header.substring(7);
         TokenRequest tokenRequest = TokenRequest.builder().accessToken(access).build();
-        try{
+        try {
 
             // 2) 블랙리스트 토큰 체크=========================================================
             if (blacklistService.isBlacklisted(tokenRequest)) {//🔴➡️ 엑세스 토큰 비어있음
@@ -96,7 +101,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 JWT 변조 가능성 : 변조된 토큰에서 null memberId가 들어올 수 있음 → 인증 우회 시도 가능*/
 
 
-            // 4) SecurityContextHolder에 인증이 없다면 주입=====================================
+            // 블랙리스트에 있는지 검증==========================================================
+            // ★ 계정 블랙리스트(현재 활성) 차단 — untilAt is null(무기한) or untilAt > now
+            LocalDateTime nowKst = LocalDateTime.now(ZoneId.of("Asia/Seoul"));
+            if (adminBlacklistJpaRepository.existsActiveByMemberId(memberId, nowKst)) {
+                log.warn("Blocked by account blacklist: memberId={}, uri={}", memberId, request.getRequestURI());
+                response.sendError(HttpServletResponse.SC_FORBIDDEN, "블랙리스트 상태(계정)"); // 403
+                return;
+            }
+
+            // 4) SecurityContextHolder 에 인증이 없다면 주입=====================================
             if (SecurityContextHolder.getContext().getAuthentication() == null) {
                 //dev~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
                 /*var roles = new ArrayList<GrantedAuthority>();
@@ -112,7 +126,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     response.sendError(HttpServletResponse.SC_FORBIDDEN, "User is blacklisted");  // 🔴➡️
                     return;
                 }
-                // 5) SecurityContext에 인증 주입 — DB 기반 권한 부여
+                // 5) SecurityContext 에 인증 주입 — DB 기반 권한 부여
                 Collection<? extends GrantedAuthority> authorities = List.of(
                         new SimpleGrantedAuthority(
                                 status.name().startsWith("ROLE_") ? status.name() : "ROLE_" + status.name()
@@ -156,7 +170,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         return uri.startsWith("/jwt/");  // 리프레시/로그아웃 등 JWT 관리 엔드포인트는 필터 스킵 → 컨트롤러에서 처리
     }
 
-    // payload에서 sub만 안전하게 추출 (로그용)
+    // payload 에서 sub 만 안전하게 추출 (로그용)
     private String safeSub(String jwt) {
         try {
             return jwtProvider.parseClaims(jwt).getSubject();
