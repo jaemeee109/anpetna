@@ -230,12 +230,10 @@ public class BoardServiceImpl implements BoardService {
 
         return ReadOneBoardRes.builder()
                 .bno(e.getBno())
-                .bWriter(e.getBWriter())
                 .bTitle(e.getBTitle())
+                .bWriter(e.getBWriter())
                 .bContent(e.getBContent())
                 .bLikeCount(e.getBLikeCount())
-                .noticeFlag(Boolean.TRUE.equals(e.getNoticeFlag()))
-                .isSecret(Boolean.TRUE.equals(e.getIsSecret()))
                 .images(images)
                 .createDate(e.getCreateDate())
                 .latestDate(e.getLatestDate())
