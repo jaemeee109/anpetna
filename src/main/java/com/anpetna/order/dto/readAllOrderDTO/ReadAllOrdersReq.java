@@ -15,7 +15,7 @@ public class ReadAllOrdersReq {
 
 
     @NotBlank
-    private MemberEntity memberId;     // 조회할 회원 ID
+    private MemberEntity member;     // 조회할 회원 ID
 
     @Min(0)
     @Builder.Default

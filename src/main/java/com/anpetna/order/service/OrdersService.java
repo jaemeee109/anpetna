@@ -8,13 +8,12 @@ import com.anpetna.order.dto.createOrderDTO.CreateOrderRes;
 import com.anpetna.order.dto.readAllOrderDTO.ReadAllOrdersRes;
 import com.anpetna.order.dto.readOneOrderDTO.ReadOneOrdersRes;
 import org.springframework.data.domain.Pageable;
-import org.springframework.transaction.annotation.Transactional;
 
 public interface OrdersService {
 
     // 추가=========================================================
 
-    CreateOrderRes create(MemberEntity memberId, CreateOrderReq req);
+    CreateOrderRes create(MemberEntity member, CreateOrderReq req);
     // =====================================================
 
 
@@ -33,6 +32,6 @@ public interface OrdersService {
     ReadAllOrdersRes getAllOrders(Pageable pageable);
 
     // 특정 회원의 계산서 목록 요약 보기
-    ReadAllOrdersRes getSummariesByMember(MemberEntity memberId, Pageable pageable);
+    ReadAllOrdersRes getSummariesByMember(MemberEntity member, Pageable pageable);
 
 }

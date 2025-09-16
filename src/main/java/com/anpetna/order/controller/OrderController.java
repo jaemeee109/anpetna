@@ -28,7 +28,7 @@ import org.springframework.web.bind.annotation.*;
 public class OrderController {
 
     private final OrdersService ordersService;
-    private final MemberRepository memberRepository; // ★ CHANGED: member 매핑을 위해 주입
+    private final MemberRepository memberRepository;
 
     // ==============================================================
 
@@ -40,12 +40,10 @@ public class OrderController {
     @PreAuthorize("hasRole('USER')")
     public ApiResult<CreateOrderRes> create(
             Authentication authentication,
-            @RequestBody CreateOrderReq req // @Valid 제거 (★ 유지)
+            @RequestBody CreateOrderReq req
     ) {
-        // ★ CHANGED: 로그인한 사용자 id(String) → MemberEntity 로드(연관관계 지연 로딩 안전)
         String loginId = authentication.getName();
         MemberEntity member = memberRepository.getReferenceById(loginId);
-        // 참고) 존재 보장 필요하면 findById(loginId).orElseThrow(...) 사용
 
         CreateOrderRes body = ordersService.create(member, req);
         return new ApiResult<>(body);
@@ -77,11 +75,11 @@ public class OrderController {
      */
     @GetMapping("/members/{memberId}")
     public ApiResult<ReadAllOrdersRes> getOrdersByMember(
-            @PathVariable("memberId") String memberId,   // ★ CHANGED: 문자열로 받고
+            @PathVariable("memberId") String memberId,   // 문자열로 받고
             @PageableDefault(size = 10, sort = "ordersId", direction = Sort.Direction.DESC)
             Pageable pageable
     ) {
-        // ★ CHANGED: memberId(String) → MemberEntity 변환
+        // memberId(String) → MemberEntity 변환
         MemberEntity member = memberRepository.getReferenceById(memberId);
 
         ReadAllOrdersRes body = ordersService.getSummariesByMember(member, pageable);
