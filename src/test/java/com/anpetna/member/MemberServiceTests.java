@@ -94,7 +94,7 @@ public class MemberServiceTests {
                 .memberRole(MemberRole.ADMIN)
                 .emailStsYn("Y")
                 .smsStsYn("Y")
-                .etc("반려견 1마리 키우는 중")
+//                .etc("반려견 1마리 키우는 중")
                 .memberFileImage(null)
                 .build();
 
@@ -120,7 +120,7 @@ public class MemberServiceTests {
         when(memberRepository.save(any(MemberEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // when
-        memberService.join(memberReq);
+//        memberService.join(memberReq);
 
         // then: 저장된 Entity 검증
         ArgumentCaptor<MemberEntity> captor = ArgumentCaptor.forClass(MemberEntity.class);

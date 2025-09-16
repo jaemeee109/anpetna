@@ -41,28 +41,29 @@ public class ItemRepositoryCustomImpl implements ItemRepositoryCustom {
     // 조건2 : 판매상태를 정렬에 고려
     @Override
     public Page<ItemEntity> orderBy(Pageable pageable, SearchAllItemsReq req) {
-        BooleanBuilder builder = new BooleanBuilder();
-        CaseBuilder caseBuilder = new CaseBuilder();
-
         // 카테고리
-        builder.and(qItem.itemCategory.eq(req.getItemCategory()));
+        BooleanBuilder builder = new BooleanBuilder();
+        if (req.getItemCategory() != null) {
+            builder.and(qItem.itemCategory.eq(req.getItemCategory()));
+        }
 
-        OrderSpecifier orderBy = null;
         // 정렬 동적 조건
+        OrderSpecifier orderBy = null;
         if (req.getOrderByPrice() != null) {
             if (req.getOrderByPrice().isAscending()) {
-                orderBy = qItem.itemPrice.desc();
-            } else if (req.getOrderByDate().isDescending()) {
                 orderBy = qItem.itemPrice.asc();
+            } else if (req.getOrderByDate().isDescending()) {
+                orderBy = qItem.itemPrice.desc();
             }
         }else if (req.getOrderByDate()!=null) {
             if (req.getOrderByDate().isAscending()){
-                orderBy =  qItem.createDate.desc();
-            } else if (req.getOrderByDate().isDescending()) {
                 orderBy =  qItem.createDate.asc();
+            } else if (req.getOrderByDate().isDescending()) {
+                orderBy =  qItem.createDate.desc();
             }
+        }else{ // 디폴트 정해
+            orderBy =  qItem.createDate.desc();
         }
-        // 디폴트 정해
 
         // 판매상태 & 최신순 정렬 적용
         List<ItemEntity> orderByDate =  queryFactory.selectFrom(qItem)
@@ -84,3 +85,4 @@ public class ItemRepositoryCustomImpl implements ItemRepositoryCustom {
         }else if (qItem.itemSellStatus.equals(ItemSellStatus.SOLD_OUT)){
             sellStatus = 0;
         };*/
+

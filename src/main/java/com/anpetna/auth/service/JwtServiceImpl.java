@@ -1,5 +1,6 @@
 package com.anpetna.auth.service;
 
+import com.anpetna.adminPage.repository.AdminBlacklistJpaRepository;
 import com.anpetna.auth.config.JwtProvider;
 import com.anpetna.auth.domain.TokenEntity;
 import com.anpetna.auth.dto.LoginMemberReq;
@@ -19,6 +20,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Optional;
 
 @Service
@@ -31,20 +34,27 @@ public class JwtServiceImpl implements JwtService {
     private final PasswordEncoder passwordEncoder;
     private final TokenHash tokenHash;
     private final BlacklistServiceImpl blacklistService;
+    private final AdminBlacklistJpaRepository adminBlacklistJpaRepository;
 
     @Override
     @Transactional
-    public TokenResponse login(LoginMemberReq loginMemberReq){
+    public TokenResponse login(LoginMemberReq loginMemberReq) {
 
         // 1) 사용자 식별자로 토큰 레코드 조회
         MemberEntity member = memberRepository.findByMemberId(loginMemberReq.getMemberId())
-                .orElseThrow(()-> new ResponseStatusException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
 
-// 2) 비밀번호 검증
-//    - passwordEncoder.matches(rawPassword, encodedPassword)
-//    - 요청으로 들어온 평문 비밀번호와 DB에 저장된 암호문을 비교
-        if (!passwordEncoder.matches(loginMemberReq.getMemberPw(),member.getMemberPw())){
+        // 2) 비밀번호 검증
+        //    - passwordEncoder.matches(rawPassword, encodedPassword)
+        //    - 요청으로 들어온 평문 비밀번호와 DB에 저장된 암호문을 비교
+        if (!passwordEncoder.matches(loginMemberReq.getMemberPw(), member.getMemberPw())) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "비밀번호가 일치하지 않습니다");
+        }
+
+        // ★★★ 09.15 추가 블랙리스트 DB에 있으면 ★★★
+        LocalDateTime nowKst = LocalDateTime.now(ZoneId.of("Asia/Seoul"));
+        if (adminBlacklistJpaRepository.existsActiveByMemberId(member.getMemberId(), nowKst)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "블랙리스트 상태로 로그인 불가입니다.");
         }
 
         final String memberId = member.getMemberId();
@@ -96,7 +106,7 @@ public class JwtServiceImpl implements JwtService {
 
 
     @Override
-    public TokenResponse refresh(TokenRequest tokenRequest){
+    public TokenResponse refresh(TokenRequest tokenRequest) {
 
         // (A) 클라에서 받은 리프레시 평문 → 해시 계산
         String hash = tokenHash.sha256(tokenRequest.getRefreshToken());
@@ -108,6 +118,13 @@ public class JwtServiceImpl implements JwtService {
         // (C) JWT 자체의 서명/만료/subject도 검증 (권장)
         Claims claims = jwtProvider.parseClaims(tokenRequest.getRefreshToken()); // 만료여도 e.getClaims() 사용 가능 구현이면 점검
         String memberId = claims.getSubject();
+
+        // ★★★ 09.15 추가 블랙리스트 DB에 있으면 ★★★
+        LocalDateTime nowKst = LocalDateTime.now(ZoneId.of("Asia/Seoul"));
+        if (adminBlacklistJpaRepository.existsActiveByMemberId(memberId, nowKst)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "블랙리스트 상태로 갱신 불가");
+        }
+
         // subject-DB 일치성(선택, 보안 강화)
         if (!memberId.equals(tokenEntity.getMemberId())) {
             // 토큰-DB 불일치 → 즉시 차단
@@ -119,14 +136,14 @@ public class JwtServiceImpl implements JwtService {
         tokenEntity.setRevokedAt(now);
         tokenRepository.save(tokenEntity);
 
-//새로운 Access/Refresh 토큰 생성 (토큰 로테이션
+        //새로운 Access/Refresh 토큰 생성 (토큰 로테이션
         String newAccessToken = jwtProvider.createAccessToken(tokenEntity.getMemberId());
         String newRefreshToken = jwtProvider.createRefreshToken(tokenEntity.getMemberId());
 
-// 새 refresh claims에서 exp 꺼내서 expiresAt 반영
+        // 새 refresh claims에서 exp 꺼내서 expiresAt 반영
         Instant newRefreshExp = jwtProvider.getRefreshExpiration(newRefreshToken);
 
-// 같은 row에 새 해시로 교체 + 만료시각 갱신 + 철회 null로
+        // 같은 row에 새 해시로 교체 + 만료시각 갱신 + 철회 null로
         tokenEntity.setRefreshToken(tokenHash.sha256(newRefreshToken));
         tokenEntity.setExpiresAt(newRefreshExp);
         tokenEntity.setRevokedAt(null);
@@ -139,9 +156,9 @@ public class JwtServiceImpl implements JwtService {
                 .map(String::toUpperCase)
                 .orElse("USER");
 
-//클라이언트에는 평문 새 토큰들을 반환
-//AccessToken: 즉시 사용
-//RefreshToken: 다음 갱신 때 클라이언트가 다시 제출
+        //클라이언트에는 평문 새 토큰들을 반환
+        //AccessToken: 즉시 사용
+        //RefreshToken: 다음 갱신 때 클라이언트가 다시 제출
         return TokenResponse.builder()
                 .accessToken(newAccessToken)
                 .refreshToken(newRefreshToken)

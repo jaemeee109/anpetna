@@ -86,13 +86,13 @@ public class ImageEntity {
         this.review = null;
         if (i != null) i.getImages().add(this);
     }
-    public void attachToReview(ReviewEntity i) {
-        this.board = null;
-        this.member = null;
-        this.item = null;
-        this.review = i;
-        if (i != null) i.getImages().add(this);
-    }
+//    public void attachToReview(ReviewEntity i) {
+//        this.board = null;
+//        this.member = null;
+//        this.item = null;
+//        this.review = i;
+//        if (i != null) i.getImages().add(this);
+//    }
 
     // ====== JPA 생명주기에서 유효성 체크 (서비스 실수 방지) ======
     @PrePersist
@@ -133,12 +133,12 @@ public class ImageEntity {
         img.attachToItem(i);
         return img;
     }
-    public static ImageEntity forReview(String fileName, String url, ReviewEntity r, Integer order) {
-        ImageEntity img = new ImageEntity();
-        img.setFileName(fileName);
-        img.setUrl(url);
-        img.setSortOrder(order == null ? 0 : order);
-        img.attachToReview(r);
-        return img;
-    }
+//    public static ImageEntity forReview(String fileName, String url, ReviewEntity r, Integer order) {
+//        ImageEntity img = new ImageEntity();
+//        img.setFileName(fileName);
+//        img.setUrl(url);
+//        img.setSortOrder(order == null ? 0 : order);
+//        img.attachToReview(r);
+//        return img;
+//    }
 }

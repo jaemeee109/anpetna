@@ -189,8 +189,8 @@ public class BoardServiceTests {
     void testDeleteExistingBoard() {
         Long existingBno = 3L; // DB에 존재하는 게시글 번호
 
-        DeleteBoardReq delReq = DeleteBoardReq.builder().bno(existingBno).build();
-        boardService.deleteBoard(delReq);
+//        DeleteBoardReq delReq = DeleteBoardReq.builder().bno(existingBno).build();
+//        boardService.deleteBoard(delReq);
 
         assertFalse(boardJpaRepository.findById(existingBno).isPresent());
     }

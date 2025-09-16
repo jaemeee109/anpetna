@@ -57,7 +57,45 @@ public class BoardController {
     }
 
     // ===========================================================
-    /* 게시글 목록 + 페이징 + (선택)검색 */
+
+
+    @GetMapping(value = "/readAll", produces = "application/json")
+    public ApiResult<PageResponseDTO<BoardDTO>> readAllBoard(
+            @RequestParam(value = "boardType", required = false) BoardType boardType,
+            @RequestParam(value = "category", required = false) String category,
+            @RequestParam(value = "type", required = false) String type,
+            @RequestParam(value = "keyword", required = false) String keyword,
+            PageRequestDTO pageRequest,
+            @AuthenticationPrincipal org.springframework.security.core.userdetails.UserDetails user
+    ) {
+        // 프런트에서 넘어온 검색 파라미터를 우선 세팅
+        pageRequest.setType(type);
+        pageRequest.setKeyword(keyword);
+
+        // QNA의 "나의 문의내역" 처리: type=w (writer)
+        if (boardType == BoardType.QNA && "w".equalsIgnoreCase(type)) {
+            if (user == null) {
+                throw new org.springframework.security.access.AccessDeniedException("로그인이 필요합니다.");
+            }
+            boolean isAdmin = user.getAuthorities().stream()
+                    .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
+
+            if (isAdmin) {
+                // 관리자: 전체 문의글 보이게 검색조건 제거
+                pageRequest.setType(null);
+                pageRequest.setKeyword(null);
+            } else {
+                // 일반회원: 본인 글만
+                pageRequest.setType("w");
+                pageRequest.setKeyword(user.getUsername());
+            }
+        }
+
+        PageResponseDTO<BoardDTO> res = boardService.readAll(boardType, category, pageRequest);
+        return new ApiResult<>(res);
+
+    }
+    /* *//* 게시글 목록 + 페이징 + (선택)검색 *//*
     @PreAuthorize("@boardGuard.canList(#boardType, authentication)")
     @GetMapping(value = "/readAll", produces = "application/json")
     public ApiResult<PageResponseDTO<BoardDTO>> readAllBoard(
@@ -94,7 +132,7 @@ public class BoardController {
             return new ApiResult<>(boardService.readAllBoard(pageRequest));
         }
     }
-
+*/
     // ===========================================================
     /* 게시글 상세 (회원 전용으로 강제하려면 아래 가드 유지) + (옵션) 좋아요 증가 */
     @PreAuthorize("@boardGuard.canReadOne(#bno, authentication)")

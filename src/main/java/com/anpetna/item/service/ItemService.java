@@ -24,7 +24,7 @@ public interface ItemService {
 
     RegisterItemRes registerItem(RegisterItemReq req, MultipartFile thumb, List<MultipartFile> files);
 
-    ModifyItemRes modifyItem(ModifyItemReq req, MultipartFile thumb, List<MultipartFile> files);
+    ModifyItemRes modifyItem(ModifyItemReq req);
 
     DeleteItemRes deleteItem(DeleteItemReq req);
 

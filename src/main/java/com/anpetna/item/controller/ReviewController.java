@@ -35,28 +35,29 @@ public class ReviewController {
     private final ReviewService reviewService;
 
     @PostMapping
-    //컨트롤러나 서비스 메서드 실행 전에 SpEL(Security Expression Language)로 권한 검증
-    public ApiResult<RegisterReviewRes> registerReview(@RequestBody RegisterReviewReq req) {
-        var postResult = reviewService.registerReview(req);
-        return new ApiResult<>(postResult);
+    @PreAuthorize("isAuthenticated()")
+    public ApiResult<RegisterReviewRes> registerReview(@PathVariable Long itemId, @RequestBody RegisterReviewReq req) {
+        var res = reviewService.registerReview(itemId, req);
+        return new ApiResult<>(res);
     }
 
-    @PutMapping
-    public ApiResult<ModifyReviewRes> updateReview(@RequestBody ModifyReviewReq req) {
-        var putResult = reviewService.modifyReview(req);
+    @PutMapping("/{reviewId}")
+    public ApiResult<ModifyReviewRes> updateReview(@PathVariable Long itemId, @PathVariable Long reviewId, @RequestBody ModifyReviewReq req) {
+        var putResult = reviewService.modifyReview(itemId, reviewId, req);
         return new ApiResult<>(putResult);
     }
 
     @DeleteMapping
-    @PreAuthorize("hasRole('ADMIN')")
-    public ApiResult<DeleteReviewRes> deleteReview(@RequestBody DeleteReviewReq req) {
-        var deleteResult = reviewService.deleteReview(req);
+    @PreAuthorize("isAuthenticated()")
+    public ApiResult<DeleteReviewRes> deleteReview(@PathVariable Long itemId, @RequestBody DeleteReviewReq req) {
+        var deleteResult = reviewService.deleteReview(itemId, req);
         return new ApiResult<>(deleteResult);
     }
 
-    @GetMapping("/{ReviewId}")
-    @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
-    public ApiResult<SearchOneReviewRes> searchOneReview(@RequestBody SearchOneReviewReq req) {
+    @GetMapping("/{reviewId}")
+    public ApiResult<SearchOneReviewRes> searchOneReview(@PathVariable Long reviewId, @PathVariable String itemId) {
+        var req = new SearchOneReviewReq();
+        req.setReviewId(reviewId);
         var getOneResult = reviewService.getOneReview(req);
         return new ApiResult<>(getOneResult);
     }
@@ -74,5 +75,4 @@ public class ReviewController {
         var getAllResult = reviewService.getAllReviews(req, pageRequestDTO, order);
         return new ApiResult<>(getAllResult);
     }
-    //  @PreAuthorize("#id == principal.id")            // 요청 파라미터 id와 로그인 사용자 id 같을 때만 허용
 }

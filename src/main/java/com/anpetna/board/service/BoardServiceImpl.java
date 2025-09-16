@@ -137,7 +137,7 @@ public class BoardServiceImpl implements BoardService {
     @Override
     @Transactional(readOnly = true)
     public PageResponseDTO<BoardDTO> readAllBoard(PageRequestDTO pr) {
-        String boardType = pr.getBoardType();
+        String boardTypeStr = pr.getBoardType();
         String keyword = pr.getKeyword();
         String[] types = pr.getTypes();
 
@@ -147,10 +147,22 @@ public class BoardServiceImpl implements BoardService {
         Pageable pageable = PageRequest.of(Math.max(pr.getPage() - 1, 0), Math.max(pr.getSize(), 1));
 
         Page<BoardEntity> page;
+
         if (hasSearch) {
-            page = boardJpaRepository.search(pageable, types, keyword);
+            // String -> BoardType(enum) 변환 (대소문자 보정)
+            BoardType bt = null;
+            if (boardTypeStr != null && !boardTypeStr.isBlank()) {
+                try {
+                    bt = BoardType.valueOf(boardTypeStr.toUpperCase());
+                } catch (IllegalArgumentException ignore) {
+                    bt = null; // 잘못된 값이면 필터 제외
+                }
+            }
+
+            page = boardJpaRepository.searchByBoardType(pageable, bt, types, keyword);
         } else {
-            page = boardJpaRepository.findByBoardTypeSafe(boardType, pageable);
+            // 검색이 없을 때는 기존 safe 쿼리 그대로 사용 (String boardType 사용)
+            page = boardJpaRepository.findByBoardTypeSafe(boardTypeStr, pageable);
         }
 
         List<BoardDTO> list = page.map(BoardDTO::new).getContent();
@@ -162,15 +174,30 @@ public class BoardServiceImpl implements BoardService {
                 .build();
     }
 
+
     @Override
     @Transactional(readOnly = true)
     public PageResponseDTO<BoardDTO> readAll(BoardType type, String category, PageRequestDTO pr) {
-        Pageable pageable = PageRequest.of(Math.max(pr.getPage() - 1, 0), Math.max(pr.getSize(), 1));
+        // 검색 파라미터
+        String keyword = pr.getKeyword();
+        String[] types = pr.getTypes();
+        boolean hasSearch = (keyword != null && !keyword.isBlank())
+                || (types != null && types.length > 0);
+
+        Pageable pageable = PageRequest.of(
+                Math.max(pr.getPage() - 1, 0),
+                Math.max(pr.getSize(), 1)
+        );
 
         Page<BoardEntity> page;
-        if (type == BoardType.FAQ && category != null && !category.isBlank()) {
+
+        if (hasSearch) {
+            // ★ 검색이 있는 경우: boardType까지 where에 포함
+            page = boardJpaRepository.searchByBoardType(pageable, type, types, keyword);
+        } else if (type == BoardType.FAQ && category != null && !category.isBlank()) {
             page = boardJpaRepository.findByBoardTypeAndCategory(type, category, pageable);
         } else {
+            // 검색이 없으면 안전 조회
             page = boardJpaRepository.findByBoardTypeSafe(type == null ? null : type.name(), pageable);
         }
 
@@ -182,6 +209,7 @@ public class BoardServiceImpl implements BoardService {
                 .total((int) page.getTotalElements())
                 .build();
     }
+
 
     /* ============================ 상세 ============================ */
     @Override
@@ -202,10 +230,12 @@ public class BoardServiceImpl implements BoardService {
 
         return ReadOneBoardRes.builder()
                 .bno(e.getBno())
-                .bTitle(e.getBTitle())
                 .bWriter(e.getBWriter())
+                .bTitle(e.getBTitle())
                 .bContent(e.getBContent())
                 .bLikeCount(e.getBLikeCount())
+                .noticeFlag(Boolean.TRUE.equals(e.getNoticeFlag()))
+                .isSecret(Boolean.TRUE.equals(e.getIsSecret()))
                 .images(images)
                 .createDate(e.getCreateDate())
                 .latestDate(e.getLatestDate())
