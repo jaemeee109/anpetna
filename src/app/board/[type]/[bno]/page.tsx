@@ -34,11 +34,11 @@ function absUrl(p?: string) {
 /** ===== 비밀글 차단 전용 뷰 ===== */
 /** 아래 값들만 바꿔서 즉시 화면에서 확인할 수 있습니다 */
 const SECRET_UI = {
-  lineColor: '#e8e8e9ff',   // 위/아래 선 색상 (예: #e5e7eb=gray-200, #d1d5db=gray-300, #9ca3af=gray-400)
-  marginY: 40,            // 선과 문구 블록의 위/아래 여백(px) - 예: 40 => 40px
-  paddingY: 64,           // 블록 내부 위/아래 패딩(px)
-  textColor: '#7d7f81ff',   // 문구 색상 (예: #6b7280=gray-600, #374151=gray-700, #111827=gray-900)
-  fontSize: 16,           // 문구 폰트 크기(px)
+  lineColor: '#e8e8e9ff',   // 위/아래 선 색상
+  marginY: 40,              // 선과 문구 블록의 위/아래 여백(px)
+  paddingY: 64,             // 블록 내부 위/아래 패딩(px)
+  textColor: '#7d7f81ff',   // 문구 색상
+  fontSize: 16,             // 문구 폰트 크기(px)
   buttonClass: 'btn-3d btn-white', // 목록 버튼 클래스(페이지 공통 스타일)
 };
 
@@ -82,8 +82,6 @@ function ForbiddenSecretView({ onBack }: { onBack: () => void }) {
   );
 }
 
-
-
 /** 프록시로 보내면서 로컬 토큰을 ?t= 로 붙여줌 (이미지 X박스/401 회피) */
 function proxiedFileUrl(p?: string) {
   const absolute = absUrl(p);
@@ -125,7 +123,17 @@ export default function BoardDetailPage({
   const likeMut = useLikeBoard();
   const removeBoardMut = useRemoveBoard();
 
-  const { data: comm, isLoading: commLoading } = useComments(id, 1, 20);
+  // ─── 403 여부를 먼저 계산 ───
+  const status = (error as any)?.status ?? (error as any)?.response?.status;
+  const msg = (error as any)?.message ?? "";
+  const isForbidden =
+    Number(status) === 403 ||
+    /(^|[^0-9])403([^0-9]|$)/.test(String(msg));
+
+  // 상세(위의 useBoardDetail) 결과를 보고, 403/실패면 댓글 질의 끔
+  const commentsEnabled = !isForbidden && !!board;
+  const { data: comm, isLoading: commLoading } = useComments(id, 1, 20, commentsEnabled);
+
   const createMut = useCreateComment();
   const removeMut = useRemoveComment(id);
   const likeCommMut = useLikeComment(id);
@@ -137,16 +145,11 @@ export default function BoardDetailPage({
 
   if (isLoading) return <div className={WRAP}>로딩중…</div>;
 
-  // ===== 403 응답 시: 전용 “비밀글 차단” 화면 =====
-  if (error) {
-    const status = (error as any)?.status ?? (error as any)?.response?.status;
-    const msg = (error as any)?.message ?? "";
-    const isForbidden = Number(status) === 403 || /403/.test(String(msg));
-    if (isForbidden) {
-      return (
-        <ForbiddenSecretView onBack={() => router.push(`/board/${type}`)} />
-      );
-    }
+  // ===== 403 응답 시: 전용 “비밀글 차단” 화면 (즉시 안내) =====
+  if (isForbidden) {
+    return (
+      <ForbiddenSecretView onBack={() => router.push(`/board/${type}`)} />
+    );
   }
 
   if (!board) return <div className={WRAP}>글이 존재하지 않습니다</div>;
@@ -156,7 +159,7 @@ export default function BoardDetailPage({
    * app/useBoards.ts는 { readOneBoard } 형태를 씁니다.
    * ⇒ 어떤 경우든 아래 ‘view’가 실제 게시글 객체가 되도록 통일합니다.
    */
-  const view: any = (board as any)?.readOneBoard ?? board; // ← 핵심 수정 (중첩 해제)
+  const view: any = (board as any)?.readOneBoard ?? board; // ← 핵심: 중첩 해제
 
   /** JWT payload 디코딩(실패 시 null) */
   function decodeJwtPayload(t: string) {
@@ -195,7 +198,7 @@ export default function BoardDetailPage({
   const admin = isAdminFromToken(rawToken);
 
   // 서버가 내려준 비밀글 여부(백엔드 ReadOneBoardRes에 포함)
-  const secretFlag = !!view?.isSecret; // ← 핵심: 중첩 해제 후 확인
+  const secretFlag = !!view?.isSecret;
 
   // 글 작성자/표시값 계산도 view 기준으로 모두 통일
   const title =

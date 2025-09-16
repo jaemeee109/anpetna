@@ -232,7 +232,7 @@ export default function OrderHistoryPage() {
           })}
 
           {!listQ.isLoading && !lines?.length && (
-            <p className="px-2 py-6 text-gray-600">구매내역이 없습니다.</p>
+            <p className="mt-[50px] px-2 py-6 text-gray-600 text-center">구매내역이 없습니다.</p>
           )}
         </div>
 

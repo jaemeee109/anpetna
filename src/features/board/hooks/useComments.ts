@@ -7,12 +7,20 @@ import {
   likeComment as apiLike,
 } from "@/features/board/data/comment.api";
 
-export function useComments(bno: number, page = 1, size = 20) {
+export function useComments(
+  bno: number,
+  page = 1,
+  size = 20,
+  enabled: boolean = true
+) {
   return useQuery({
     queryKey: ["comments", bno, page, size],
     queryFn: () => fetchComments(bno, page, size),
+    enabled, // ← 403 등일 때 상세가 막히면 댓글 요청 자체를 안 보냄
   });
 }
+
+
 
 export function useCreateComment() {
   const qc = useQueryClient();

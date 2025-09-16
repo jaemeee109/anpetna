@@ -132,7 +132,7 @@ export default function ItemDetailPage() {
   const [qty, setQty] = useState<number>(1);
 
   const IMG_BASE = resolveImgBase();
-const addMut = useAddCart();
+  const addMut = useAddCart();
   useEffect(() => setIsAdmin(isAdminClient()), []);
 
   // 상세 조회
@@ -165,6 +165,24 @@ const addMut = useAddCart();
 
   const price = Number(item?.itemPrice || 0);
   const total = useMemo(() => price * Math.max(1, Number(qty || 1)), [price, qty]);
+
+  // ✅ 품절 여부(응답에 오는 다양한 키를 안전하게 검사)
+  // - 문자열 상태: itemSellStatus / sellStatus 가 'SOLD_OUT'
+  // - 수량/재고: itemStock / stock / quantity 가 0 이하
+  const soldOut = useMemo(() => {
+    const s =
+      String((item as any)?.itemSellStatus ?? (item as any)?.sellStatus ?? '')
+        .trim()
+        .toUpperCase();
+    if (s === 'SOLD_OUT') return true;
+    const stockRaw =
+      (item as any)?.itemStock ??
+      (item as any)?.stock ??
+      (item as any)?.quantity;
+    const stock = Number(stockRaw);
+    if (!Number.isNaN(stock)) return stock <= 0;
+    return false;
+  }, [item]);
 
   const onDec = () => setQty((q) => Math.max(1, Number(q || 1) - 1));
   const onInc = () => setQty((q) => Math.max(1, Number(q || 1) + 1));
@@ -300,28 +318,50 @@ const addMut = useAddCart();
             <button
               type="button"
               className="btn-3d btn-white btn-cta rounded border"
-              onClick={() => addMut.mutate({ itemId: Number(id), quantity: Math.max(1, Number(qty || 1)) })}
-  disabled={addMut.isPending}
->
+              onClick={() => {
+                // ✅ 비회원 가드
+                if (!getAccessToken()) {
+                  alert('로그인 후 이용이 가능합니다');
+                  return;
+                }
+                // ✅ 품절 가드
+                if (soldOut) {
+                  alert('품절된 상품입니다');
+                  return;
+                }
+                addMut.mutate({ itemId: Number(id), quantity: Math.max(1, Number(qty || 1)) });
+              }}
+              disabled={addMut.isPending}
+            >
               장바구니
             </button>
             <button
               type="button"
               className="btn-3d btn-white btn-cta rounded border"
               onClick={() => {
-      // 현재 페이지 params에서 [id] 추출
-      const m = location.pathname.match(/\/items\/(\d+)/);
-      const id = m ? Number(m[1]) : 0;
-      const q = 1; // 기본 수량 1 (필요 시 상세 페이지의 수량 상태값으로 교체)
-      if (id > 0) {
-        location.href = `/order/checkout?itemId=${id}&quantity=${q}`;
-      } else {
-        alert('상품 정보를 확인할 수 없습니다.');
-      }
-    }}
-  >
-    주문하기
-  </button>
+                // ✅ 비회원 가드
+                if (!getAccessToken()) {
+                  alert('로그인 후 이용이 가능합니다');
+                  return;
+                }
+                // ✅ 품절 가드
+                if (soldOut) {
+                  alert('품절된 상품입니다');
+                  return;
+                }
+                // 현재 페이지 params에서 [id] 추출 (네 기존 로직 유지)
+                const m = location.pathname.match(/\/items\/(\d+)/);
+                const id = m ? Number(m[1]) : 0;
+                const q = 1; // (기존 로직 유지) 필요 시 qty로 바꾸고 싶으면 여기만 qty로 교체
+                if (id > 0) {
+                  location.href = `/order/checkout?itemId=${id}&quantity=${q}`;
+                } else {
+                  alert('상품 정보를 확인할 수 없습니다.');
+                }
+              }}
+            >
+              주문하기
+            </button>
           </div>
         </div>
       </section>
@@ -359,7 +399,7 @@ const addMut = useAddCart();
         <p className="policy-sub">교환/반품 가능 기간</p>
         <p>· 구매자는 상품 수령 후 7일 이내에 교환 및 반품 신청이 가능합니다. (단, 단순변심의 경우 교환은 불가하며, 반품만 가능합니다.)</p>
         <p>· 상품이 표시·광고 내용과 다르거나 하자 등 계약 내용과 다르게 이행된 경우에는 상품 수령 후 3개월 이내, 그 사실을 안 날 또는 알 수 있었던 날부터 30일 이내에 QNA [문의하기]를 통해 청약 철회가 가능합니다.</p>
-        <p className="policy-sub">교환/반품 비용</p>
+        <p>· 교환/반품 비용</p>
         <p>· 구매자의 단순 변심으로 교환/반품할 경우에는 구매자가 배송비를 부담합니다.</p>
         <p>· 상품 하자나 제품 불일치, 배송 문제로 교환/반품할 경우에는 판매자가 배송비를 부담합니다.</p>
         <p className="policy-sub">교환/반품 시 유의사항</p>

@@ -1,7 +1,10 @@
+// src/app/member/delete/page.tsx
 'use client';
 
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { purgeAuthArtifacts } from '@/features/member/data/session';
+
 
 // ===== 공용 유틸 (Login/Info 페이지 톤에 맞춤) =====
 async function parseJsonSafe(resp: Response): Promise<any> {
@@ -89,49 +92,26 @@ export default function DeleteAccountPage() {
       setErr(null);
       setOk(null);
 
-      // ✅ 백엔드 정리가 완료되면 첫 번째만 남기는 걸 추천!
-      const body = { memberId, memberPw: password };
-      const candidates: { url: string; method: 'DELETE'|'POST'|'GET'; withBody: boolean }[] = [
-        // 권장 표준
-        { url: apiURL(`/member/remove`), method: 'DELETE', withBody: false },
-        // 비밀번호 확인이 필요한 서버라면
-        { url: apiURL(`/member/remove`), method: 'POST', withBody: true },
-        // 레거시 호환 (현재 서버가 제공 중인 경우)
-        { url: apiURL(`/member/delete`), method: 'GET', withBody: false },
-      ];
+      // ✅ 백엔드에 맞춰 /member/delete (GET)만 호출
+      const url = apiURL(`/member/delete`);
+      const resp = await fetch(url, {
+        method: 'GET',
+        credentials: 'include',
+        headers: authHeaders(), // Authorization만 추가
+      });
 
-      let success = false;
-      let last = '';
-
-      for (const c of candidates) {
-        const init: RequestInit = {
-          method: c.method,
-          credentials: 'include',
-          headers: authHeaders(c.withBody ? { 'Content-Type': 'application/json' } : {}),
-          ...(c.withBody ? { body: JSON.stringify(body) } : {}),
-        };
-
-        const resp = await fetch(c.url, init);
-        if (resp.ok) { success = true; break; }
-
+      if (!resp.ok) {
         const t = await parseJsonSafe(resp);
-        last = `HTTP ${resp.status} ${typeof t?.raw === 'string' ? t.raw : JSON.stringify(t)}`;
-        if (resp.status === 401) break; // 인증 실패면 반복 의미 없음
+        throw new Error(`회원 탈퇴 실패\nHTTP ${resp.status} ${typeof t?.raw === 'string' ? t.raw : JSON.stringify(t)}`);
       }
-
-      if (!success) throw new Error(`회원 탈퇴 실패\n${last}`);
+// 성공: 프로젝트 공통 정리 + 헤더 즉시 갱신
+purgeAuthArtifacts(); // 토큰/쿠키/스토리지 전부 삭제 & 'auth-changed' 이벤트 발행
+setOk('회원 탈퇴가 완료되었습니다.');
+alert('계정이 삭제되었습니다. 이용해 주셔서 감사합니다.');
+router.replace('/');
 
       // 성공: 로컬 인증 흔적 제거
-      try {
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('memberId');
-        document.cookie = 'accessToken=; Max-Age=0; path=/;';
-        document.cookie = 'JSESSIONID=; Max-Age=0; path=/;';
-      } catch {}
-
-      setOk('회원 탈퇴가 완료되었습니다.');
-      alert('계정이 삭제되었습니다. 이용해 주셔서 감사합니다.');
-      router.replace('/');
+      
     } catch (e: any) {
       setErr(e?.message || '회원 탈퇴 처리 중 오류가 발생했습니다.');
     } finally {

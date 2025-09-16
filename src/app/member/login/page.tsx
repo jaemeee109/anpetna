@@ -4,6 +4,9 @@
 import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { login, readMemberMe } from '@/features/member/data/member.api';
+import { purgeAuthArtifacts } from '@/features/member/data/session';
+
+
 import PawIcon from '@/components/icons/Paw';
 
 /* ---------- 역할 판별 유틸(로직만 추가, UI 비변경) ---------- */
@@ -89,6 +92,7 @@ export default function LoginPage() {
   const [err, setErr] = useState<string | null>(null);
 
   async function onSubmit(e: FormEvent) {
+    purgeAuthArtifacts();
     e.preventDefault();
     if (submitting) return;
     setSubmitting(true);

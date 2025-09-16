@@ -1,4 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import http from '@/shared/data/http';
+import { purgeAuthArtifacts } from '@/features/member/data/session';
+
+
 import type {
   ReadMemberAllRes,
   ReadMemberOneRes,
@@ -208,14 +212,11 @@ export async function modifyMember(body: ModifyMemberReq): Promise<ReadMemberOne
   throw new Error('회원 수정 실패');
 }
 
-export async function removeMember(): Promise<{ok:true}> {
-  for (const b of bases()) {
-    try {
-      await jsonFetch(`${b}/member/delete`, { method:'POST', credentials:'include', headers:authHeaders() });
-      return { ok:true };
-    } catch {}
-  }
-  throw new Error('회원 탈퇴 실패');
+export async function removeMember(): Promise<void> {
+  // 백엔드는 GET /member/delete 사용
+  await http.get('/member/delete');
+  // 로컬 인증 흔적 제거
+  purgeAuthArtifacts();
 }
 
 export async function signup(body: JoinMemberReq): Promise<JoinMemberRes> {

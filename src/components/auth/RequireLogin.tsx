@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
-
+import { getAccessToken } from '@/shared/data/http';
 function getCookie(name: string) {
   if (typeof document === 'undefined') return null;
   const safe = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -11,17 +11,19 @@ function getCookie(name: string) {
   return m ? decodeURIComponent(m[1]) : null;
 }
 
-function isAuthed() {
-  // 개발 우회 스위치
+// 추가: 공용 http 유틸에서 만료 토큰을 자동 정리해주는 getAccessToken 사용
+function isAuthed(): boolean {
   if (process.env.NEXT_PUBLIC_DEV_BYPASS_AUTH === 'true') return true;
-
   if (typeof window === 'undefined') return false;
-  return !!(
-    localStorage.getItem('accessToken') ||
-    getCookie('accessToken') ||
-    getCookie('JSESSIONID')
-  );
+
+  // 유효한 액세스 토큰이 있을 때만 true (만료/손상 토큰은 getAccessToken에서 이미 제거됨)
+  const t = getAccessToken();
+  if (t && String(t).trim()) return true;
+
+  // 서버 세션(JSESSIONID)만 있는 경우도 허용
+  return !!getCookie('JSESSIONID');
 }
+
 
 
 export default function RequireLogin({ children }: { children: React.ReactNode }) {
