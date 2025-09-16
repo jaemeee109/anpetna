@@ -285,7 +285,7 @@ public class OrdersServiceImpl implements OrdersService {
 
         return ReadOneOrdersRes.builder()
                 .ordersId(o.getOrdersId())  // 주문 ID
-                .memberId(o.getMemberId() != null ? o.getMemberId() : null)  // 엔티티 대신 회원ID만 노출
+                .memberId(o.getMemberId() != null ? o.getMemberId().getMemberId() : null)  // 엔티티 대신 회원ID만 노출
                 .cardId(o.getCardId())      // 카드 ID
                 .itemsSubtotal(itemsSubtotal)   // 물건값
                 .shippingFee(shippingFee)       // 배송비
@@ -305,7 +305,7 @@ public class OrdersServiceImpl implements OrdersService {
 
         return ReadAllOrdersRes.Line.builder()
                 .ordersId(o.getOrdersId())
-                .memberId(o.getMemberId() != null ? o.getMemberId() : null)
+                .memberId(o.getMemberId() != null ? o.getMemberId().getMemberId() : null)
                 .itemQuantity(itemQty)          // 총 수량
                 .itemsSubtotal(subtotal)        // 물건값
                 .shippingFee(shipping)          // 배송비
