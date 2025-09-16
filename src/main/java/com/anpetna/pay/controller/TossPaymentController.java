@@ -24,12 +24,16 @@ public class TossPaymentController {
     private final OrdersRepository ordersRepository;
     private final TossPaymentService tossPaymentService;
 
-    /** 헤더만 사용: 최종 결제 금액은 OrdersEntity.totalAmount */
+    /**
+     * 헤더만 사용: 최종 결제 금액은 OrdersEntity.totalAmount
+     */
     private int computeOrderAmount(OrdersEntity order) {
         return order.getTotalAmount();
     }
 
-    /** 현재 로그인 사용자 ID 추출 */
+    /**
+     * 현재 로그인 사용자 ID 추출
+     */
     private String currentMemberId(Authentication auth) {
         if (auth == null) return null;
         Object p = auth.getPrincipal();
@@ -39,14 +43,18 @@ public class TossPaymentController {
         return null;
     }
 
-    /** 결제 가능한 상태인지 (PENDING만 허용) */
+    /**
+     * 결제 가능한 상태인지 (PENDING만 허용)
+     */
     private void assertPayable(OrdersEntity order) {
         if (order.getStatus() != OrdersStatus.PENDING) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "결제 불가 상태");
         }
     }
 
-    /** 주문명: 라인 접근 없이 수량으로만 생성 (스냅샷/아이템명 접근하지 않음) */
+    /**
+     * 주문명: 라인 접근 없이 수량으로만 생성 (스냅샷/아이템명 접근하지 않음)
+     */
     private String makeOrderName(OrdersEntity order) {
         int cnt = Math.max(0, order.getItemQuantity());
         if (cnt <= 0) return "주문";
@@ -82,7 +90,7 @@ public class TossPaymentController {
                     "isSuccess", false,
                     "resCode", 400,
                     "resMessage", "MIN_AMOUNT_NOT_MET",
-                    "data", Map.of("min", min, "amount", amount, "method", method)
+                    "result", Map.of("min", min, "amount", amount, "method", method)
             ));
         }
 
@@ -91,10 +99,10 @@ public class TossPaymentController {
 
         return ResponseEntity.ok(Map.of(
                 "isSuccess", true,
-                "data", Map.of(
+                "result", Map.of(
                         "orderNo", order.getOrdersId(),
                         "orderId", orderId,
-                        "amount", amount,
+                        "totalAmount", amount,
                         "orderName", orderName
                 )
         ));
@@ -102,15 +110,17 @@ public class TossPaymentController {
 
     @PostMapping("/confirm")
     public ResponseEntity<?> confirm(@RequestBody Map<String, Object> body, Authentication authentication) {
-        String paymentKey = (String) body.get("paymentKey");
-        String orderId    = (String) body.get("orderId");
-        Number amtN       = (Number) body.get("amount");
-        if (paymentKey == null || orderId == null || amtN == null) {
+        // 1) 바디 파싱: paymentKey / orderId / 금액(totalAmount 우선, 없으면 amount)
+        String paymentKey = asString(body.get("paymentKey"));
+        String orderId = asString(body.get("orderId"));
+        Object amountObj = body.containsKey("totalAmount") ? body.get("totalAmount") : body.get("amount");
+        Integer clientAmount = toInt(amountObj);
+
+        if (paymentKey == null || orderId == null || clientAmount == null) {
             return ResponseEntity.badRequest().body(Map.of(
                     "isSuccess", false, "resCode", 400, "resMessage", "invalid request"
             ));
         }
-        int clientAmount = amtN.intValue();
 
         Long orderNo;
         try {
@@ -148,7 +158,27 @@ public class TossPaymentController {
         order.setStatus(OrdersStatus.PAID);
         ordersRepository.save(order);
 
-        return ResponseEntity.ok(Map.of("isSuccess", true, "data", result));
+        return ResponseEntity.ok(Map.of("isSuccess", true, "result", result));
+    }
+
+    /**
+     * null-safe String 변환
+     */
+    private String asString(Object v) {
+        return v == null ? null : String.valueOf(v);
+    }
+
+    /**
+     * null-safe 정수 변환 (Number/문자열 모두 지원)
+     */
+    private Integer toInt(Object v) {
+        if (v == null) return null;
+        if (v instanceof Number n) return n.intValue();
+        try {
+            return Integer.parseInt(String.valueOf(v));
+        } catch (Exception e) {
+            return null;
+        }
     }
 }
 
