@@ -5,7 +5,7 @@ import com.anpetna.cart.repository.CartRepository;
 import com.anpetna.item.domain.ItemEntity;
 import com.anpetna.item.repository.ItemRepository;
 import com.anpetna.member.domain.MemberEntity;
-import com.anpetna.member.repository.MemberRepository;
+import com.anpetna.member.repository.MemberRepository;            // ✅ ADDED
 import com.anpetna.order.constant.OrdersStatus;
 import com.anpetna.order.domain.AddressEntity;
 import com.anpetna.order.domain.OrderEntity;
@@ -34,13 +34,14 @@ import java.util.List;
 public class OrdersServiceImpl implements OrdersService {
 
     private final OrdersRepository ordersRepository;
+//    private final OrderRepository orderRepository; // 집계용
+    // 계산 로직을 Entity에 컬럼을 두고 DB에서 계산하는 형식으로 바꾸면서 주석 처리.
 
     private static final int DEFAULT_SHIPPING_FEE = 3000;   // 기본 배송비 (입력 없을 경우 자동 적용)
-    private static final int FREE_SHIPPING_THRESHOLD = 100_000; // 10만원 이상 무료 배송
-
     private final ItemRepository itemRepository;
     private final OrderRepository orderRepository;
     private final CartRepository cartRepository;
+    //    private static final int FREE_SHIPPING_THRESHOLD = 100_000; // 10만원 이상 무료 배송
     private final MemberRepository memberRepository;
 
     // 기존에는 임의로 설정한 배송비와 무료배송비용 사용.
@@ -50,15 +51,15 @@ public class OrdersServiceImpl implements OrdersService {
     // 추가=========================================================
     @Transactional
     @Override
-    public CreateOrderRes create(MemberEntity member, CreateOrderReq req) {
-        if (member == null)
+    public CreateOrderRes create(MemberEntity memberId, CreateOrderReq req) {
+        if (memberId == null)
             throw new IllegalArgumentException("memberId는 필수입니다.");
         if (req == null || req.getMode() == null)
             throw new IllegalArgumentException("mode는 필수입니다.");
 
         // 1) 주문 헤더(아직 저장하지 않음)
         OrdersEntity orders = OrdersEntity.builder()
-                .member(member)
+                .memberId(memberId)
                 .cardId("MANUAL")
                 .status(OrdersStatus.PENDING)
                 .itemQuantity(0)
@@ -73,7 +74,7 @@ public class OrdersServiceImpl implements OrdersService {
         // 배송지: checkout 페이지에서 입력한 배송지 정보 반영
         // (createOrder() 경로와 동일한 방식. 기존 메서드에는 누락되어 있던 부분)
         orders.setShippingAddress(toAddressEntity(req.getShippingAddress()));
-        //   useSavedAddress(true) 같은 회원 프로필 재사용 로직은 이 메서드에서는 처리하지 않고,
+        // ※ useSavedAddress(true) 같은 회원 프로필 재사용 로직은 이 메서드에서는 처리하지 않고,
         //   프론트가 shippingAddress를 채워 보내도록 통일. (필요하면 이후 memberRepository 주입 후 분기 추가 가능)
 
         int totalQty = 0;
@@ -89,7 +90,8 @@ public class OrdersServiceImpl implements OrdersService {
 
             OrderEntity line = OrderEntity.builder()
                     .item(item)
-                    .price(item.getItemPrice())          // 현재 라인 price는 "단가"를 저장
+                    .price(item.getItemPrice())          // ★ NOTE: 현재 라인 price는 "단가"를 저장합니다.
+                    // (주석엔 총액처럼 보이지만 로직은 단가 기준입니다)
                     .quantity(qty)
                     .orders(orders)
                     .build();
@@ -103,7 +105,8 @@ public class OrdersServiceImpl implements OrdersService {
                 throw new IllegalArgumentException("장바구니에서 구매할 itemIds가 비었습니다.");
             }
             for (Long itemId : req.getItemIds()) {
-                CartEntity c = cartRepository.findByMember_MemberIdAndItem_ItemId(member.getMemberId(), itemId)
+                // ✅ CHANGED: CartRepository는 String memberId를 받으므로 엔티티에서 꺼내 전달
+                CartEntity c = cartRepository.findByMember_MemberIdAndItem_ItemId(memberId.getMemberId(), itemId)
                         .orElseThrow(() -> new IllegalArgumentException("장바구니에 해당 상품이 없습니다: " + itemId));
 
                 ItemEntity item = c.getItem();
@@ -111,7 +114,7 @@ public class OrdersServiceImpl implements OrdersService {
 
                 OrderEntity line = OrderEntity.builder()
                         .item(item)
-                        .price(item.getItemPrice())
+                        .price(item.getItemPrice())      // ★ NOTE: 단가 저장
                         .quantity(qty)
                         .orders(orders)
                         .build();
@@ -226,15 +229,15 @@ public class OrdersServiceImpl implements OrdersService {
 
     // 특정 회원의 계산서(주문서) 목록 요약 보기
     @Override
-    public ReadAllOrdersRes getSummariesByMember(MemberEntity member, Pageable pageable) {
+    public ReadAllOrdersRes getSummariesByMember(MemberEntity memberId, Pageable pageable) {
         // findByMemberId로 해당 회원의 주문서들만 페이징 조회.
         // 나머지 구성은 전체 목록과 동일(요약 라인 매핑 + 페이징 메타).
-        if (member == null)
+        if (memberId == null)
             throw new IllegalArgumentException("memberId는 비워둘 수 없습니다.");
         if (pageable == null)
             throw new IllegalArgumentException("pageable은 비워둘 수 없습니다.");
 
-        Page<OrdersEntity> page = ordersRepository.findByMember(member, pageable);
+        Page<OrdersEntity> page = ordersRepository.findByMemberId(memberId, pageable);
 
         // DTO로 변환
         var rows = page.getContent().stream()
@@ -282,7 +285,7 @@ public class OrdersServiceImpl implements OrdersService {
 
         return ReadOneOrdersRes.builder()
                 .ordersId(o.getOrdersId())  // 주문 ID
-                .memberId(o.getMember() != null ? o.getMember().getMemberId() : null)
+                .memberId(o.getMemberId() != null ? o.getMemberId() : null)  // 엔티티 대신 회원ID만 노출
                 .cardId(o.getCardId())      // 카드 ID
                 .itemsSubtotal(itemsSubtotal)   // 물건값
                 .shippingFee(shippingFee)       // 배송비
@@ -302,7 +305,7 @@ public class OrdersServiceImpl implements OrdersService {
 
         return ReadAllOrdersRes.Line.builder()
                 .ordersId(o.getOrdersId())
-                .memberId(o.getMember() != null ? o.getMember().getMemberId() : null)
+                .memberId(o.getMemberId() != null ? o.getMemberId() : null)
                 .itemQuantity(itemQty)          // 총 수량
                 .itemsSubtotal(subtotal)        // 물건값
                 .shippingFee(shipping)          // 배송비
@@ -316,6 +319,7 @@ public class OrdersServiceImpl implements OrdersService {
         return OrderDTO.builder()
                 .orderId(e.getOrderId())
                 .itemId(e.getItem() != null ? e.getItem().getItemId() : null)
+                .name(e.getItem() != null ? e.getItem().getItemName() : null) // ★ 추가
                 .price(e.getPrice())
                 .quantity(e.getQuantity())
                 .thumbnailUrl(firstImageUrl(e))
@@ -333,7 +337,7 @@ public class OrdersServiceImpl implements OrdersService {
 
     // 주문 헤더 기준 첫 번째 라인의 첫 이미지 반환
     private String firstImageUrlFromHeader(OrdersEntity orders) {
-        // 이미지가 있는 첫 라인을 순회 탐색
+        // ★ CHANGED: 첫 라인만 보지 말고, 이미지가 있는 첫 라인을 순회 탐색
         if (orders.getOrderItems() == null || orders.getOrderItems().isEmpty()) return null;
         for (OrderEntity li : orders.getOrderItems()) {
             String u = firstImageUrl(li);

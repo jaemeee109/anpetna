@@ -15,7 +15,7 @@ public class ReadOneOrdersRes {
 
     private Long ordersId;  // 주문서 ID
 
-    private String memberId;    // 주문자 ID
+    private MemberEntity memberId;    // 주문자 ID
 
     private String cardId;   // 카드 ID
 

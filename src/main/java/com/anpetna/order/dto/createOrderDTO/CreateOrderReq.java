@@ -36,7 +36,7 @@ public class CreateOrderReq {
 
     // 배송지 선택 방식
     @NotBlank
-    private String memberId;
+    private MemberEntity memberId;
 
     @NotBlank
     private String cardId;

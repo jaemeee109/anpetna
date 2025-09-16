@@ -18,7 +18,7 @@ public class ReadOneOrdersReq {
     Long ordersId;
 
     @NotNull
-    MemberEntity member;
+    MemberEntity memberId;
     // 토큰 사용자와 일치 확인 용도
 
 

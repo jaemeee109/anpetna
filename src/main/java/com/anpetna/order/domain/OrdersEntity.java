@@ -27,8 +27,8 @@ public class OrdersEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "orders_memberId", nullable = false)
-    @ToString.Exclude
-    private MemberEntity member;
+    @ToString.Exclude // LAZY 연관관계 출력 시 순환/지연로딩 이슈 방지
+    private MemberEntity memberId;
 
     @Column(name = "orders_cardId", nullable = false) // 결제 카드 식별자(문자열)
     private String cardId;
