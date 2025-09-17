@@ -1,5 +1,6 @@
 package com.anpetna.order.dto.readOneOrderDTO;
 
+import com.anpetna.member.domain.MemberEntity;
 import com.anpetna.order.constant.OrdersStatus;
 import com.anpetna.order.dto.AddressDTO;
 import com.anpetna.order.dto.OrderDTO;
