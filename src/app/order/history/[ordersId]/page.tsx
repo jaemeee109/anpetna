@@ -55,15 +55,23 @@ export default function OrderDetailPage() {
   });
 
   // 배송지 입력 폼 상태 (초기값: 서버 값)
-  const [addr, setAddr] = useState({ zipcode: '', street: '', detail: '', receiver: '' });
+ const [addr, setAddr] = useState({
+  zipcode: '',
+  street: '',
+  detail: '',
+  receiver: '',
+  phone: '',
+});
   useEffect(() => {
     if (data?.shippingAddress) {
-      setAddr({
-        zipcode: data.shippingAddress.zipcode ?? '',
-        street: data.shippingAddress.street ?? '',
-        detail: data.shippingAddress.detail ?? '',
-        receiver: data.shippingAddress.receiver ?? '',
-      });
+     setAddr({
+  zipcode: data.shippingAddress.zipcode ?? '',
+  street: data.shippingAddress.street ?? '',
+  detail: data.shippingAddress.detail ?? '',
+  receiver: data.shippingAddress.receiver ?? '',
+  phone: data.shippingAddress.phone ?? '',
+});
+
     }
   }, [data]);
 
@@ -119,8 +127,8 @@ export default function OrderDetailPage() {
               <label className="w-[140px] text-center">Tel</label>
               <input
                 className="order-input"
-                value={'' as any}
-                onChange={() => {}}
+                 value={addr.phone}
+                 onChange={(e) => setAddr((s) => ({ ...s, phone: e.target.value }))}
                 placeholder="연락처 입력"
               />
             </div>

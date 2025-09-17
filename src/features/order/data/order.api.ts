@@ -11,10 +11,11 @@ export type CreateOrderBody = {
   memberId: string;
   cardId: string;
   useSavedAddress: boolean;
-  shippingAddress: { zipcode: string; street: string; detail: string; receiver: string };
+  shippingAddress: { zipcode: string; street: string; detail: string; receiver: string; phone: string };
   items: { itemId: number; quantity: number }[];
   shippingFee?: number;
 };
+
 export type CreateOrderRes = { ordersId: number };
 
 /** 공통: ApiResult 래핑 해제 + 주문번호 검증 */
