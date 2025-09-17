@@ -7,6 +7,6 @@ public enum OrdersStatus {
     SHIPPED,   // 발송됨
     DELIVERED, // 배송 완료
     CANCELLED,  // 취소
-    REFUNDED    // 환불 완료
-
+    REFUNDED,   // 환불 완료
+    CONFIRMATION // 구매확정
 }
