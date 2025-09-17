@@ -9,6 +9,33 @@ import { readMemberMe } from '@/features/member/data/member.api';
 import { useEffect, useMemo, useState } from 'react';
 import PawIcon from '@/src/components/icons/Paw';
 
+/** 주문 상태 배지 */
+function statusBadge(s?: string | null) {
+  const map: Record<
+    string,
+    { label: string; bg: string; color: string }
+  > = {
+    PENDING:      { label: '주문완료',   bg: '#fde2f3', color: '#fa71c6ff' }, 
+    PAID:         { label: '결제완료',  bg: '#fef9c3', color: '#bd9b2cff' }, 
+    SHIPPED:      { label: '배송출발',   bg: '#e0f2fe', color: '#0369a1' }, 
+    DELIVERED:    { label: '배송완료',   bg: '#dcfce7', color: '#166534' }, 
+    CANCELLED:    { label: '주문취소',   bg: '#ffedd5', color: '#9a3412' }, 
+    REFUNDED:     { label: '환불완료',   bg: '#fee2e2', color: '#991b1b' }, 
+    CONFIRMATION: { label: '구매확정',   bg: '#e5e7eb', color: '#374151' }, 
+  };
+  const info = s ? map[s] : undefined;
+  if (!info) return null;
+  return (
+    <span
+      className="order-status-chip mt-[10px]"
+      style={{ background: info.bg, color: info.color }}
+    >
+      {info.label}
+    </span>
+  );
+}
+
+
 /** ===== board와 동일한 로컬 Pager (번호 5개씩, 앞/뒤 버튼만 3D 버튼) ===== */
 function Pager({
   current,
@@ -43,6 +70,9 @@ function Pager({
   const WRAP_GAP = 'gap-[6px]';
   const NUM_GAP = 'gap-[6px]';
   const NUM_SIDE_MARGIN = 'mx-[10px]';
+  
+
+
 
   return (
     <nav className={`flex items-center justify-center ${WRAP_GAP}`}>
@@ -120,7 +150,9 @@ type Line = {
   thumbnailUrl?: string | null;
   itemImageUrl?: string | null;
   totalAmount?: number | null;
+  status?: string | null;   // ← 추가
 };
+
 
 async function fetchFirstItemName(ordersId: number): Promise<string> {
   const detail = await orderApi.detail(ordersId);
@@ -213,7 +245,10 @@ export default function OrderHistoryPage() {
               >
                 {/* 카드 내부 전부 가운데 정렬 */}
                 <div className="grid grid-cols-[140px_120px_1fr_160px] gap-[5px] place-items-center text-center mt-[15px] mb-[15px]">
-                  <div className="font-medium">Order No.{id}</div>
+                  <div className="font-medium">
+  Order No.{id}
+  <div>{statusBadge(line.status)}</div> 
+</div>
 
                   <img
                     src={thumb || '/file.svg'}
@@ -261,7 +296,24 @@ export default function OrderHistoryPage() {
         .btn-white { background: #fff; }
         a.no-underline { text-decoration: none !important; }
         a.text-black { color: #111827 !important; }
+
+        /* 주문 상태 배지(알약형) — 캡쳐 스타일 참고 */
+.order-status-chip{
+  display:inline-flex;
+  align-items:center;
+  padding: 2px 8px;           /* 기존 px-2 py-[2px] 크기 유지 */
+  border-radius: 9999px;      /* 완전한 알약 모양 */
+  font-size: 12px;            /* 기존 text-[12px] 유지 */
+  font-weight: 600;           /* 글씨 조금 진하게 */
+  line-height: 1.25;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.8) inset; /* 살짝 볼륨감 */
+}
+
+
+
       `}</style>
+
+
     </RequireLogin>
   );
 }

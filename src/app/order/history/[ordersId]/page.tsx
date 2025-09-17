@@ -83,6 +83,24 @@ export default function OrderDetailPage() {
     },
     onError: (e: any) => alert(e?.message || '배송지 저장 실패'),
   });
+  // (추가) 주문 상태 변경/취소 공용 뮤테이션  ─ 절대 조건문/JSX 안에 넣지 마세요.
+const mChange = useMutation({
+  mutationFn: (next: string) => orderApi.changeStatus(id, next),
+  onSuccess: () => {
+    // 상세 화면 갱신
+    qc.invalidateQueries({ queryKey: ['order', 'detail', id] });
+    // 목록(요약) 갱신: 'orders'로 시작하는 모든 쿼리 무효화
+    qc.invalidateQueries({
+      predicate: ({ queryKey }) => Array.isArray(queryKey) && queryKey[0] === 'orders',
+    });
+    alert('주문 상태가 변경되었습니다.');
+  },
+  onError: (e: any) => {
+    alert(e?.message || '상태 변경에 실패했습니다.');
+  },
+});
+
+
 
   if (isLoading) return <div className="px-4 py-10 text-center">불러오는 중…</div>;
   if (error) return <div className="px-4 py-10 text-center text-red-600">오류: {(error as any)?.message}</div>;
@@ -90,6 +108,8 @@ export default function OrderDetailPage() {
 
   const items = Array.isArray(data.ordersItems) ? data.ordersItems : [];
   const IMG_BASE = resolveImgBase();
+
+
 
   // ===== 합계(주문페이지와 동일 규칙) =====
   const itemsTotal = items.reduce(
@@ -101,15 +121,48 @@ export default function OrderDetailPage() {
   const payTotal =
     data?.totalAmount != null ? Number(data.totalAmount) : itemsTotal + shippingFee;
 
+/** 상세페이지 상태 → 라벨/배경/배송조회 문구 */
+const STATUS = {
+  PENDING:      { label: '주문완료',   bg: '#fde2f3', color: '#fa71c6ff', note: '조회가 불가능합니다' },
+  PAID:         { label: '결제완료',  bg: '#fef9c3', color: '#bd9b2cff', note: '현재 상품준비중으로 조회가 불가능합니다' },
+  SHIPPED:      { label: '배송출발',   bg: '#e0f2fe', color: '#0369a1', note: 'PostNumber : 00000-00-00000 고객님의 주소로 이동중입니다' },
+  DELIVERED:    { label: '배송완료',   bg: '#dcfce7', color: '#166534', note: '배송이 완료 되었습니다' },
+  CANCELLED:    { label: '주문취소',   bg: '#ffedd5', color: '#9a3412', note: '조회가 불가능합니다' },
+  REFUNDED:     { label: '환불완료',   bg: '#fee2e2', color: '#991b1b', note: '조회가 불가능합니다' },
+  CONFIRMATION: { label: '구매확정',   bg: '#e5e7eb', color: '#374151', note: '배송이 완료 되었습니다' },
+} as const;
+
+function statusChip(s?: string) {
+  const m = (s && (STATUS as any)[s]) as { label: string; bg: string; color: string } | undefined;
+  if (!m) return null;
+  return (
+    <span
+      className="order-status-chip"
+      style={{ background: m.bg, color: m.color }}
+    >
+      {m.label}
+    </span>
+  );
+}
+
+
+const trackMsg =
+  (data?.status && (STATUS as any)[data.status]?.note) ||
+  '조회가 불가능합니다';
+
+
+
   return (
     <RequireLogin>
       {/* ▶ 체크아웃과 동일한 폭/레이아웃 */}
       <main className="mx-auto w-[700px] px-4">
         <h1 className="text-2xl font-semibold text-center mt-[30px] mb-[20px]">My Orders&nbsp;<PawIcon/></h1>
-        <p className="text-center mb-[24px]">
-          <span className="font-semibold">주문번호:&nbsp;</span>
-          <span className="font-bold text-emerald-600">{id}</span>
-        </p>
+       <div className="text-center mb-[24px]">
+  <div className="text-center mb-[8px]">{statusChip(String(data?.status || ''))}</div>
+  <span className="font-semibold">주문번호:&nbsp;</span>
+  <span className="font-bold text-emerald-600">{id}</span>
+</div>
+
 
         {/* (1) 배송지 정보 — 주문페이지와 동일 UI/클래스 */}
         <h2 className="text-lg font-semibold mt-[20px] mb-[8px] text-left">배송지 정보</h2>
@@ -160,16 +213,27 @@ export default function OrderDetailPage() {
         </section>
 
         <div className="mt-[25px] flex justify-end mr-[15px]">
-          <button className="btn-3d btn-white !px-4 !py-2" onClick={() => mUpdate.mutate(addr)}>
-            배송지 변경
-          </button>
+          <button
+  className="btn-3d btn-white !px-4 !py-2"
+  onClick={() => {
+    const s = String(data?.status || '');
+    if (s === 'PENDING' || s === 'PAID') {
+      mUpdate.mutate(addr);
+    } else {
+      alert('배송지변경이 불가능합니다');
+    }
+  }}
+>
+  배송지 변경
+</button>
+
         </div>
 
         {/* (1-1) 배송조회 */}
         <h2 className="text-lg font-semibold mt-[24px] mb-[8px] text-left">배송조회</h2>
         <section className="apn-card p-4 h-card-track">
           <div className="track-note ml-[30px] mt-[25px]">
-            현재 상품준비중으로 조회가 불가능합니다
+           {trackMsg}
           </div>
         </section>
 
@@ -275,6 +339,22 @@ export default function OrderDetailPage() {
           )}
           <div className="items-bottom-pad" />
         </section>
+        {/* ▷ 구매확정 버튼 (주문상품 카드 하단/우측) */}
+{(data?.status === 'PAID' || data?.status === 'SHIPPED' || data?.status === 'DELIVERED') && (
+  <div className="mt-[10px] flex justify-end mt-[20px] mr-[15px]">
+    <button
+      type="button"
+      className="btn-3d btn-white !px-4 !py-2"
+      onClick={() => {
+        if (!confirm('구매확정시 주문취소/교환/환불이 불가능합니다')) return;
+        mChange.mutate('CONFIRMATION');
+      }}
+    >
+      구매확정
+    </button>
+  </div>
+)}
+
 
         {/* ▷ 결제금액 (주문페이지와 동일, 안내문 폰트/색 동일 적용) */}
         <h2 className="text-lg font-semibold mt-[50px] mb-[15px] text-left">결제금액</h2>
@@ -312,6 +392,19 @@ export default function OrderDetailPage() {
 
         {/* 하단 버튼 — 가운데 정렬 */}
         <div className="flex justify-center gap-[20px] mt-[40px] mb-[60px]">
+          {(data?.status === 'PENDING' || data?.status === 'PAID') && (
+  <button
+    type="button"
+    className="btn-3d btn-white w-[200px] px-4 py-2 text-center"
+    onClick={() => {
+    if (!confirm('주문을 취소하시겠습니까?')) return;
+    mChange.mutate('CANCELLED'); // 훅 선언(X) / 인스턴스 사용(O)
+  }}
+  >
+    주문취소
+  </button>
+)}
+
           <Link href="/board/QNA" className="btn-3d btn-white w-[200px] px-4 py-2 text-center">
             문의하기
           </Link>
@@ -437,7 +530,22 @@ export default function OrderDetailPage() {
           .after-note { font-size: var(--after-note-fs); color: var(--after-note-color); margin-bottom: 120px; }
 
           /* ▶ 배송조회 카드 문구 (위치/폰트/색 네가 조절 가능) */
-          .track-note { font-size: 14px; color: #b6b6b6ff(--track-note-color); }
+          .track-note { font-size: 14px; color: var(--track-note-color, #6b7280); }
+
+/* 주문 상태 배지(알약형) — 캡쳐 스타일 참고 */
+.order-status-chip{
+  display:inline-flex;
+  align-items:center;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.25;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.8) inset;
+}
+
+
+
         `}</style>
       </main>
     </RequireLogin>
