@@ -22,7 +22,7 @@ import lombok.*;
                 )
         },
         indexes = {
-                @Index(name = "idx_subscriber_enabled", columnList = "subscriber_id, is_enabled"),
+                @Index(name = "idx_subscriber_enabled", columnList = "subscriber_id"),
                 @Index(name = "idx_scope_board_type", columnList = "scope_board_type")
         }
 )
