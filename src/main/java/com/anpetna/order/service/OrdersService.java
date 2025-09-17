@@ -14,7 +14,7 @@ public interface OrdersService {
 
     // 추가=========================================================
 
-    CreateOrderRes create(MemberEntity memberId, CreateOrderReq req);
+    CreateOrderRes create(String memberId, CreateOrderReq req);
     // =====================================================
 
 
@@ -33,6 +33,6 @@ public interface OrdersService {
     ReadAllOrdersRes getAllOrders(Pageable pageable);
 
     // 특정 회원의 계산서 목록 요약 보기
-    ReadAllOrdersRes getSummariesByMember(MemberEntity memberId, Pageable pageable);
+    ReadAllOrdersRes getSummariesByMember(String memberId, Pageable pageable);
 
 }

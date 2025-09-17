@@ -51,15 +51,18 @@ public class OrdersServiceImpl implements OrdersService {
     // 추가=========================================================
     @Transactional
     @Override
-    public CreateOrderRes create(MemberEntity memberId, CreateOrderReq req) {
-        if (memberId == null)
+    public CreateOrderRes create(String memberId, CreateOrderReq req) {
+        if (memberId == null || memberId.isBlank())
             throw new IllegalArgumentException("memberId는 필수입니다.");
         if (req == null || req.getMode() == null)
             throw new IllegalArgumentException("mode는 필수입니다.");
 
+        MemberEntity member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 회원: " + memberId));
+
         // 1) 주문 헤더(아직 저장하지 않음)
         OrdersEntity orders = OrdersEntity.builder()
-                .memberId(memberId)
+                .memberId(member)
                 .cardId("MANUAL")
                 .status(OrdersStatus.PENDING)
                 .itemQuantity(0)
@@ -106,7 +109,7 @@ public class OrdersServiceImpl implements OrdersService {
             }
             for (Long itemId : req.getItemIds()) {
                 // ✅ CHANGED: CartRepository는 String memberId를 받으므로 엔티티에서 꺼내 전달
-                CartEntity c = cartRepository.findByMember_MemberIdAndItem_ItemId(memberId.getMemberId(), itemId)
+                CartEntity c = cartRepository.findByMember_MemberIdAndItem_ItemId(memberId, itemId)
                         .orElseThrow(() -> new IllegalArgumentException("장바구니에 해당 상품이 없습니다: " + itemId));
 
                 ItemEntity item = c.getItem();
@@ -229,10 +232,10 @@ public class OrdersServiceImpl implements OrdersService {
 
     // 특정 회원의 계산서(주문서) 목록 요약 보기
     @Override
-    public ReadAllOrdersRes getSummariesByMember(MemberEntity memberId, Pageable pageable) {
+    public ReadAllOrdersRes getSummariesByMember(String memberId, Pageable pageable) {
         // findByMemberId로 해당 회원의 주문서들만 페이징 조회.
         // 나머지 구성은 전체 목록과 동일(요약 라인 매핑 + 페이징 메타).
-        if (memberId == null)
+        if (memberId == null || memberId.isBlank())
             throw new IllegalArgumentException("memberId는 비워둘 수 없습니다.");
         if (pageable == null)
             throw new IllegalArgumentException("pageable은 비워둘 수 없습니다.");

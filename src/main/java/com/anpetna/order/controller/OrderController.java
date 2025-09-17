@@ -44,10 +44,9 @@ public class OrderController {
     ) {
         // ★ CHANGED: 로그인한 사용자 id(String) → MemberEntity 로드(연관관계 지연 로딩 안전)
         String loginId = authentication.getName();
-        MemberEntity member = memberRepository.getReferenceById(loginId);
         // 참고) 존재 보장 필요하면 findById(loginId).orElseThrow(...) 사용
 
-        CreateOrderRes body = ordersService.create(member, req);
+        CreateOrderRes body = ordersService.create(loginId, req);
         return new ApiResult<>(body);
     }
 
@@ -84,7 +83,7 @@ public class OrderController {
         // ★ CHANGED: memberId(String) → MemberEntity 변환
         MemberEntity member = memberRepository.getReferenceById(memberId);
 
-        ReadAllOrdersRes body = ordersService.getSummariesByMember(member, pageable);
+        ReadAllOrdersRes body = ordersService.getSummariesByMember(memberId, pageable);
         return new ApiResult<>(body); // 200 OK
     }
 
