@@ -1,29 +1,40 @@
+version: "3.9"
+
 services:
-  app:
-      image: rayoh95/anpetna:latest
-      ports:
-        - 8080:8080
-      environment:
-        SPRING_PROFILES_ACTIVE: dev
   jenkins:
-    image: myjenkins-docker:lts
+    image: jenkins/jenkins:lts-jdk17      # ← 공식 컨트롤러 이미지
+    container_name: anpetna-jenkins
+    # 컨트롤러 UI: 호스트 8081 → 컨테이너 8080
     ports:
       - "8081:8080"
-      - "50001:50000"
+    # (선택) 에이전트 JNLP 포트 외부 공개가 필요 없다면 열지 않아도 됩니다.
+    # - "50001:50000"
+    # 도커 빌드/배포를 컨트롤러에서 하려면 docker.sock 마운트 유지
+    user: root
     volumes:
-      - ${HOST_JENKINS_HOME}:/var/jenkins_home
+      - ${HOST_JENKINS_HOME:-/opt/anpetna/jenkins}:/var/jenkins_home
       - /var/run/docker.sock:/var/run/docker.sock
-    links:
-      - worker-1
+    environment:
+      - TZ=Asia/Seoul
+    restart: unless-stopped
+    networks: [vpc]
 
   worker-1:
-    image: jenkins/ssh-agent:latest-jdk17
+    image: jenkins/ssh-agent:latest-jdk17  # ← 공식 SSH 에이전트
+    container_name: anpetna-worker-1
+    # 호스트 디렉터리 바인드(필요 없다면 제거 가능)
     volumes:
-      - ${HOST_JENKINS_WORKER_1}:/home/jenkins
+      - ${HOST_JENKINS_WORKER_1:-/opt/anpetna/jenkins/worker1}:/home/jenkins
     environment:
+      - TZ=Asia/Seoul
       - JENKINS_SLAVE_SSH_PUBKEY=ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDktVaVsAr7Auw8T7S4tq1W4v3zIz98nFDJaJM0Y0Q2+/o7sxDKYbR2SGxyO/UgbfBV840Sg0vY+4QTAv12jltvzN1MaLu5HlGi9Rba9XdR1gWinDE5J+Piz5UCnfIkGnGXA4PZg4CTUpueSeM8fvziOZJBNCp1qR+TYmYxWlVIcSGIZELKOA6rz1P2GsINIx2EX63CYkaG+YXsoKVOdBF2ffvxTHAhVCktyf4zYiTqwjw7XbzQpf6tygBqRZttpkM+3VwqG2BGkj7Nfqr1OXrOEJT25j01wqj3V4Su5zGBVGC/2vtSoDM+1ADwYyC+FhZUDa9W8YQrKRHTq1ry925vQG9Z7JXuG6Ze4ShYRhDaaT0Owi2X2dfG5Hcs1hdSVIK7Mgl+ef2JQOgseiMsah/dL5g0W78ksa742OOtwCQpmvghLzIBHTrF2SgPvKM0NyR4fr1YLGOBrrepM14tvfFW4gSMPAksx3COIyiWdCMARAUZikVfiQhNexgqoOo9hos= jenkins@2dc6aead33e6
+      - JENKINS_AGENT_SSH_PUBKEY=ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDktVaVsAr7Auw8T7S4tq1W4v3zIz98nFDJaJM0Y0Q2+/o7sxDKYbR2SGxyO/UgbfBV840Sg0vY+4QTAv12jltvzN1MaLu5HlGi9Rba9XdR1gWinDE5J+Piz5UCnfIkGnGXA4PZg4CTUpueSeM8fvziOZJBNCp1qR+TYmYxWlVIcSGIZELKOA6rz1P2GsINIx2EX63CYkaG+YXsoKVOdBF2ffvxTHAhVCktyf4zYiTqwjw7XbzQpf6tygBqRZttpkM+3VwqG2BGkj7Nfqr1OXrOEJT25j01wqj3V4Su5zGBVGC/2vtSoDM+1ADwYyC+FhZUDa9W8YQrKRHTq1ry925vQG9Z7JXuG6Ze4ShYRhDaaT0Owi2X2dfG5Hcs1hdSVIK7Mgl+ef2JQOgseiMsah/dL5g0W78ksa742OOtwCQpmvghLzIBHTrF2SgPvKM0NyR4fr1YLGOBrrepM14tvfFW4gSMPAksx3COIyiWdCMARAUZikVfiQhNexgqoOo9hos= jenkins@2dc6aead33e6
+    # Docker 네트워크 상에서 jenkins ↔ worker-1 통신(SSH:22)
+    expose:
+      - "22"
+    restart: unless-stopped
+    networks: [vpc]
 
-#  sonarqube:
-#    image: sonarqube:9-community
-#    ports:
-#      - "9000:9000"
+networks:
+  vpc:
+    driver: bridge

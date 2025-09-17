@@ -46,7 +46,7 @@ services:
     ports: ["80:80"]
     volumes:
       - ${APP_DIR}/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ${APP_DIR}/nginx-conf/active-upstream.var:/etc/nginx/conf.d/active-upstream.var:ro
+      - ${APP_DIR}/conf.d:/etc/nginx/conf.d:ro
     depends_on:
       - app-blue
       - app-green
