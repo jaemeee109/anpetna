@@ -1,6 +1,5 @@
 package com.anpetna.order.dto.readOneOrderDTO;
 
-
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;

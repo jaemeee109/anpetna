@@ -1,5 +1,6 @@
 package com.anpetna.order.dto.readAllOrderDTO;
 
+import com.anpetna.member.domain.MemberEntity;
 import com.anpetna.order.constant.OrdersStatus;
 import com.anpetna.order.dto.AddressDTO;
 import lombok.Builder;

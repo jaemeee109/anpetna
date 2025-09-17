@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head><meta charset="UTF-8"><title>결제 실패</title></head>
+<body>
+<h2>결제 실패</h2>
+<p>사유: <span id="msg"></span></p>
+<script>
+    const qs = new URLSearchParams(location.search);
+    document.getElementById("msg").textContent = qs.get("message") || "알 수 없는 오류";
+</script>
+</body>
+</html>

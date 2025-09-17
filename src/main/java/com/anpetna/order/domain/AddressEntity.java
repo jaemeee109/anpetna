@@ -1,7 +1,10 @@
 package com.anpetna.order.domain;
 
 import jakarta.persistence.Embeddable;
+import jakarta.persistence.Entity;
+import jakarta.validation.constraints.Size;
 import lombok.*;
+
 
 @Embeddable
 @Getter
@@ -18,5 +21,8 @@ public class AddressEntity {
     private String detail;    // 상세주소
 
     private String receiver;  // 수령인
+
+    @Size(max = 20)
+    private String phone;     // 연락처
 
 }

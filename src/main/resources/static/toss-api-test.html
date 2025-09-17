@@ -1,0 +1,201 @@
+<!-- src/main/resources/static/toss-test.html -->
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <title>Toss Payments 테스트 (단일 페이지, URL/서버세션 없음)</title>
+
+    <!-- Toss Payments SDK (클래식 스크립트) -->
+    <script src="https://js.tosspayments.com/v2/standard"></script>
+
+    <style>
+        body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; max-width: 720px; margin: 32px auto; padding: 0 16px;}
+        .card { border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; margin: 12px 0; }
+        .row { display: flex; gap: 8px; align-items: center; }
+        .row input { flex: 1; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; }
+        button { padding: 10px 14px; border: 1px solid #d1d5db; border-radius: 10px; background: #fff; cursor: pointer; }
+        button[disabled] { opacity: .5; cursor: not-allowed; }
+        .muted { color: #6b7280; font-size: 14px; }
+        .ok { color: #065f46; }
+        .err { color: #b91c1c; }
+    </style>
+
+    <script>
+        const clientKey = "test_ck_DnyRpQWGrN9OkBPk1J7bVKwv1M9E";
+
+        // UI helpers
+        function show(id, on=true){ const el=document.getElementById(id); if(!el) return; el.style.display = on? 'block':'none'; }
+        function text(id, t){ const el=document.getElementById(id); if(el) el.textContent = t; }
+        function enable(id, on=true){ const el=document.getElementById(id); if(el) el.disabled = !on; }
+
+        async function prepareAndArm(orderNo) {
+            // 상태 초기화
+            text('status', '주문 정보를 불러오는 중…');
+            text('summary', '');
+            enable('pay', false);
+
+            // Toss SDK 확인
+            if (typeof window.TossPayments !== "function") {
+                text('status', 'Toss SDK 로드 실패: js.tosspayments.com 차단 여부 확인');
+                return;
+            }
+
+            // prepare 호출
+            let orderId = "ORDER-" + Date.now();
+            let amount = 0;
+            let orderName = "주문";
+
+            // 서버에서 금액/주문명/외부 orderId 받아오기 (body로 orderNo 전송)
+            try {
+                // ★ 결제수단을 서버에 알려줌(카드 기준: 최소 100원)
+                const payMethod = "CARD";
+
+                const resp = await fetch("/api/pay/toss/prepare", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Cache-Control": "no-store"
+                    },
+                    body: JSON.stringify({ orderNo, method: payMethod }) // ★ method 함께 보냄
+                });
+
+                const prep = await resp.json();
+
+                // ★ 실패 응답(최소금액 미달 등) 처리
+                if (!resp.ok || prep?.isSuccess !== true) {
+                    const min = prep?.data?.min;
+                    const amt = prep?.data?.amount;
+                    alert(min
+                        ? `최소 결제금액(${min}원) 미만입니다. 현재 ${amt}원입니다.`
+                        : (prep?.resMessage || "결제 준비 실패"));
+                    btn.disabled = true;
+                    return;
+                }
+
+                if (!prep?.data) {
+                    alert("prepare payload 오류");
+                    btn.disabled = true;
+                    return;
+                }
+
+                // ✅ 내가 보낸 orderNo와 서버가 처리한 orderNo 비교(안전망)
+                if (String(prep.data.orderNo) !== String(orderNo)) {
+                    console.error("주문 번호 불일치! client:", orderNo, "server:", prep.data.orderNo);
+                    try { sessionStorage.removeItem("checkoutOrderNo"); } catch(e) {}
+                    btn.disabled = true;
+                    alert("다른 주문이 선택되었습니다. 다시 시도하세요.");
+                    return;
+                }
+
+                orderId   = prep.data.orderId;
+                amount    = prep.data.amount;
+                orderName = prep.data.orderName;
+
+            } catch (e) {
+                console.error(e);
+                text('status', '주문 정보를 불러올 수 없습니다.');
+                return;
+            }
+
+            if (amount <= 0) {
+                text('status', '결제할 금액이 0원입니다. 주문 내역을 확인해 주세요.');
+                return;
+            }
+
+            // 요약 표시
+            text('status', '주문 정보 확인 완료');
+            text('summary', `주문번호 #${orderNo} · ${orderName} · ${amount.toLocaleString()}원`);
+
+            // Toss 초기화 및 버튼 arm
+            const tossPayments = window.TossPayments(clientKey);
+            const payment = tossPayments.payment({ customerKey: "anon-guest-1" });
+
+            const payBtn = document.getElementById('pay');
+            payBtn.onclick = async () => {
+                enable('pay', false);
+                try {
+                    await payment.requestPayment({
+                        method: "CARD",
+                        amount: { currency: "KRW", value: amount },
+                        orderId,
+                        orderName,
+                        // 실제 파일이 존재해야 합니다 (static/pay/toss/success.html / fail.html 권장)
+                        successUrl: `${location.origin}/success.html`,
+                        failUrl: `${location.origin}/fail.html`
+                    });
+                } catch (e) {
+                    alert("결제창 오류: " + (e?.message ?? e));
+                    enable('pay', true);
+                }
+            };
+            enable('pay', true);
+        }
+
+        function resetOrderSelection() {
+            sessionStorage.removeItem('checkoutOrderNo');
+            show('setup', true);
+            show('checkout', false);
+            text('status', '');
+            text('summary', '');
+            enable('pay', false);
+        }
+
+        async function main() {
+            // 초기 UI
+            show('setup', true);
+            show('checkout', false);
+            text('status', '');
+            enable('pay', false);
+
+            // 저장된 orderNo 있으면 자동 세팅
+            const saved = sessionStorage.getItem('checkoutOrderNo');
+            if (saved) {
+                document.getElementById('orderNoInput').value = saved;
+                show('setup', false);
+                show('checkout', true);
+                await prepareAndArm(saved);
+            }
+
+            // “주문 번호 사용” 버튼
+            document.getElementById('useOrderNo').addEventListener('click', async () => {
+                const orderNo = (document.getElementById('orderNoInput').value || '').trim();
+                if (!/^\d+$/.test(orderNo)) {
+                    alert('주문번호를 숫자로 입력하세요.');
+                    return;
+                }
+                sessionStorage.setItem('checkoutOrderNo', orderNo);
+                show('setup', false);
+                show('checkout', true);
+                await prepareAndArm(orderNo);
+            });
+
+            // “다른 주문 선택” 버튼
+            document.getElementById('changeOrder').addEventListener('click', resetOrderSelection);
+        }
+
+        window.addEventListener("DOMContentLoaded", main);
+    </script>
+</head>
+<body>
+<h1>Toss 결제 테스트</h1>
+
+<!-- 주문번호 입력 영역 -->
+<div id="setup" class="card">
+    <div class="row">
+        <input id="orderNoInput" type="number" placeholder="주문번호 입력 (예: 123)" />
+        <button id="useOrderNo">주문 번호 사용</button>
+    </div>
+    <p class="muted">URL/서버 세션 없이 테스트합니다. 주문 PK만 입력하세요.</p>
+</div>
+
+<!-- 결제 영역 -->
+<div id="checkout" class="card" style="display:none">
+    <p id="status" class="muted"></p>
+    <p id="summary" class="ok"></p>
+    <div class="row">
+        <button id="pay" disabled>결제하기</button>
+        <button id="changeOrder" type="button">다른 주문 선택</button>
+    </div>
+</div>
+</body>
+</html>

@@ -1,6 +1,7 @@
 package com.anpetna.member.service;
 
 
+import com.anpetna.auth.repository.TokenRepository;
 import com.anpetna.image.domain.ImageEntity;
 import com.anpetna.item.repository.ItemRepository;
 import com.anpetna.member.domain.MemberEntity;
@@ -35,6 +36,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -48,6 +50,7 @@ public class MemberServiceImpl implements MemberService {
     private final MemberRepository memberRepository;
     private final PasswordEncoder passwordEncoder;
     private final ItemRepository itemRepository;
+    private final TokenRepository tokenRepository;
     // final -> 생성자를 만들고 주입
 
     @Value("${app.upload.dir}")       // 실제 파일 저장 경로 (예: C:/uploads or /var/www/uploads)
@@ -227,9 +230,15 @@ public class MemberServiceImpl implements MemberService {
 
         MemberEntity member = memberRepository.findById(memberId).orElse(null);
 
-        memberRepository.delete(member);
-        return null;
+        Instant now = Instant.now();
+        tokenRepository.revokeAllActiveByMemberId(memberId, now);
+        tokenRepository.deleteByMemberId(memberId);
 
+        memberRepository.delete(member);
+
+        return DeleteMemberRes.builder()
+                .memberId(memberId)
+                .build();
     }
 
 
