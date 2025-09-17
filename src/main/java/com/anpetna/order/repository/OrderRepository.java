@@ -9,6 +9,7 @@ import java.util.List;
 
 @Repository
 public interface OrderRepository extends JpaRepository<OrderEntity, Long> {
+    List<OrderEntity> findByOrders_OrdersId(Long ordersOrdersId);
 
 
 //    // 페이징 처리하여 한 주문서의 라인들(아이템들) 조회

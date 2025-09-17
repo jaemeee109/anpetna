@@ -1,5 +1,6 @@
 package com.anpetna.pay.controller;
 
+import com.anpetna.notification.feature.order.service.OrderNotificationService;
 import com.anpetna.order.constant.OrdersStatus;
 import com.anpetna.order.domain.OrdersEntity;
 import com.anpetna.order.repository.OrdersRepository;
@@ -23,6 +24,7 @@ public class TossPaymentController {
 
     private final OrdersRepository ordersRepository;
     private final TossPaymentService tossPaymentService;
+    private final OrderNotificationService orderNotificationService;
 
     /**
      * 헤더만 사용: 최종 결제 금액은 OrdersEntity.totalAmount
@@ -157,6 +159,8 @@ public class TossPaymentController {
         // 상태 갱신
         order.setStatus(OrdersStatus.PAID);
         ordersRepository.save(order);
+
+        orderNotificationService.notifyOrderSuccess(memberId, clientAmount, orderId);
 
         return ResponseEntity.ok(Map.of("isSuccess", true, "result", result));
     }
