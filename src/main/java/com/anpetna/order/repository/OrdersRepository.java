@@ -15,12 +15,15 @@ import java.util.Optional;
 public interface OrdersRepository extends JpaRepository<OrdersEntity, Long> {
 
     // 주문 단건 상세 조회 (주문 헤더 + 품목 + 아이템 + 이미지까지 한번에 로딩)
-    @EntityGraph(attributePaths = {"orderItems", "orderItems.itemEntity", "orderItems.itemEntity.images"})
+    @EntityGraph(attributePaths = {"orderItems", "orderItems.item", "orderItems.item.images"})
     Optional<OrdersEntity> findByOrdersId(Long ordersId);
 
     // 특정 회원의 주문 페이징 처리로
-    Page<OrdersEntity> findByMemberId(String memberId, Pageable pageable);
-
+    @EntityGraph(attributePaths = {"orderItems", "orderItems.item", "orderItems.item.images"})
+    Page<OrdersEntity> findByMemberId_MemberId(String memberId, Pageable pageable);
+//스프링 데이터 JPA에선 연관 엔티티의 내부 속성으로 검색할 때 “프로퍼티 경로”를 씁니다. 
+// 즉 OrdersEntity.memberId(=MemberEntity).memberId(=String)을 의미하도록 
+// 메서드명을 findByMemberId_MemberId(...)로 변경
 
 //    @EntityGraph(attributePaths = { "orderItems", "orderItems.itemEntity" })
 //    Page<OrdersEntity> findByMemberId(String memberId, Pageable pageable);

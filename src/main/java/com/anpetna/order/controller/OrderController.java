@@ -81,7 +81,7 @@ public class OrderController {
             Pageable pageable
     ) {
         // ★ CHANGED: memberId(String) → MemberEntity 변환
-        MemberEntity member = memberRepository.getReferenceById(memberId);
+      //  MemberEntity member = memberRepository.getReferenceById(memberId);
 
         ReadAllOrdersRes body = ordersService.getSummariesByMember(memberId, pageable);
         return new ApiResult<>(body); // 200 OK

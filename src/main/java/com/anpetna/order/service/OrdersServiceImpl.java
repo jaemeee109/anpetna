@@ -240,7 +240,7 @@ public class OrdersServiceImpl implements OrdersService {
         if (pageable == null)
             throw new IllegalArgumentException("pageable은 비워둘 수 없습니다.");
 
-        Page<OrdersEntity> page = ordersRepository.findByMemberId(memberId, pageable);
+        Page<OrdersEntity> page = ordersRepository.findByMemberId_MemberId(memberId, pageable);
 
         // DTO로 변환
         var rows = page.getContent().stream()
@@ -295,6 +295,7 @@ public class OrdersServiceImpl implements OrdersService {
                 .totalAmount(totalAmount)       // 총 금액
                 .status(o.getStatus())
                 .shippingAddress(toAddressDTO(o.getShippingAddress()))  // 배송지
+                .thumbnailUrl(firstImageUrlFromHeader(o))
                 .ordersItems(lines) // 품목 리스트
                 .build();
     }
@@ -314,6 +315,7 @@ public class OrdersServiceImpl implements OrdersService {
                 .shippingFee(shipping)          // 배송비
                 .totalAmount(grandTotal)        // 총 금액
                 .status(o.getStatus())
+                .thumbnailUrl(firstImageUrlFromHeader(o))
                 .build();
     }
 
