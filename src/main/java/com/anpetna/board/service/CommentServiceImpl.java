@@ -14,12 +14,6 @@ import com.anpetna.board.dto.updateComment.UpdateCommRes;
 import com.anpetna.board.repository.BoardJpaRepository;
 import com.anpetna.board.repository.CommentJpaRepository;
 import com.anpetna.core.coreDto.PageResponseDTO;
-import com.anpetna.notification.common.constant.NotificationType;
-import com.anpetna.notification.common.constant.TargetType;
-import com.anpetna.notification.common.dto.CreateNotificationCmd;
-import com.anpetna.notification.common.service.NotificationService;
-import com.anpetna.notification.feature.comment.service.CommentNotificationService;
-import com.anpetna.notification.feature.like.service.LikeNotificationService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
@@ -44,8 +38,6 @@ public class CommentServiceImpl implements CommentService {
     private final CommentJpaRepository commentJpaRepository; // 의존성 주입
     private final BoardJpaRepository boardJpaRepository;
     private final MemberRepository memberRepository;
-    private final CommentNotificationService commentNotificationService;
-    private final LikeNotificationService likeNotificationService;
 
     // 댓글 좋아요 누를때 누른 사람이 또 못누르게 막기 위해 메서드 추가
     private final ConcurrentMap<Long, Set<String>> likeGuard = new ConcurrentHashMap<>();
@@ -104,8 +96,6 @@ public class CommentServiceImpl implements CommentService {
                 .build();
 
         CommentEntity saved = commentJpaRepository.save(entity);
-
-        commentNotificationService.notifyCommentCreated(boardRef, saved, memberId);
 
         return CreateCommRes.builder()
                 .createComm(CommentDTO.fromEntity(saved))   // ← 엔티티 대신 DTO로 반환
@@ -212,12 +202,6 @@ public class CommentServiceImpl implements CommentService {
         // 5) 첫 눌림이면 +1
         int current = entity.getCLikeCount() == null ? 0 : entity.getCLikeCount();
         entity.setCLikeCount(current + 1); // dirty checking
-
-        try {
-            likeNotificationService.notifyCommentLike(entity, memberId);
-        } catch (Exception ex) {
-            log.warn("notifyCommentLike failed: cno={}, actor={}", cno, memberId, ex);
-        }
 
         return UpdateCommRes.builder()
                 .updateComment(CommentDTO.fromEntity(entity))

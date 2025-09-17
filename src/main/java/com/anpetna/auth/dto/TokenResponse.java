@@ -1,6 +1,5 @@
 package com.anpetna.auth.dto;
 
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import lombok.*;
 
 @Getter
@@ -8,7 +7,6 @@ import lombok.*;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@JsonDeserialize(builder = TokenResponse.TokenResponseBuilder.class)
 public class TokenResponse {
     private String accessToken;
     private String refreshToken;
