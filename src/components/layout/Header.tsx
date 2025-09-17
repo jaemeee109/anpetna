@@ -255,22 +255,51 @@ export default function Header() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function handleLogout() {
-    const base =
-      process.env.NEXT_PUBLIC_API_BASE ||
-      (typeof window !== 'undefined'
-        ? window.location.origin.replace(':3000', ':8000')
-        : '');
-    try { await fetch(new URL('/jwt/logout', base), { method: 'POST', credentials: 'include', headers: authHeaders() }); } catch {}
-    try { await fetch(new URL('/member/logout', base), { method: 'POST', credentials: 'include', headers: authHeaders() }); } catch {}
+async function handleLogout() {
+  const base =
+    process.env.NEXT_PUBLIC_API_BASE ||
+    (typeof window !== 'undefined'
+      ? window.location.origin.replace(':3000', ':8000')
+      : '');
 
-    clearLocalAuth();
-    setMyOpen(false); setSysOpen(false);
-    setAuthed(false); setAdmin(false);
+  // 서버 세션/토큰 정리: 실패해도 넘어가도록 allSettled
+  try {
+    await Promise.allSettled([
+      fetch(new URL('/jwt/logout', base), {
+        method: 'POST',
+        credentials: 'include',
+        headers: authHeaders(),
+      }),
+      fetch(new URL('/member/logout', base), {
+        method: 'POST',
+        credentials: 'include',
+        headers: authHeaders(),
+      }),
+    ]);
+  } catch {}
 
-    router.replace('/');
-    setTimeout(() => { if (typeof window !== 'undefined') window.location.reload(); }, 50);
-  }
+  // 로컬 인증 흔적 정리 + 헤더 상태 반영
+  clearLocalAuth();
+  setMyOpen(false);
+  setSysOpen(false);
+  setAuthed(false);
+  setAdmin(false);
+
+  // 다른 탭/컴포넌트 동기화 (이미 리스너 있음)
+  try { window.dispatchEvent(new Event('auth-changed')); } catch {}
+
+  // 홈으로 이동 → 메인 화면 노출 보장
+  // 1) 라우터로 즉시 이동
+  router.replace('/');
+
+  // 2) 혹시 잔여 클라이언트 상태가 남아있을 수 있으니, 아주 짧게 지연 후 하드 내비로 확실히 정리
+  setTimeout(() => {
+    if (typeof window !== 'undefined') {
+      window.scrollTo(0, 0);
+      window.location.replace('/'); // 메인으로 완전 이동
+    }
+  }, 50);
+}
 
   const helpActive =
     pathname === '/board/FAQ' ||
