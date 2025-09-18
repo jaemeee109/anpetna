@@ -12,7 +12,7 @@ import org.springframework.stereotype.Repository;
 import java.util.Optional;
 
 @Repository
-public interface OrdersRepository extends JpaRepository<OrdersEntity, Long> {
+public interface  OrdersRepository extends JpaRepository<OrdersEntity, Long> {
 
     // 주문 단건 상세 조회 (주문 헤더 + 품목 + 아이템 + 이미지까지 한번에 로딩)
     @EntityGraph(attributePaths = {"orderItems", "orderItems.item", "orderItems.item.images"})
@@ -45,5 +45,7 @@ public interface OrdersRepository extends JpaRepository<OrdersEntity, Long> {
 //                    .build();
 //        });
 //    }
+
+    Optional<OrdersEntity> findByOrdersIdAndMemberId_MemberId(Long ordersId, String memberId);
 
 }

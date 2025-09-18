@@ -16,6 +16,8 @@ public class ModifyReviewRes {
 
     private String res;
 
+    private String imageUrl;
+
     public ModifyReviewRes modified(){
         this.res = "modified";
         return this;

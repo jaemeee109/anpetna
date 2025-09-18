@@ -12,6 +12,8 @@ public class RegisterReviewRes {
 
     private String res;
 
+    private String imageUrl;
+
     public RegisterReviewRes registered(){
         this.res = "registered";
         return this;

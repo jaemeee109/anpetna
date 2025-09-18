@@ -2,6 +2,7 @@ package com.anpetna.item.service;
 
 import com.anpetna.core.coreDto.PageRequestDTO;
 import com.anpetna.core.coreDto.PageResponseDTO;
+import com.anpetna.image.service.FileService;
 import com.anpetna.item.config.ReviewMapper;
 import com.anpetna.item.domain.ItemEntity;
 import com.anpetna.item.domain.ReviewEntity;
@@ -19,6 +20,10 @@ import com.anpetna.item.repository.ItemRepository;
 import com.anpetna.item.repository.ReviewRepository;
 import com.anpetna.member.domain.MemberEntity;
 import com.anpetna.member.repository.MemberRepository;
+import com.anpetna.order.constant.OrdersStatus;
+import com.anpetna.order.domain.OrdersEntity;
+import com.anpetna.order.repository.OrderRepository;
+import com.anpetna.order.repository.OrdersRepository;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
 import org.hibernate.query.SortDirection;
@@ -29,6 +34,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 //  item(ONE)을 등록하면 image(MANY)가 등록
@@ -42,18 +48,24 @@ public class ReviewServiceImpl implements ReviewService {
     private final ReviewMapper reviewMapper;
     private final ItemRepository itemRepository;
     private final MemberRepository memberRepository;
+    private final FileService fileService;
+    private final OrdersRepository ordersRepository;
+    private final OrderRepository orderRepository;
 
-    public ReviewServiceImpl(ReviewRepository reviewRepository, ModelMapper modelMapper, ReviewMapper reviewMapper, ItemRepository itemRepository, MemberRepository memberRepository) {
+    public ReviewServiceImpl(ReviewRepository reviewRepository, ModelMapper modelMapper, ReviewMapper reviewMapper, ItemRepository itemRepository, MemberRepository memberRepository, FileService fileService, OrdersRepository ordersRepository, OrderRepository orderRepository) {
         this.reviewRepository = reviewRepository;
         this.modelMapper = modelMapper;
         this.reviewMapper = reviewMapper;
         this.itemRepository = itemRepository;
         this.memberRepository = memberRepository;
+        this.fileService = fileService;
+        this.ordersRepository = ordersRepository;
+        this.orderRepository = orderRepository;
     }
 
     @Override
     @Transactional
-    public RegisterReviewRes registerReview(Long itemId, RegisterReviewReq req) {
+    public RegisterReviewRes registerReview(Long itemId, RegisterReviewReq req, MultipartFile image) {
         // 1) 로그인 사용자 식별
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !auth.isAuthenticated() || "anonymousUser".equals(auth.getPrincipal())) {
@@ -67,6 +79,31 @@ public class ReviewServiceImpl implements ReviewService {
         MemberEntity member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new EntityNotFoundException("Member not found"));
 
+        // 2-1) 주문서 로드 + 소유자 검증
+        if (req.getOrdersId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "ordersId는 필수입니다.");
+        }
+        OrdersEntity orders = ordersRepository
+                .findByOrdersIdAndMemberId_MemberId(req.getOrdersId(), memberId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "본인 주문이 아닙니다."));
+
+        // 2-2) 상태: 구매확정(CONFIRMATION)만 허용
+        if (orders.getStatus() != OrdersStatus.CONFIRMATION) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "구매확정 상태에서만 리뷰 작성 가능합니다.");
+        }
+
+        // 2-3) 주문서에 해당 itemId 포함 여부 확인
+        boolean containsItem = orderRepository.existsByOrders_OrdersIdAndItem_ItemId(orders.getOrdersId(), itemId);
+        if (!containsItem) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "해당 주문서에 이 상품이 포함되어 있지 않습니다.");
+        }
+
+        // 2-4) 중복 방지 (정책 A: 회원×아이템 1회)
+        boolean dup = reviewRepository.existsByMemberId_MemberIdAndItemId_ItemId(memberId, itemId);
+        if (dup) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 이 상품에 대한 리뷰를 작성하셨습니다.");
+        }
+
         // 3) 요청 DTO -> 엔티티 매핑 (네 매퍼 그대로 사용)
         ReviewEntity reqEntity = reviewMapper.cReviewMapReq().map(req);
 
@@ -74,6 +111,15 @@ public class ReviewServiceImpl implements ReviewService {
         reqEntity.setItemId(item);
         reqEntity.setMemberId(member);
         reqEntity.setRegDate(java.time.LocalDateTime.now());
+
+        if (image != null && !image.isEmpty()) {
+            try {
+                var uploaded = fileService.uploadFile(image, 0);
+                reqEntity.setImageUrl(uploaded.getUrl());
+            } catch (Exception e) {
+                System.out.println("image upload failed");
+            }
+        }
 
         // 5) 저장
         ReviewEntity saved = reviewRepository.save(reqEntity);
@@ -86,7 +132,7 @@ public class ReviewServiceImpl implements ReviewService {
 
     @Override
     @Transactional
-    public ModifyReviewRes modifyReview(Long itemId, Long reviewId, ModifyReviewReq req) {
+    public ModifyReviewRes modifyReview(Long itemId, Long reviewId, ModifyReviewReq req, MultipartFile image) {
         // 1) 인증 확인
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !auth.isAuthenticated() || "anonymousUser".equals(auth.getPrincipal())) {
@@ -131,6 +177,22 @@ public class ReviewServiceImpl implements ReviewService {
         found.setItemId(originalItem);
         found.setMemberId(originalMember);
 
+        if (image != null && !image.isEmpty()) {
+            try {
+                // 1) 이전 이미지가 있으면 삭제
+                if (found.getImageUrl() != null) {
+                    try { fileService.deleteFile(found.getImageUrl()); } catch (Exception ignore) {}
+                }
+                // 2) 새 이미지 업로드
+                var uploaded = fileService.uploadFile(image, 0);
+                // 3) 교체 반영
+                found.setImageUrl(uploaded.getUrl());
+            } catch (Exception e) {
+                System.out.println("image replace failed");
+            }
+        }
+
+
         // 7) 저장
         ReviewEntity saved = reviewRepository.save(found);
 
@@ -168,6 +230,12 @@ public class ReviewServiceImpl implements ReviewService {
         boolean isAdmin = auth.getAuthorities().stream().anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
         if (!isOwner && !isAdmin) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "권한이 없습니다.");
+        }
+
+        if (found.getImageUrl() != null) {
+            try {
+                fileService.deleteFile(found.getImageUrl());
+            } catch (Exception ignore) { /*실패해도 리뷰삭제는 그대로 진행*/ }
         }
 
         // 5) 삭제
