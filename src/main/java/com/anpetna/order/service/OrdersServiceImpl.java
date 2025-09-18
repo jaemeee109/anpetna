@@ -181,22 +181,27 @@ public class OrdersServiceImpl implements OrdersService {
         ordersRepository.save(orders);
         return toReadOneOrdersRes(orders);
     }
-
-    // 주문 상태 전이 허용 규칙 정의
+    // 주문 상태 전이 허용 규칙
     private boolean isValidTransition(OrdersStatus from, OrdersStatus to) {
-        if (from == to) return true; // 같은 상태는 허용
+        if (from == to) return true;
         return switch (from) {
-            case PENDING   -> (to == OrdersStatus.PAID
+            case PENDING    -> (to == OrdersStatus.PAID
                     || to == OrdersStatus.CANCELLED);
-            case PAID      -> (to == OrdersStatus.SHIPPED
+            case PAID       -> (to == OrdersStatus.SHIPPED
                     || to == OrdersStatus.CANCELLED
-                    || to == OrdersStatus.REFUNDED);     // 결제 후 환불 허용
-            case SHIPPED   -> (to == OrdersStatus.DELIVERED
-                    || to == OrdersStatus.REFUNDED);     // 발송 후도 환불 허용
-            case DELIVERED -> (to == OrdersStatus.REFUNDED);     // 배송완료 후 환불 허용(반품 환불 등)
-            case CANCELLED, REFUNDED -> false;      // 종단 상태: 더 이상 전이 불가
+                    || to == OrdersStatus.REFUNDED
+                    || to == OrdersStatus.CONFIRMATION); // ★ 허용 추가
+            case SHIPPED    -> (to == OrdersStatus.DELIVERED
+                    || to == OrdersStatus.REFUNDED
+                    || to == OrdersStatus.CONFIRMATION); // ★ 허용 추가
+            case DELIVERED  -> (to == OrdersStatus.CONFIRMATION
+                    || to == OrdersStatus.REFUNDED);
+            case CONFIRMATION, CANCELLED, REFUNDED -> false; // 종단 상태
         };
+
     }
+
+
 
     // 계산서 단건 상세 보기
     @Override

@@ -9,4 +9,6 @@ public enum OrdersStatus {
     CANCELLED,  // 취소
     REFUNDED,   // 환불 완료
     CONFIRMATION // 구매확정
+    
+
 }
