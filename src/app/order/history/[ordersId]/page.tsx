@@ -156,10 +156,10 @@ const trackMsg =
     <RequireLogin>
       {/* ▶ 체크아웃과 동일한 폭/레이아웃 */}
       <main className="mx-auto w-[700px] px-4">
-        <h1 className="text-2xl font-semibold text-center mt-[30px] mb-[20px]">My Orders&nbsp;<PawIcon/></h1>
-       <div className="text-center mb-[24px]">
-  <div className="text-center mb-[8px]">{statusChip(String(data?.status || ''))}</div>
-  <span className="font-semibold">주문번호:&nbsp;</span>
+        <h1 className="text-2xl font-semibold text-center mt-[50px] mb-[20px]">My Orders&nbsp;<PawIcon/></h1>
+       <div className="text-center mb-[50px]">
+  <div className="text-center mb-[15px]">{statusChip(String(data?.status || ''))}</div>
+  <span className="font-semibold ">주문번호:&nbsp;</span>
   <span className="font-bold text-emerald-600">{id}</span>
 </div>
 
@@ -532,17 +532,26 @@ const trackMsg =
           /* ▶ 배송조회 카드 문구 (위치/폰트/색 네가 조절 가능) */
           .track-note { font-size: 14px; color: var(--track-note-color, #6b7280); }
 
-/* 주문 상태 배지(알약형) — 캡쳐 스타일 참고 */
-.order-status-chip{
-  display:inline-flex;
-  align-items:center;
-  padding: 2px 8px;
-  border-radius: 9999px;
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1.25;
-  box-shadow: 0 1px 0 rgba(255,255,255,0.8) inset;
-}
+          /* 주문 상태 배지(알약형) — 캡쳐 스타일 참고 */
+          .order-status-chip {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+
+            /* 크기 고정 */
+            min-width: 80px;     /* 가로 최소값 */
+            height: 35px;        /* 세로 높이 */
+            line-height: 28px;   /* 텍스트 중앙정렬 효과 */
+            letter-spacing: 0.5px; /* 글자간격 */
+
+            padding: 0 10px;     /* 좌우 여백 */
+            border-radius: 9999px;
+
+            font-size: 15px;
+            font-weight: 500;
+            box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset;
+          }
+
 
 
 

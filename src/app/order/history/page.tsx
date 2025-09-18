@@ -298,16 +298,20 @@ export default function OrderHistoryPage() {
         a.text-black { color: #111827 !important; }
 
         /* 주문 상태 배지(알약형) — 캡쳐 스타일 참고 */
-.order-status-chip{
-  display:inline-flex;
-  align-items:center;
-  padding: 2px 8px;           /* 기존 px-2 py-[2px] 크기 유지 */
-  border-radius: 9999px;      /* 완전한 알약 모양 */
-  font-size: 12px;            /* 기존 text-[12px] 유지 */
-  font-weight: 600;           /* 글씨 조금 진하게 */
-  line-height: 1.25;
-  box-shadow: 0 1px 0 rgba(255,255,255,0.8) inset; /* 살짝 볼륨감 */
-}
+        .order-status-chip{
+          display:inline-flex;
+          align-items:center;
+          padding: 2px 8px;           /* 기존 px-2 py-[2px] 크기 유지 */
+          border-radius: 9999px;      /* 완전한 알약 모양 */
+          font-size: 14px;            /* 기존 text-[12px] 유지 */
+          font-weight: 600;           /* 글씨 조금 진하게 */
+          box-shadow: 0 1px 0 rgba(255,255,255,0.8) inset; /* 살짝 볼륨감 */
+           justify-content: center;
+           min-width: 70px;     /* 가로 최소값 */
+           height: 25px;        /* 세로 높이 */
+           line-height: 28px;   /* 텍스트 중앙정렬 효과 */
+           letter-spacing: 1.0px; /* 글자간격 */
+        }
 
 
 
