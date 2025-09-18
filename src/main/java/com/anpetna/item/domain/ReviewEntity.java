@@ -41,7 +41,8 @@ public class ReviewEntity {
     @JoinColumn(name = "member_id", nullable = false, referencedColumnName = "member_id")
     private MemberEntity memberId;
 
-    @Column(name = "image_url", length = 512)
-    private String imageUrl;
+    @OneToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    @JoinColumn(name = "image")
+    private ImageEntity image;
 
 }

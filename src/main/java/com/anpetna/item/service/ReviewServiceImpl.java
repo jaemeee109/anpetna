@@ -2,7 +2,9 @@ package com.anpetna.item.service;
 
 import com.anpetna.core.coreDto.PageRequestDTO;
 import com.anpetna.core.coreDto.PageResponseDTO;
+import com.anpetna.image.domain.ImageEntity;
 import com.anpetna.image.service.FileService;
+import com.anpetna.image.service.LocalStorage;
 import com.anpetna.item.config.ReviewMapper;
 import com.anpetna.item.domain.ItemEntity;
 import com.anpetna.item.domain.ReviewEntity;
@@ -26,6 +28,7 @@ import com.anpetna.order.repository.OrderRepository;
 import com.anpetna.order.repository.OrdersRepository;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
+import lombok.RequiredArgsConstructor;
 import org.hibernate.query.SortDirection;
 import org.modelmapper.ModelMapper;
 import org.springframework.data.domain.Page;
@@ -41,6 +44,7 @@ import org.springframework.web.server.ResponseStatusException;
 //  review(ONE)을 등록하면 item(ONE)가 등록
 //  item(ONE)를 조회하면 관련된 review(MANY)가 조회 (회우너이 본인 정보 조회하는 것과 비슷한 맥락)
 @Service
+@RequiredArgsConstructor
 public class ReviewServiceImpl implements ReviewService {
 
     private final ReviewRepository reviewRepository;
@@ -48,20 +52,9 @@ public class ReviewServiceImpl implements ReviewService {
     private final ReviewMapper reviewMapper;
     private final ItemRepository itemRepository;
     private final MemberRepository memberRepository;
-    private final FileService fileService;
+    private final LocalStorage localStorage;
     private final OrdersRepository ordersRepository;
     private final OrderRepository orderRepository;
-
-    public ReviewServiceImpl(ReviewRepository reviewRepository, ModelMapper modelMapper, ReviewMapper reviewMapper, ItemRepository itemRepository, MemberRepository memberRepository, FileService fileService, OrdersRepository ordersRepository, OrderRepository orderRepository) {
-        this.reviewRepository = reviewRepository;
-        this.modelMapper = modelMapper;
-        this.reviewMapper = reviewMapper;
-        this.itemRepository = itemRepository;
-        this.memberRepository = memberRepository;
-        this.fileService = fileService;
-        this.ordersRepository = ordersRepository;
-        this.orderRepository = orderRepository;
-    }
 
     @Override
     @Transactional
@@ -114,12 +107,23 @@ public class ReviewServiceImpl implements ReviewService {
 
         if (image != null && !image.isEmpty()) {
             try {
-                var uploaded = fileService.uploadFile(image, 0);
-                reqEntity.setImageUrl(uploaded.getUrl());
+                // 1) 스토리지 업로드 → 메타 정보(ImageDTO 등) 수령
+                var uploaded = localStorage.uploadFile(image, 0); // sortOrder=0 고정
+
+                // 2) 업로드 메타를 DB 엔티티로 변환
+                ImageEntity img = modelMapper.map(uploaded, ImageEntity.class);
+
+                // 2-1) 혹시 매핑에 없는 필드 보정 (필요 시만)
+                if (img.getSortOrder() == null) img.setSortOrder(0);
+
+                // 3) 리뷰↔이미지 연결 (1:1)
+                reqEntity.setImage(img);
+
             } catch (Exception e) {
                 System.out.println("image upload failed");
             }
         }
+
 
         // 5) 저장
         ReviewEntity saved = reviewRepository.save(reqEntity);
@@ -179,18 +183,32 @@ public class ReviewServiceImpl implements ReviewService {
 
         if (image != null && !image.isEmpty()) {
             try {
-                // 1) 이전 이미지가 있으면 삭제
-                if (found.getImageUrl() != null) {
-                    try { fileService.deleteFile(found.getImageUrl()); } catch (Exception ignore) {}
+                // 1) 기존 물리 파일 삭제
+                if (found.getImage() != null && found.getImage().getUrl() != null) {
+                    try { localStorage.deleteFile(found.getImage().getUrl()); } catch (Exception ignore) {}
                 }
-                // 2) 새 이미지 업로드
-                var uploaded = fileService.uploadFile(image, 0);
-                // 3) 교체 반영
-                found.setImageUrl(uploaded.getUrl());
+
+                // 2) 새 업로드
+                var uploaded = localStorage.uploadFile(image, 0);
+
+                // 3) 기존 ImageEntity 재사용 or 새로 교체 (택1)
+                if (found.getImage() != null) {
+                    // (A) 재사용: 필드만 업데이트
+                    found.getImage().setUrl(uploaded.getUrl());
+                    // found.getImage().setOriginalName(uploaded.getOriginalName()); ...
+                    found.getImage().setSortOrder(0);
+                } else {
+                    // (B) 새 엔티티로 교체
+                    ImageEntity img = modelMapper.map(uploaded, ImageEntity.class);
+                    if (img.getSortOrder() == null) img.setSortOrder(0);
+                    found.setImage(img);
+                    // (양방향이면) img.setReview(found);
+                }
             } catch (Exception e) {
                 System.out.println("image replace failed");
             }
         }
+
 
 
         // 7) 저장
@@ -232,15 +250,19 @@ public class ReviewServiceImpl implements ReviewService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "권한이 없습니다.");
         }
 
-        if (found.getImageUrl() != null) {
-            try {
-                fileService.deleteFile(found.getImageUrl());
-            } catch (Exception ignore) { /*실패해도 리뷰삭제는 그대로 진행*/ }
+        // (리뷰 삭제 직전)
+        if (found.getImage() != null) {
+            // 1) 물리 파일 먼저 삭제
+            String url = found.getImage().getUrl();
+            if (url != null && !url.isBlank()) {
+                try {
+                    localStorage.deleteFile(url);
+                } catch (Exception ignore) { /* 실패해도 리뷰 삭제는 진행 */ }
+            }
+            found.setImage(null);
         }
-
-        // 5) 삭제
         reviewRepository.delete(found);
-
+        
         // 6) 응답
         DeleteReviewRes res = DeleteReviewRes.builder()
                 .reviewId(req.getReviewId())
