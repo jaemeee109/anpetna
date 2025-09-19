@@ -7,8 +7,12 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -21,7 +25,43 @@ public interface  OrdersRepository extends JpaRepository<OrdersEntity, Long> {
     // 특정 회원의 주문 페이징 처리로
     @EntityGraph(attributePaths = {"orderItems", "orderItems.item", "orderItems.item.images"})
     Page<OrdersEntity> findByMemberId_MemberId(String memberId, Pageable pageable);
-//스프링 데이터 JPA에선 연관 엔티티의 내부 속성으로 검색할 때 “프로퍼티 경로”를 씁니다. 
+
+    //
+    @Query("""
+        select o from OrdersEntity o
+        where (:from is null or o.createDate >= :from)
+          and (:to   is null or o.createDate <  :to)
+          and (:status is null or o.status = :status)
+          and (:memberId is null or o.memberId.memberId = :memberId)
+    """)
+    Page<OrdersEntity> findErpList(
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to,
+            @Param("status") OrdersStatus status,
+            @Param("memberId") String memberId,
+            Pageable pageable
+    );
+    //총액 + 총 수량
+    @Query("""
+        select
+          coalesce(sum(o.totalAmount - o.shippingFee),0),
+          coalesce(sum(o.shippingFee),0),
+          coalesce(sum(o.totalAmount),0),
+          coalesce(sum(o.itemQuantity),0)
+        from OrdersEntity o
+        where (:from is null or o.createDate >= :from)
+          and (:to   is null or o.createDate <  :to)
+          and (:status is null or o.status = :status)
+          and (:memberId is null or o.memberId.memberId = :memberId)
+    """)
+    List<Object[]> sumErp(
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to,
+            @Param("status") OrdersStatus status,
+            @Param("memberId") String memberId
+    );
+
+    //스프링 데이터 JPA에선 연관 엔티티의 내부 속성으로 검색할 때 “프로퍼티 경로”를 씁니다.
 // 즉 OrdersEntity.memberId(=MemberEntity).memberId(=String)을 의미하도록 
 // 메서드명을 findByMemberId_MemberId(...)로 변경
 

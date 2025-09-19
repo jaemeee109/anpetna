@@ -178,6 +178,8 @@ public class NotificationServiceImpl implements NotificationService {
         // 3) 응답용 DTO 변환
         NotificationDTO dto = NotificationDTO.from(saved);
 
+        repo.flush();
+        
         // 4) 커밋 이후 실시간 푸시(핵심!)
         //    - 이벤트 이름: "notification"
         //    - id: saved.getEventId() → SSE Last-Event-ID 복구용으로 쓰일 수 있음

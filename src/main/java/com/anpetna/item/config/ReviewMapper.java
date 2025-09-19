@@ -58,10 +58,43 @@ public class ReviewMapper {
 
     public TypeMap<ReviewEntity, ReviewDTO> rReviewMapRes() {
         itemEntityToDto();
-        TypeMap<ReviewEntity, ReviewDTO> typeMap = modelMapper.createTypeMap(ReviewEntity.class, ReviewDTO.class);
+
+        // 기존 typeMap 재사용 확인
+        TypeMap<ReviewEntity, ReviewDTO> typeMap = modelMapper.getTypeMap(ReviewEntity.class, ReviewDTO.class);
+        if (typeMap == null) {
+            typeMap = modelMapper.createTypeMap(ReviewEntity.class, ReviewDTO.class);
+        }
+
+        // itemId 매핑 유지
         typeMap.addMappings(mapper -> mapper.map(ReviewEntity::getItemId, ReviewDTO::setItemId));
+
+        // imageUrl + writer 매핑을 한 postConverter에서 처리
+        typeMap.setPostConverter(ctx -> {
+            ReviewEntity src = ctx.getSource();
+            ReviewDTO dest = ctx.getDestination();
+
+            // 이미지 매핑 (null-safe)
+            if (src.getImage() != null) {
+                dest.setImageUrl(src.getImage().getUrl());
+            } else {
+                dest.setImageUrl(null);
+            }
+
+            // 작성자 아이디 매핑 (null-safe)
+            try {
+                if (src != null && src.getMemberId() != null && src.getMemberId().getMemberId() != null) {
+                    dest.setWriter(src.getMemberId().getMemberId());
+                }
+            } catch (Exception ignore) { }
+
+            return dest;
+        });
+
         return typeMap;
     }
+
+
+
 
     private TypeMap<ItemEntity, ItemDTO> itemEntityToDto() {
         TypeMap<ItemEntity, ItemDTO> typeMap = modelMapper.getTypeMap(ItemEntity.class, ItemDTO.class);

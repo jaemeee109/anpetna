@@ -12,6 +12,7 @@ import com.anpetna.order.dto.readOneOrderDTO.ReadOneOrdersRes;
 import com.anpetna.order.service.OrdersService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -68,6 +69,20 @@ public class OrderController {
         return new ApiResult<>(body); // 200 OK
     }
 
+    @GetMapping("/admin/erp")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResult<ReadAllOrdersRes> getAdminOrders(
+            @RequestParam String from,  // yyyy-MM-dd
+            @RequestParam String to,    // yyyy-MM-dd (포함)
+            @RequestParam(required = false) OrdersStatus status, // 선택 필터
+            @RequestParam(required = false) String memberId,     // 선택 필터
+            @PageableDefault(size = 50, sort = "ordersId", direction = Sort.Direction.DESC)
+            Pageable pageable
+    ){
+        ReadAllOrdersRes erp = ordersService.erp(from, to, status, memberId, pageable);
+        return new ApiResult<>(erp);
+    }
+
     /**
      * 특정 회원의 주문서(계산서) 목록 조회
      *
@@ -118,6 +133,18 @@ public class OrderController {
         ReadOneOrdersRes body = ordersService.updateStatus(ordersId, next);
         return new ApiResult<>(body); // 200 OK
     }
+
+    //관리자 상태 변경
+    @PostMapping("/admin/{ordersId}/status")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResult<ReadOneOrdersRes> adminChangeStatus(
+            @PathVariable("ordersId") @Min(1) Long ordersId,
+            @RequestParam @NotNull OrdersStatus next,
+            @RequestParam(required = false) String reason) {
+        ReadOneOrdersRes adminStatus = ordersService.adminStatus(ordersId,next,reason);
+        return new ApiResult<>(adminStatus);
+    }
+
 
     // ==============================================================
 

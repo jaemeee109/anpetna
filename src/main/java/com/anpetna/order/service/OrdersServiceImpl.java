@@ -26,7 +26,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -171,6 +175,44 @@ public class OrdersServiceImpl implements OrdersService {
         return toReadOneOrdersRes(orders);
     }
 
+    //상태(관리자)
+    private static final Map<OrdersStatus, Set<OrdersStatus>> ALLOWED = Map.of(
+            OrdersStatus.PAID,            Set.of(OrdersStatus.SHIPMENT_READY),
+            OrdersStatus.SHIPMENT_READY,  Set.of(OrdersStatus.SHIPPED),
+            OrdersStatus.SHIPPED,         Set.of(OrdersStatus.DELIVERED)
+    );
+
+    //관리자 상태 변경
+    @Override
+    @Transactional
+    public ReadOneOrdersRes adminStatus(Long ordersId, OrdersStatus next, String reason) {
+
+        OrdersEntity o = ordersRepository.findById(ordersId).orElseThrow(() ->
+                new ResponseStatusException(HttpStatus.NOT_FOUND, "주문 없음: " + ordersId));
+
+        // 허용 전이 검증
+        if (!ALLOWED.getOrDefault(o.getStatus(), Set.of()).contains(next)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "허용되지 않은 전이: " + o.getStatus() + " -> " + next);
+        }
+
+        switch (next) {
+            case SHIPMENT_READY ->
+                o.setStatus(OrdersStatus.SHIPMENT_READY);
+                // 필요시 포장 준비 로직만 추가
+            case SHIPPED        -> o.setStatus(OrdersStatus.SHIPPED);
+            case DELIVERED ->
+                o.setStatus(OrdersStatus.DELIVERED);
+            default -> throw new ResponseStatusException(HttpStatus.CONFLICT, "이 메서드로는 처리 불가");
+        }
+
+        o.setStatus(next);
+        return toReadOne(o);
+    }
+
+    private ReadOneOrdersRes toReadOne(OrdersEntity o) { /* 매핑 */ return null; }
+
+
     // 배송지변경 추가★
     @Override
     @Transactional
@@ -187,10 +229,13 @@ public class OrdersServiceImpl implements OrdersService {
         return switch (from) {
             case PENDING    -> (to == OrdersStatus.PAID
                     || to == OrdersStatus.CANCELLED);
-            case PAID       -> (to == OrdersStatus.SHIPPED
+            case PAID       -> (to == OrdersStatus.SHIPMENT_READY
+                    || to == OrdersStatus.SHIPPED
                     || to == OrdersStatus.CANCELLED
                     || to == OrdersStatus.REFUNDED
                     || to == OrdersStatus.CONFIRMATION); // ★ 허용 추가
+            case SHIPMENT_READY ->
+                    (to == OrdersStatus.SHIPPED || to == OrdersStatus.CANCELLED);
             case SHIPPED    -> (to == OrdersStatus.DELIVERED
                     || to == OrdersStatus.REFUNDED
                     || to == OrdersStatus.CONFIRMATION); // ★ 허용 추가
@@ -233,6 +278,75 @@ public class OrdersServiceImpl implements OrdersService {
                 .pageSize(page.getSize())
                 .content(rows)
                 .build();
+    }
+
+    //회계
+    @Override
+    public ReadAllOrdersRes erp(String from, String to,
+                                OrdersStatus status, String memberId,
+                                Pageable pageable){
+        LocalDate fromD = LocalDate.parse(from);               // yyyy-MM-dd
+        LocalDate toD   = LocalDate.parse(to).plusDays(1);     // 포함 범위 → 미만 비교 위해 +1d
+        LocalDateTime fromDt = fromD.atStartOfDay();
+        LocalDateTime toDt   = toD.atStartOfDay();
+
+        Page<OrdersEntity> page = ordersRepository.findErpList(fromDt, toDt, status, memberId, pageable);
+        List<Object[]> list = ordersRepository.sumErp(fromDt, toDt, status, memberId);
+        Object[] sums = list.isEmpty() ? new Object[]{0,0,0,0} : list.get(0);
+        long sumItemsSubtotal = toLong(sums[0]);
+        long sumShippingFee   = toLong(sums[1]);
+        long sumTotalAmount   = toLong(sums[2]);
+
+        // 목록 -> Line 매핑
+        List<ReadAllOrdersRes.Line> lines = page.getContent().stream()
+                .map(this::toLine)
+                .toList();
+
+        // 맨 앞에 요약 한 줄 삽입 (ordersId=0, memberId="TOTAL")
+        ReadAllOrdersRes.Line summary = ReadAllOrdersRes.Line.builder()
+                .ordersId(0L)
+                .memberId("TOTAL")
+                .itemQuantity(0) // 필요시 sums[3] 사용해 총 수량 넣으셔도 됨
+                .itemsSubtotal((int) sumItemsSubtotal)
+                .shippingFee((int) sumShippingFee)
+                .totalAmount((int) sumTotalAmount)
+                .status(null)
+                .thumbnailUrl(null)
+                .build();
+
+        List<ReadAllOrdersRes.Line> content =
+                new java.util.ArrayList<>(lines.size() + 1);
+        content.add(summary);
+        content.addAll(lines);
+
+        return ReadAllOrdersRes.builder()
+                .totalElements(page.getTotalElements())
+                .totalPages(page.getTotalPages())
+                .pageNumber(page.getNumber())
+                .pageSize(page.getSize())
+                .content(content)
+                .build();
+    }
+    //매핑
+    private ReadAllOrdersRes.Line toLine(OrdersEntity o) {
+        return ReadAllOrdersRes.Line.builder()
+                .ordersId(o.getOrdersId())
+                .memberId(o.getMemberId().getMemberId())
+                .itemQuantity(o.getItemQuantity())
+                .itemsSubtotal(o.getTotalAmount() - o.getShippingFee())
+                .shippingFee(o.getShippingFee())
+                .totalAmount(o.getTotalAmount())
+                .status(o.getStatus())
+                .thumbnailUrl(o.getOrdersThumbnail())
+                .build();
+    }
+    private long toLong(Object x) {
+        if (x == null) return 0L;
+        if (x instanceof Object[] arr) {           // ← 배열이 오면 첫 칸 꺼내서 재시도
+            if (arr.length == 0 || arr[0] == null) return 0L;
+            x = arr[0];
+        }
+        return ((Number) x).longValue();           // BigDecimal/Long/Integer 전부 OK
     }
 
     // 특정 회원의 계산서(주문서) 목록 요약 보기

@@ -21,6 +21,8 @@ public interface OrdersService {
     // 배송 상태 변경
     ReadOneOrdersRes updateStatus(Long ordersId, OrdersStatus nextStatus);
 
+    //관리자 전용 상태 변경
+    ReadOneOrdersRes adminStatus(Long ordersId, OrdersStatus next, String reason);
     // 배송지 변경 추가
     ReadOneOrdersRes updateAddress(Long ordersId, AddressDTO address);
 
@@ -31,6 +33,8 @@ public interface OrdersService {
 
     // 전체 계산서 목록 요약 보기
     ReadAllOrdersRes getAllOrders(Pageable pageable);
+    //회계(erp
+    ReadAllOrdersRes erp(String from, String to, OrdersStatus status, String memberId, Pageable pageable);
 
     // 특정 회원의 계산서 목록 요약 보기
     ReadAllOrdersRes getSummariesByMember(String memberId, Pageable pageable);
