@@ -138,6 +138,7 @@ public class SecurityConfig {
 
                         // --- Order ---
                         .requestMatchers("/order/**").permitAll()
+                        .requestMatchers("/admin/**").hasRole("ADMIN")
 
                         .anyRequest().authenticated()
                 )
