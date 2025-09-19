@@ -43,4 +43,6 @@ public class ReadAllOrdersRes {
         private String thumbnailUrl;  // 대표 썸네일 (주문 헤더용)
     }
 
+
+
 }
