@@ -116,6 +116,13 @@ public class SecurityConfig {
                         // --- Comment ---
                         .requestMatchers("/comment/**").hasAnyRole("ADMIN", "USER")
 
+
+                        // --- Review ---
+                        .requestMatchers(HttpMethod.POST,   "/item/*/review", "/item/*/review/**").authenticated()
+                        .requestMatchers(HttpMethod.PUT,    "/item/*/review/**").authenticated()
+                        .requestMatchers(HttpMethod.DELETE, "/item/*/review/**").authenticated()
+
+
                         // --- Item ---
 
                         .requestMatchers(HttpMethod.GET, "/item", "/item/**").permitAll()
@@ -123,11 +130,6 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/item", "/item/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/item", "/item/**").hasRole("ADMIN")
 
-                        // --- Review ---
-                        .requestMatchers(HttpMethod.GET,"/review", "/review/**").hasAnyRole("ADMIN", "USER")
-                        .requestMatchers(HttpMethod.POST, "/review", "/review/**").hasRole("USER")
-                        .requestMatchers(HttpMethod.PUT, "/review", "/review/**").hasRole("USER")
-                        .requestMatchers(HttpMethod.DELETE, "/review", "/review/**").hasAnyRole("ADMIN", "USER")
 
 
                         // --- Cart ---

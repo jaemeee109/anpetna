@@ -77,7 +77,7 @@ public class ReviewController {
     }
 
     @GetMapping
-    @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
+   // @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
     public ApiResult<PageResponseDTO<ReviewDTO>> searchAllReviews(
             @PathVariable Long itemId,
             @ModelAttribute PageRequestDTO pageRequestDTO,

@@ -20,7 +20,10 @@ public class ReviewMapper {
    private final ModelMapper modelMapper;
 
    public TypeMap<RegisterReviewReq, ReviewEntity> cReviewMapReq() {
-       TypeMap<RegisterReviewReq, ReviewEntity> typeMap = modelMapper.createTypeMap(RegisterReviewReq.class, ReviewEntity.class);
+       TypeMap<RegisterReviewReq, ReviewEntity> typeMap = modelMapper.getTypeMap(RegisterReviewReq.class, ReviewEntity.class);
+       if(typeMap==null){
+           typeMap = modelMapper.createTypeMap(RegisterReviewReq.class, ReviewEntity.class);
+       }
        typeMap.addMappings(mapper -> {
            mapper.skip(ReviewEntity::setItemId);
            mapper.skip(ReviewEntity::setMemberId);
@@ -29,7 +32,10 @@ public class ReviewMapper {
    }
 
     public TypeMap<ModifyReviewReq, ReviewEntity> uReviewMapReq() {
-        TypeMap<ModifyReviewReq, ReviewEntity> typeMap = modelMapper.createTypeMap(ModifyReviewReq.class, ReviewEntity.class);
+        TypeMap<ModifyReviewReq, ReviewEntity> typeMap = modelMapper.getTypeMap(ModifyReviewReq.class, ReviewEntity.class);
+        if(typeMap==null){
+            typeMap = modelMapper.createTypeMap(ModifyReviewReq.class, ReviewEntity.class);
+        }
         typeMap.setPropertyCondition(Conditions.isNotNull());
         typeMap.addMappings(mapper -> {
             mapper.skip(ReviewEntity::setItemId);
@@ -40,7 +46,10 @@ public class ReviewMapper {
 
     public TypeMap<ReviewEntity, SearchOneReviewRes> r1ReviewMapRes() {
         itemEntityToDto();
-        TypeMap<ReviewEntity, SearchOneReviewRes> typeMap = modelMapper.createTypeMap(ReviewEntity.class, SearchOneReviewRes.class);
+        TypeMap<ReviewEntity, SearchOneReviewRes> typeMap = modelMapper.getTypeMap(ReviewEntity.class, SearchOneReviewRes.class);
+        if(typeMap==null){
+            typeMap = modelMapper.createTypeMap(ReviewEntity.class, SearchOneReviewRes.class);
+        }
         typeMap.addMappings(mapper -> {
             mapper.map(ReviewEntity::getItemId, SearchOneReviewRes::setItemId);
         });
