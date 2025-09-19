@@ -4,6 +4,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.ToString;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 import java.util.function.Function;
@@ -26,19 +27,24 @@ public class PageResponseDTO<E> { // <E> E 엔티티용 변수명 (변할 수 �
     private List<E> dtoList ; // 목록
 
     // 생성자에서 Page 객체 받아서 바로 매핑
-    public PageResponseDTO(Page<E> page) {
+    public PageResponseDTO(Page<E> page, Pageable pageable) {
+        this.page = pageable.getPageNumber();
+        this.size = pageable.getPageSize();
         this.dtoList = page.getContent();
-        this.page = page.getNumber();
-        this.size = page.getSize();
         this.total= (int)page.getTotalElements();
-        this.prev = page.hasPrevious();
-        this.next = page.hasNext();
+
+        this.end = (int)(Math.ceil(this.page / 5.0)) * 5 ; // 화면에서의 마지막 번호
+        this.start = end - 4;
+        int last = (int)(Math.ceil((total/(double)size))); // 데이터 개수를 계산한 마지막 페이지 번호
+        this.end = end > last ? last : end ;  // 3항 연산자  -> 최종 활용되는 페이지 번호
+        this.prev = this.start > 1 ;   // 이전페이지 유무
+        this.next = total > this.end * this.size ; // 다음페이지 유무
     }
 
-    //Page<Entity>와 EntityToDto를 받아 PafeResponseDTO<DTO>반환
-    public static <E, D> PageResponseDTO<D> toDTO(Page<E> page, Function<E, D> mapper) {
+    //Page<Entity>와 EntityToDto를 받아 PageResponseDTO<DTO>반환
+    public static <E, D> PageResponseDTO<D> toDTO(Page<E> page, Function<E, D> mapper, Pageable pageable) {
         Page<D> pageDTO = page.map(mapper);
-        return new PageResponseDTO(pageDTO);
+        return new PageResponseDTO<>(pageDTO, pageable);
     }
 
     //생성자

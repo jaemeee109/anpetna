@@ -179,7 +179,7 @@ public class ItemServiceImpl implements ItemService {
             String entityUrl = itemEntity.getImages().get(0).getUrl();
             resEach.setThumbnailUrl(entityUrl);
             return resEach;
-        });
+        }, pageable);
 
         return res;
     }

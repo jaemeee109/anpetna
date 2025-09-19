@@ -35,7 +35,7 @@ public class AdminMemberServiceImpl implements AdminMemberService {
         Page<MemberEntity> page = memberRepository.findAll(memberEntitySpecification, pageable);
 
         // 3) PageResponseDTO 로 변환 (프로젝트 표준)
-        return PageResponseDTO.toDTO(page, this::toAdminPageDTO);
+        return PageResponseDTO.toDTO(page, this::toAdminPageDTO, pageable);
     }
 
     /*======================================================================================================*/
@@ -79,7 +79,7 @@ public class AdminMemberServiceImpl implements AdminMemberService {
         Page<MemberEntity> page = memberRepository.findAll(spec, pageable);
 
         // 3) 표준 페이지 DTO 로 변환
-        return PageResponseDTO.toDTO(page, this::toAdminPageDTO);
+        return PageResponseDTO.toDTO(page, this::toAdminPageDTO, pageable);
     }
 
     /*======================================================================================================*/
