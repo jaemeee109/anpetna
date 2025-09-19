@@ -89,6 +89,14 @@ public class ImageEntity {
         if (board  != null) cnt++;
         if (member != null) cnt++;
         if (item   != null) cnt++;
+
+        // 리뷰 전용 이미지(ReviewEntity가 image FK로 참조)인 경우에는
+        // board/member/item 부모가 없어도 정상으로 본다.
+        if (cnt == 0) {
+            return;
+        }
+
+
         if (cnt != 1) {
             throw new IllegalStateException("Image must be attached to exactly ONE parent (board|member|item|review).");
         }
