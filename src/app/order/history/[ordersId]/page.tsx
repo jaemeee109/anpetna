@@ -130,7 +130,7 @@ const STATUS = {
   CANCELLED:    { label: '주문취소',   bg: '#ffedd5', color: '#9a3412', note: '조회가 불가능합니다' },
   REFUNDED:     { label: '환불완료',   bg: '#fee2e2', color: '#991b1b', note: '조회가 불가능합니다' },
   CONFIRMATION: { label: '구매확정',   bg: '#e5e7eb', color: '#374151', note: '배송이 완료 되었습니다' },
-  SHIPMENT_READY: { label: '배송준비중', bg: '#e2c3c7ff', color: '#461d3f6b', note: '현재 상품준비중으로 조회가 불가능합니다' },
+  SHIPMENT_READY: { label: '배송준비중', bg:'#e6d8f8ff', color: '#17021b6b' , note: '현재 상품준비중으로 조회가 불가능합니다' },
 
 } as const;
 
