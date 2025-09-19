@@ -5,6 +5,8 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useAddCart } from '@/features/cart/hooks/useCart';
+import ReviewSection from '@/features/review/ui/ReviewSection';
+
 
 /** 가격 포맷(1,000 단위 + 원) */
 function formatPriceKRW(n?: number) {
@@ -386,6 +388,18 @@ export default function ItemDetailPage() {
 
       <div className="divider mb-[20px]" />
 
+      
+{/* 리뷰 영역 */}
+<ReviewSection itemId={Number(id)} />
+
+<hr className="faq-sep" />
+
+{/* 고정 안내문구 */}
+<p className="text-[13px] text-gray-600 mt-3">
+  ※ 상품 리뷰는 구매자 본인 작성 원칙이며, 운영정책에 따라 수정/삭제될 수 있습니다.
+</p>
+
+
       {/* 고정 안내문 (모든 상세페이지) */}
       <section className="policy mt-[30px] mb-[30px]">
         <p>· 상품의 색상은 모니터 사양에 따라 실제 색상과 다소 차이가 있을 수 있습니다.</p>
@@ -440,11 +454,12 @@ export default function ItemDetailPage() {
            ========================= */
         .apn-detail {
           /* 본문 가운데 정렬 */
-          max-width: calc(var(--thumb-size) + var(--info-w) + 72px);
+          max-width: calc(var(--thumb-w) + var(--info-w) + 72px);
           margin: 0 auto;
 
           /* 크기 변수 */
-          --thumb-size: 350px;   /* 썸네일 한 변(px) */
+          --thumb-w: 260px;      /* 썸네일 가로 */
+          --thumb-h: 340px;      /* 썸네일 세로 */
           --info-w: 520px;       /* 오른쪽 정보 영역 너비(px) */
           --detail-w: 640px;     /* 상세이미지 최대 가로(px) */
           --detail-h: 640px;     /* 상세이미지 최대 세로(px) */
@@ -470,7 +485,7 @@ export default function ItemDetailPage() {
         /* 고정 2열 레이아웃을 화면 가운데 배치 */
         .detail-top {
           display: grid;
-          grid-template-columns: var(--thumb-size) var(--info-w);
+          grid-template-columns: var(--thumb-w) var(--info-w);
           justify-content: center;
           align-items: start;
           column-gap: 24px;
@@ -478,8 +493,8 @@ export default function ItemDetailPage() {
 
         /* 썸네일 — 정사각 고정 */
         .thumb-box {
-          width: var(--thumb-size);
-          height: var(--thumb-size);
+          width: var(--thumb-w);
+          height: var(--thumb-h);
           border: 1px solid #e5e7eb; border-radius: 8px;
           overflow: hidden; background: #fafafa;
         }

@@ -279,7 +279,7 @@ export default function ItemsPage() {
                 <div className="w-full overflow-hidden rounded-xl bg-white shadow-sm">
                   {/* 고정 높이 썸네일 래퍼: SOLD_OUT이면 회색 필터 */}
                   <div
-                    className="relative w-260px] h-[340px] overflow-hidden"
+                    className="relative w-[260px] h-[340px] overflow-hidden"
                     style={{ filter: isSoldOut ? 'grayscale(100%)' : undefined }}
                   >
                     {img ? (

@@ -22,6 +22,8 @@ function statusBadge(s?: string | null) {
     CANCELLED:    { label: '주문취소',   bg: '#ffedd5', color: '#9a3412' }, 
     REFUNDED:     { label: '환불완료',   bg: '#fee2e2', color: '#991b1b' }, 
     CONFIRMATION: { label: '구매확정',   bg: '#e5e7eb', color: '#374151' }, 
+    SHIPMENT_READY: { label: '배송준비중', bg: '#e2c3c7ff', color: '#461d3f6b' },
+
   };
   const info = s ? map[s] : undefined;
   if (!info) return null;
