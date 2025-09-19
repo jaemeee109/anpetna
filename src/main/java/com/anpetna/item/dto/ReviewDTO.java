@@ -17,4 +17,6 @@ public class ReviewDTO {
 
     private ItemDTO itemId;
 
+    private String imageUrl;
+
 }

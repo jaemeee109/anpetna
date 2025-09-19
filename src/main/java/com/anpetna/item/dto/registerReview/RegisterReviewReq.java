@@ -28,4 +28,6 @@ public class RegisterReviewReq{
         this.images.add(imageDTO);
     }
 
+    private Long ordersId; // 리뷰를 쓰려는 '주문서'의 PK
+
 }

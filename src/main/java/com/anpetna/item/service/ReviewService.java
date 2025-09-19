@@ -14,15 +14,16 @@ import com.anpetna.item.dto.searchAllReview.SearchAllReviewsRes;
 import com.anpetna.item.dto.searchOneReview.SearchOneReviewReq;
 import com.anpetna.item.dto.searchOneReview.SearchOneReviewRes;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
 public interface ReviewService {
 
 
-    RegisterReviewRes registerReview(Long itemId, RegisterReviewReq req);
+    RegisterReviewRes registerReview(Long itemId, RegisterReviewReq req, MultipartFile image);
    // @PreAuthorize("@authEvaluator.authorizeReview(#req.reviewId, principal.getUsername())")
-    ModifyReviewRes modifyReview(Long itemId, Long reviewId, ModifyReviewReq req);
+    ModifyReviewRes modifyReview(Long itemId, Long reviewId, ModifyReviewReq req, MultipartFile image);
     //@PreAuthorize("@authEvaluator.authorizeReview(#req.reviewId, principal.getUsername())")
     DeleteReviewRes deleteReview(Long itemId, DeleteReviewReq req);
 

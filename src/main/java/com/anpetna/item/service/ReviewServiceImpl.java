@@ -2,6 +2,9 @@ package com.anpetna.item.service;
 
 import com.anpetna.core.coreDto.PageRequestDTO;
 import com.anpetna.core.coreDto.PageResponseDTO;
+import com.anpetna.image.domain.ImageEntity;
+import com.anpetna.image.service.FileService;
+import com.anpetna.image.service.LocalStorage;
 import com.anpetna.item.config.ReviewMapper;
 import com.anpetna.item.domain.ItemEntity;
 import com.anpetna.item.domain.ReviewEntity;
@@ -19,8 +22,13 @@ import com.anpetna.item.repository.ItemRepository;
 import com.anpetna.item.repository.ReviewRepository;
 import com.anpetna.member.domain.MemberEntity;
 import com.anpetna.member.repository.MemberRepository;
+import com.anpetna.order.constant.OrdersStatus;
+import com.anpetna.order.domain.OrdersEntity;
+import com.anpetna.order.repository.OrderRepository;
+import com.anpetna.order.repository.OrdersRepository;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
+import lombok.RequiredArgsConstructor;
 import org.hibernate.query.SortDirection;
 import org.modelmapper.ModelMapper;
 import org.springframework.data.domain.Page;
@@ -29,12 +37,14 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 //  item(ONE)을 등록하면 image(MANY)가 등록
 //  review(ONE)을 등록하면 item(ONE)가 등록
 //  item(ONE)를 조회하면 관련된 review(MANY)가 조회 (회우너이 본인 정보 조회하는 것과 비슷한 맥락)
 @Service
+@RequiredArgsConstructor
 public class ReviewServiceImpl implements ReviewService {
 
     private final ReviewRepository reviewRepository;
@@ -42,18 +52,13 @@ public class ReviewServiceImpl implements ReviewService {
     private final ReviewMapper reviewMapper;
     private final ItemRepository itemRepository;
     private final MemberRepository memberRepository;
-
-    public ReviewServiceImpl(ReviewRepository reviewRepository, ModelMapper modelMapper, ReviewMapper reviewMapper, ItemRepository itemRepository, MemberRepository memberRepository) {
-        this.reviewRepository = reviewRepository;
-        this.modelMapper = modelMapper;
-        this.reviewMapper = reviewMapper;
-        this.itemRepository = itemRepository;
-        this.memberRepository = memberRepository;
-    }
+    private final LocalStorage localStorage;
+    private final OrdersRepository ordersRepository;
+    private final OrderRepository orderRepository;
 
     @Override
     @Transactional
-    public RegisterReviewRes registerReview(Long itemId, RegisterReviewReq req) {
+    public RegisterReviewRes registerReview(Long itemId, RegisterReviewReq req, MultipartFile image) {
         // 1) 로그인 사용자 식별
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !auth.isAuthenticated() || "anonymousUser".equals(auth.getPrincipal())) {
@@ -67,6 +72,31 @@ public class ReviewServiceImpl implements ReviewService {
         MemberEntity member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new EntityNotFoundException("Member not found"));
 
+        // 2-1) 주문서 로드 + 소유자 검증
+        if (req.getOrdersId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "ordersId는 필수입니다.");
+        }
+        OrdersEntity orders = ordersRepository
+                .findByOrdersIdAndMemberId_MemberId(req.getOrdersId(), memberId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "본인 주문이 아닙니다."));
+
+        // 2-2) 상태: 구매확정(CONFIRMATION)만 허용
+        if (orders.getStatus() != OrdersStatus.CONFIRMATION) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "구매확정 상태에서만 리뷰 작성 가능합니다.");
+        }
+
+        // 2-3) 주문서에 해당 itemId 포함 여부 확인
+        boolean containsItem = orderRepository.existsByOrders_OrdersIdAndItem_ItemId(orders.getOrdersId(), itemId);
+        if (!containsItem) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "해당 주문서에 이 상품이 포함되어 있지 않습니다.");
+        }
+
+        // 2-4) 중복 방지 (정책 A: 회원×아이템 1회)
+        boolean dup = reviewRepository.existsByMemberId_MemberIdAndItemId_ItemId(memberId, itemId);
+        if (dup) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 이 상품에 대한 리뷰를 작성하셨습니다.");
+        }
+
         // 3) 요청 DTO -> 엔티티 매핑 (네 매퍼 그대로 사용)
         ReviewEntity reqEntity = reviewMapper.cReviewMapReq().map(req);
 
@@ -74,6 +104,26 @@ public class ReviewServiceImpl implements ReviewService {
         reqEntity.setItemId(item);
         reqEntity.setMemberId(member);
         reqEntity.setRegDate(java.time.LocalDateTime.now());
+
+        if (image != null && !image.isEmpty()) {
+            try {
+                // 1) 스토리지 업로드 → 메타 정보(ImageDTO 등) 수령
+                var uploaded = localStorage.uploadFile(image, 0); // sortOrder=0 고정
+
+                // 2) 업로드 메타를 DB 엔티티로 변환
+                ImageEntity img = modelMapper.map(uploaded, ImageEntity.class);
+
+                // 2-1) 혹시 매핑에 없는 필드 보정 (필요 시만)
+                if (img.getSortOrder() == null) img.setSortOrder(0);
+
+                // 3) 리뷰↔이미지 연결 (1:1)
+                reqEntity.setImage(img);
+
+            } catch (Exception e) {
+                System.out.println("image upload failed");
+            }
+        }
+
 
         // 5) 저장
         ReviewEntity saved = reviewRepository.save(reqEntity);
@@ -86,7 +136,7 @@ public class ReviewServiceImpl implements ReviewService {
 
     @Override
     @Transactional
-    public ModifyReviewRes modifyReview(Long itemId, Long reviewId, ModifyReviewReq req) {
+    public ModifyReviewRes modifyReview(Long itemId, Long reviewId, ModifyReviewReq req, MultipartFile image) {
         // 1) 인증 확인
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !auth.isAuthenticated() || "anonymousUser".equals(auth.getPrincipal())) {
@@ -131,6 +181,36 @@ public class ReviewServiceImpl implements ReviewService {
         found.setItemId(originalItem);
         found.setMemberId(originalMember);
 
+        if (image != null && !image.isEmpty()) {
+            try {
+                // 1) 기존 물리 파일 삭제
+                if (found.getImage() != null && found.getImage().getUrl() != null) {
+                    try { localStorage.deleteFile(found.getImage().getUrl()); } catch (Exception ignore) {}
+                }
+
+                // 2) 새 업로드
+                var uploaded = localStorage.uploadFile(image, 0);
+
+                // 3) 기존 ImageEntity 재사용 or 새로 교체 (택1)
+                if (found.getImage() != null) {
+                    // (A) 재사용: 필드만 업데이트
+                    found.getImage().setUrl(uploaded.getUrl());
+                    // found.getImage().setOriginalName(uploaded.getOriginalName()); ...
+                    found.getImage().setSortOrder(0);
+                } else {
+                    // (B) 새 엔티티로 교체
+                    ImageEntity img = modelMapper.map(uploaded, ImageEntity.class);
+                    if (img.getSortOrder() == null) img.setSortOrder(0);
+                    found.setImage(img);
+                    // (양방향이면) img.setReview(found);
+                }
+            } catch (Exception e) {
+                System.out.println("image replace failed");
+            }
+        }
+
+
+
         // 7) 저장
         ReviewEntity saved = reviewRepository.save(found);
 
@@ -170,9 +250,19 @@ public class ReviewServiceImpl implements ReviewService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "권한이 없습니다.");
         }
 
-        // 5) 삭제
+        // (리뷰 삭제 직전)
+        if (found.getImage() != null) {
+            // 1) 물리 파일 먼저 삭제
+            String url = found.getImage().getUrl();
+            if (url != null && !url.isBlank()) {
+                try {
+                    localStorage.deleteFile(url);
+                } catch (Exception ignore) { /* 실패해도 리뷰 삭제는 진행 */ }
+            }
+            found.setImage(null);
+        }
         reviewRepository.delete(found);
-
+        
         // 6) 응답
         DeleteReviewRes res = DeleteReviewRes.builder()
                 .reviewId(req.getReviewId())
