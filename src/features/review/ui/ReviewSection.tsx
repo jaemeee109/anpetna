@@ -233,12 +233,41 @@ export default function ReviewSection({ itemId }: { itemId: number }) {
     return () => { stop = true; };
   }, [myId, itemId, base]);
 
-  // 이미 내가 쓴 리뷰가 목록에 있으면 버튼 숨김
-  useEffect(() => {
-    if (!myId || !list.length) return;
-    const mineExists = list.some((r) => String(r.memberId ?? r.writer ?? '') === String(myId));
-    if (mineExists) setCanWrite(false);
-  }, [list, myId]);
+  // ✅ 내 리뷰 존재여부를 서버 페이징 전체를 훑어 확인
+  async function alreadyWroteForItem(): Promise<boolean> {
+    if (!myId) return false; // 로그인 안 된 경우엔 여기서 false (버튼 클릭시 별도 경고는 너의 기존 정책 유지)
+    let p = 1;
+    const sizeCheck = 50; // 한 번에 50개씩
+    while (true) {
+      const usp = new URLSearchParams();
+      usp.set('order', 'date');
+      usp.set('direction', 'DESCENDING');
+      usp.set('page', String(p));
+      usp.set('size', String(sizeCheck));
+
+      const resp = await fetch(`${base}/item/${itemId}/review?${usp.toString()}`, {
+        method: 'GET',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        credentials: 'include',
+      });
+
+      const j = await resp.clone().json().catch(() => null as any);
+      if (!resp.ok) {
+        throw new Error(j?.message || j?.resMessage || `리뷰 목록 조회 실패 (${resp.status})`);
+      }
+
+      const pageData = normalizePage(j);
+      const pageList = pageData?.content ?? [];
+      const mineExists = pageList.some(
+        (r: any) => String(r.memberId ?? r.writer ?? '') === String(myId)
+      );
+      if (mineExists) return true;
+
+      const hasNext = Boolean((pageData as any)?.next);
+      if (!hasNext) return false;
+      p += 1;
+    }
+  }
 
   /* =========================
      ▶ 리뷰 등록 폼 (모달)
@@ -409,16 +438,36 @@ export default function ReviewSection({ itemId }: { itemId: number }) {
             <Paw className="w-[18px] h-[18px]" />&nbsp;
           </h3>
 
-          {canWrite && (
-            <button
-              type="button"
-              className="btn"
-              onClick={openForm}
-              aria-label="리뷰 등록"
-            >
-              리뷰 등록
-            </button>
-          )}
+          <button
+            type="button"
+            className="btn"
+            onClick={async () => {
+              try {
+                // 1) 서버 전체 페이지를 훑어 '내 리뷰' 존재여부 실시간 확인
+                const wrote = await alreadyWroteForItem();
+
+                // 2) 이미 작성한 경우 → 안내 후 종료
+                if (wrote) {
+                  alert('이미 리뷰를 작성하셨습니다.');
+                  return;
+                }
+
+                // 3) 기존 canWrite 정책(구매확정/주문검증)을 한 번 더 확인
+                if (!canWrite || !targetOrdersId) {
+                  alert('구매확정된 주문이 없거나, 해당 주문에 이 상품이 포함되어 있지 않습니다.');
+                  return;
+                }
+
+                // 4) 모두 통과 → 작성 모달 오픈
+                openForm();
+              } catch (e: any) {
+                alert(e?.message || '리뷰 작성 가능 여부 확인 중 오류가 발생했습니다.');
+              }
+            }}
+            aria-label="리뷰 등록"
+          >
+            리뷰 등록
+          </button>
         </div>
 
         {/* 오른쪽: 정렬 드롭다운 */}

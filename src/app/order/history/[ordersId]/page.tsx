@@ -55,23 +55,22 @@ export default function OrderDetailPage() {
   });
 
   // 배송지 입력 폼 상태 (초기값: 서버 값)
- const [addr, setAddr] = useState({
-  zipcode: '',
-  street: '',
-  detail: '',
-  receiver: '',
-  phone: '',
-});
+  const [addr, setAddr] = useState({
+    zipcode: '',
+    street: '',
+    detail: '',
+    receiver: '',
+    phone: '',
+  });
   useEffect(() => {
     if (data?.shippingAddress) {
-     setAddr({
-  zipcode: data.shippingAddress.zipcode ?? '',
-  street: data.shippingAddress.street ?? '',
-  detail: data.shippingAddress.detail ?? '',
-  receiver: data.shippingAddress.receiver ?? '',
-  phone: data.shippingAddress.phone ?? '',
-});
-
+      setAddr({
+        zipcode: data.shippingAddress.zipcode ?? '',
+        street: data.shippingAddress.street ?? '',
+        detail: data.shippingAddress.detail ?? '',
+        receiver: data.shippingAddress.receiver ?? '',
+        phone: data.shippingAddress.phone ?? '',
+      });
     }
   }, [data]);
 
@@ -84,23 +83,21 @@ export default function OrderDetailPage() {
     onError: (e: any) => alert(e?.message || '배송지 저장 실패'),
   });
   // (추가) 주문 상태 변경/취소 공용 뮤테이션  ─ 절대 조건문/JSX 안에 넣지 마세요.
-const mChange = useMutation({
-  mutationFn: (next: string) => orderApi.changeStatus(id, next),
-  onSuccess: () => {
-    // 상세 화면 갱신
-    qc.invalidateQueries({ queryKey: ['order', 'detail', id] });
-    // 목록(요약) 갱신: 'orders'로 시작하는 모든 쿼리 무효화
-    qc.invalidateQueries({
-      predicate: ({ queryKey }) => Array.isArray(queryKey) && queryKey[0] === 'orders',
-    });
-    alert('주문 상태가 변경되었습니다.');
-  },
-  onError: (e: any) => {
-    alert(e?.message || '상태 변경에 실패했습니다.');
-  },
-});
-
-
+  const mChange = useMutation({
+    mutationFn: (next: string) => orderApi.changeStatus(id, next),
+    onSuccess: () => {
+      // 상세 화면 갱신
+      qc.invalidateQueries({ queryKey: ['order', 'detail', id] });
+      // 목록(요약) 갱신: 'orders'로 시작하는 모든 쿼리 무효화
+      qc.invalidateQueries({
+        predicate: ({ queryKey }) => Array.isArray(queryKey) && queryKey[0] === 'orders',
+      });
+      alert('주문 상태가 변경되었습니다.');
+    },
+    onError: (e: any) => {
+      alert(e?.message || '상태 변경에 실패했습니다.');
+    },
+  });
 
   if (isLoading) return <div className="px-4 py-10 text-center">불러오는 중…</div>;
   if (error) return <div className="px-4 py-10 text-center text-red-600">오류: {(error as any)?.message}</div>;
@@ -108,8 +105,6 @@ const mChange = useMutation({
 
   const items = Array.isArray(data.ordersItems) ? data.ordersItems : [];
   const IMG_BASE = resolveImgBase();
-
-
 
   // ===== 합계(주문페이지와 동일 규칙) =====
   const itemsTotal = items.reduce(
@@ -121,50 +116,45 @@ const mChange = useMutation({
   const payTotal =
     data?.totalAmount != null ? Number(data.totalAmount) : itemsTotal + shippingFee;
 
-/** 상세페이지 상태 → 라벨/배경/배송조회 문구 */
-const STATUS = {
-  PENDING:      { label: '주문완료',   bg: '#fde2f3', color: '#fa71c6ff', note: '조회가 불가능합니다' },
-  PAID:         { label: '결제완료',  bg: '#fef9c3', color: '#bd9b2cff', note: '현재 상품준비중으로 조회가 불가능합니다' },
-  SHIPPED:      { label: '배송출발',   bg: '#e0f2fe', color: '#0369a1', note: 'PostNumber : 00000-00-00000 고객님의 주소로 이동중입니다' },
-  DELIVERED:    { label: '배송완료',   bg: '#dcfce7', color: '#166534', note: '배송이 완료 되었습니다' },
-  CANCELLED:    { label: '주문취소',   bg: '#ffedd5', color: '#9a3412', note: '조회가 불가능합니다' },
-  REFUNDED:     { label: '환불완료',   bg: '#fee2e2', color: '#991b1b', note: '조회가 불가능합니다' },
-  CONFIRMATION: { label: '구매확정',   bg: '#e5e7eb', color: '#374151', note: '배송이 완료 되었습니다' },
-  SHIPMENT_READY: { label: '배송준비중', bg:'#e6d8f8ff', color: '#17021b6b' , note: '현재 상품준비중으로 조회가 불가능합니다' },
+  /** 상세페이지 상태 → 라벨/배경/배송조회 문구 */
+  const STATUS = {
+    PENDING: { label: '주문완료', bg: '#fde2f3', color: '#fa71c6ff', note: '조회가 불가능합니다' },
+    PAID: { label: '결제완료', bg: '#fef9c3', color: '#bd9b2cff', note: '현재 상품준비중으로 조회가 불가능합니다' },
+    SHIPPED: { label: '배송출발', bg: '#e0f2fe', color: '#0369a1', note: 'PostNumber : 00000-00-00000 고객님의 주소로 이동중입니다' },
+    DELIVERED: { label: '배송완료', bg: '#dcfce7', color: '#166534', note: '배송이 완료 되었습니다' },
+    CANCELLED: { label: '주문취소', bg: '#ffedd5', color: '#9a3412', note: '조회가 불가능합니다' },
+    REFUNDED: { label: '환불완료', bg: '#fee2e2', color: '#991b1b', note: '조회가 불가능합니다' },
+    CONFIRMATION: { label: '구매확정', bg: '#e5e7eb', color: '#374151', note: '배송이 완료 되었습니다' },
+    SHIPMENT_READY: { label: '배송준비중', bg: '#e6d8f8ff', color: '#17021b6b', note: '현재 상품준비중으로 조회가 불가능합니다' },
+  } as const;
 
-} as const;
+  function statusChip(s?: string) {
+    const m = (s && (STATUS as any)[s]) as { label: string; bg: string; color: string } | undefined;
+    if (!m) return null;
+    return (
+      <span
+        className="order-status-chip"
+        style={{ background: m.bg, color: m.color }}
+      >
+        {m.label}
+      </span>
+    );
+  }
 
-function statusChip(s?: string) {
-  const m = (s && (STATUS as any)[s]) as { label: string; bg: string; color: string } | undefined;
-  if (!m) return null;
-  return (
-    <span
-      className="order-status-chip"
-      style={{ background: m.bg, color: m.color }}
-    >
-      {m.label}
-    </span>
-  );
-}
-
-
-const trackMsg =
-  (data?.status && (STATUS as any)[data.status]?.note) ||
-  '조회가 불가능합니다';
-
-
+  const trackMsg =
+    (data?.status && (STATUS as any)[data.status]?.note) ||
+    '조회가 불가능합니다';
 
   return (
     <RequireLogin>
       {/* ▶ 체크아웃과 동일한 폭/레이아웃 */}
       <main className="mx-auto w-[700px] px-4">
         <h1 className="text-2xl font-semibold text-center mt-[50px] mb-[20px]">My Orders&nbsp;<PawIcon/></h1>
-       <div className="text-center mb-[50px]">
-  <div className="text-center mb-[15px]">{statusChip(String(data?.status || ''))}</div>
-  <span className="font-semibold ">주문번호:&nbsp;</span>
-  <span className="font-bold text-emerald-600">{id}</span>
-</div>
-
+        <div className="text-center mb-[50px]">
+          <div className="text-center mb-[15px]">{statusChip(String(data?.status || ''))}</div>
+          <span className="font-semibold ">주문번호:&nbsp;</span>
+          <span className="font-bold text-emerald-600">{id}</span>
+        </div>
 
         {/* (1) 배송지 정보 — 주문페이지와 동일 UI/클래스 */}
         <h2 className="text-lg font-semibold mt-[20px] mb-[8px] text-left">배송지 정보</h2>
@@ -182,8 +172,8 @@ const trackMsg =
               <label className="w-[140px] text-center">Tel</label>
               <input
                 className="order-input"
-                 value={addr.phone}
-                 onChange={(e) => setAddr((s) => ({ ...s, phone: e.target.value }))}
+                value={addr.phone}
+                onChange={(e) => setAddr((s) => ({ ...s, phone: e.target.value }))}
                 placeholder="연락처 입력"
               />
             </div>
@@ -216,26 +206,25 @@ const trackMsg =
 
         <div className="mt-[25px] flex justify-end mr-[15px]">
           <button
-  className="btn-3d btn-white !px-4 !py-2"
-  onClick={() => {
-    const s = String(data?.status || '');
-    if (s === 'PENDING' || s === 'PAID') {
-      mUpdate.mutate(addr);
-    } else {
-      alert('배송지변경이 불가능합니다');
-    }
-  }}
->
-  배송지 변경
-</button>
-
+            className="btn-3d btn-white !px-4 !py-2"
+            onClick={() => {
+              const s = String(data?.status || '');
+              if (s === 'PENDING' || s === 'PAID') {
+                mUpdate.mutate(addr);
+              } else {
+                alert('배송지변경이 불가능합니다');
+              }
+            }}
+          >
+            배송지 변경
+          </button>
         </div>
 
         {/* (1-1) 배송조회 */}
         <h2 className="text-lg font-semibold mt-[24px] mb-[8px] text-left">배송조회</h2>
         <section className="apn-card p-4 h-card-track">
           <div className="track-note ml-[30px] mt-[25px]">
-           {trackMsg}
+            {trackMsg}
           </div>
         </section>
 
@@ -312,7 +301,12 @@ const trackMsg =
                 const lineTotal = priceOne * qty;
 
                 return (
-                  <div key={key} className="items-row flex items-center px-2">
+                  <Link
+                    key={key}
+                    href={`/items/${it.itemId}`}
+                    className="items-row flex items-center px-2"
+                    style={{ textDecoration: 'none', color: 'inherit' }}
+                  >
                     <div className="order-thumb mr-2 mt-[20px] ml-[30px] mb-[20px]">
                       <Image
                         src={img}
@@ -334,35 +328,48 @@ const trackMsg =
                         {lineTotal.toLocaleString()} <span className="text-sm">원</span>
                       </div>
                     </div>
-                  </div>
+                  </Link>
                 );
               })}
             </div>
           )}
           <div className="items-bottom-pad" />
         </section>
-        {/* ▷ 구매확정 버튼 (주문상품 카드 하단/우측) */}
-{(data?.status === 'PAID' || data?.status === 'SHIPPED' || data?.status === 'DELIVERED') && (
-  <div className="mt-[10px] flex justify-end mt-[20px] mr-[15px]">
-    <button
-      type="button"
-      className="btn-3d btn-white !px-4 !py-2"
-      onClick={() => {
-        if (!confirm('구매확정시 주문취소/교환/환불이 불가능합니다')) return;
-        mChange.mutate('CONFIRMATION');
-      }}
-    >
-      구매확정
-    </button>
-  </div>
-)}
 
+        {/* (추가) 구매확정 후 리뷰 안내 — 주문상품 카드 "바로 아래" */}
+        {data?.status === 'CONFIRMATION' && (
+          <div className="review-note ml-[15px] mt-[10px]">
+            {/* 사용자가 주신 Bootstrap 아이콘 (class → className) */}
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+              className="bi bi-pencil" viewBox="0 0 16 16">
+              <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325"/>
+            </svg>
+            <span>상품페이지에서 리뷰를 작성해주세요</span>
+          </div>
+        )}
+
+        {/* ▷ 구매확정 버튼 (주문상품 카드 하단/우측) */}
+        {(data?.status === 'PAID' || data?.status === 'SHIPPED' || data?.status === 'DELIVERED') && (
+          <div className="mt-[10px] flex justify-end mt-[20px] mr-[15px]">
+            <button
+              type="button"
+              className="btn-3d btn-white !px-4 !py-2"
+              onClick={() => {
+                if (!confirm('구매확정시 주문취소/교환/환불이 불가능합니다')) return;
+                mChange.mutate('CONFIRMATION');
+              }}
+            >
+              구매확정
+            </button>
+          </div>
+        )}
 
         {/* ▷ 결제금액 (주문페이지와 동일, 안내문 폰트/색 동일 적용) */}
         <h2 className="text-lg font-semibold mt-[50px] mb-[15px] text-left">결제금액</h2>
         <section className="apn-card p-4 h-card-sum">
           <div className="sum-center-wrap">
-            <div className="sum-row total w-[420px] flex justify-between mt-[35px]">
+          <div className="sum-row total w-[420px] flex justify-between mt-[35px]">
+
               <div>총 주문금액</div>
               <div>
                 {itemsTotal.toLocaleString()} <span className="text-sm">원</span>
@@ -395,17 +402,17 @@ const trackMsg =
         {/* 하단 버튼 — 가운데 정렬 */}
         <div className="flex justify-center gap-[20px] mt-[40px] mb-[60px]">
           {(data?.status === 'PENDING' || data?.status === 'PAID') && (
-  <button
-    type="button"
-    className="btn-3d btn-white w-[200px] px-4 py-2 text-center"
-    onClick={() => {
-    if (!confirm('주문을 취소하시겠습니까?')) return;
-    mChange.mutate('CANCELLED'); // 훅 선언(X) / 인스턴스 사용(O)
-  }}
-  >
-    주문취소
-  </button>
-)}
+            <button
+              type="button"
+              className="btn-3d btn-white w-[200px] px-4 py-2 text-center"
+              onClick={() => {
+                if (!confirm('주문을 취소하시겠습니까?')) return;
+                mChange.mutate('CANCELLED'); // 훅 선언(X) / 인스턴스 사용(O)
+              }}
+            >
+              주문취소
+            </button>
+          )}
 
           <Link href="/board/QNA" className="btn-3d btn-white w-[200px] px-4 py-2 text-center">
             문의하기
@@ -447,6 +454,10 @@ const trackMsg =
             /* 배송조회 카드 텍스트 커스텀 */
             --track-note-fs: 14px;
             --track-note-color: #6b7280;
+
+            /* (추가) 리뷰 안내문 스타일 변수 */
+            --review-note-fs: 14px;
+            --review-note-color: #374151;
           }
 
           /* 버튼(3D) */
@@ -554,9 +565,19 @@ const trackMsg =
             box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset;
           }
 
-
-
-
+          /* (추가) 구매확정 후 리뷰 안내 */
+          .review-note {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: var(--review-note-fs);
+            color: var(--review-note-color);
+          }
+          .review-note svg {
+            width: 1em;
+            height: 1em;
+            fill: currentColor;
+          }
         `}</style>
       </main>
     </RequireLogin>
