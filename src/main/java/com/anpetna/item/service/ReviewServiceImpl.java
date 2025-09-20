@@ -181,6 +181,21 @@ public class ReviewServiceImpl implements ReviewService {
         found.setItemId(originalItem);
         found.setMemberId(originalMember);
 
+        // =========================
+        // ★ 추가: 이미지 삭제 플래그 처리
+        //  - 프론트가 removeImage=true 를 보내고, 새 파일 업로드(image)가 없을 때
+        //    기존 이미지를 삭제(물리 파일 삭제 시도 후 연관 해제)합니다.
+        // =========================
+        boolean wantRemove = Boolean.TRUE.equals(req.getRemoveImage()); // ★ 추가
+        if (wantRemove && (image == null || image.isEmpty())) {         // ★ 추가
+            if (found.getImage() != null && found.getImage().getUrl() != null) { // ★ 추가
+                try {                                                    // ★ 추가
+                    localStorage.deleteFile(found.getImage().getUrl());  // ★ 추가 (물리 파일 정리 시도)
+                } catch (Exception ignore) {}                            // ★ 추가
+            }                                                            // ★ 추가
+            found.setImage(null);                                        // ★ 추가 (연관 해제 → orphanRemoval이면 DB row도 제거)
+        }                                                                // ★ 추가
+
         if (image != null && !image.isEmpty()) {
             try {
                 // 1) 기존 물리 파일 삭제
@@ -209,8 +224,6 @@ public class ReviewServiceImpl implements ReviewService {
             }
         }
 
-
-
         // 7) 저장
         ReviewEntity saved = reviewRepository.save(found);
 
@@ -218,6 +231,7 @@ public class ReviewServiceImpl implements ReviewService {
         ModifyReviewRes res = modelMapper.map(saved, ModifyReviewRes.class);
         return res.modified();
     }
+
 
     @Override
     @Transactional

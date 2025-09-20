@@ -61,12 +61,19 @@ public class ReviewController {
     }
 
 
-    @DeleteMapping
+    @DeleteMapping("/{reviewId}")
     @PreAuthorize("isAuthenticated()")
-    public ApiResult<DeleteReviewRes> deleteReview(@PathVariable Long itemId, @RequestBody DeleteReviewReq req) {
+    public ApiResult<DeleteReviewRes> deleteReview(
+            @PathVariable Long itemId,
+            @PathVariable Long reviewId
+    ) {
+        DeleteReviewReq req = new DeleteReviewReq();
+        req.setReviewId(reviewId);
         var deleteResult = reviewService.deleteReview(itemId, req);
         return new ApiResult<>(deleteResult);
     }
+
+
 
     @GetMapping("/{reviewId}")
     public ApiResult<SearchOneReviewRes> searchOneReview(@PathVariable Long reviewId, @PathVariable String itemId) {
