@@ -108,15 +108,15 @@ export default function Header() {
 
   // 드롭다운
   const [myOpen, setMyOpen] = useState(false);
-  const [sysOpen, setSysOpen] = useState(false);
+  const [sysOpen, setSysOpen] = useState(false);     // ※ SYSTEM UI는 제거하지만 원본 흐름 보존을 위해 상태 자체는 유지
   const myRef = useRef<HTMLDivElement | null>(null);
-  const sysRef = useRef<HTMLDivElement | null>(null);
+  const sysRef = useRef<HTMLDivElement | null>(null); // ※ 동일
 
   useEffect(() => {
     const onDocClick = (e: MouseEvent) => {
       const t = e.target as Node;
       if (myRef.current && !myRef.current.contains(t)) setMyOpen(false);
-      if (sysRef.current && !sysRef.current.contains(t)) setSysOpen(false);
+      if (sysRef.current && !sysRef.current.contains(t)) setSysOpen(false); // 사용처 유지(문제 없음)
     };
     document.addEventListener('click', onDocClick);
     return () => document.removeEventListener('click', onDocClick);
@@ -156,7 +156,7 @@ export default function Header() {
 
     const token = getTokenFromStorage();
 
-    // ✅ 이미 ADMIN이면 서버 확인 생략 (여기서 끝내면 콘솔의 401 반복 로그가 사라짐)
+    // ✅ 이미 ADMIN이면 서버 확인 생략
     const isAdminByJwt = token ? payloadHasAdmin(decodeJwt(token)) : false;
     const stored = (typeof window !== 'undefined' && localStorage.getItem('memberRole')) || '';
     const up = stored.toUpperCase();
@@ -167,7 +167,7 @@ export default function Header() {
       return;
     }
 
-    // 토큰이 없으면 서버조회 스킵 (httpOnly 쿠키 환경 고려)
+    // 토큰이 없으면 서버조회 스킵
     if (!token) {
       if (stored) {
         setAuthed(true);
@@ -179,7 +179,7 @@ export default function Header() {
       return;
     }
 
-    // 토큰이 있을 때만 서버로 최종 확인 (USER/BLACKLIST 구분용)
+    // 토큰이 있을 때만 서버로 최종 확인
     const id =
       (typeof window !== 'undefined' && (localStorage.getItem('memberId') || localStorage.getItem('loginId'))) || '';
     if (!id) return;
@@ -189,14 +189,13 @@ export default function Header() {
       (typeof window !== 'undefined' ? window.location.origin.replace(':3000', ':8000') : '');
 
     const candidates = [
-      `/member/my_page/${encodeURIComponent(id)}`, // ✅ USER 가능
-      `/member/readOne/${encodeURIComponent(id)}`, // 보조
+      `/member/my_page/${encodeURIComponent(id)}`,
+      `/member/readOne/${encodeURIComponent(id)}`,
     ];
 
     for (const p of candidates) {
       try {
         const r = await fetch(new URL(p, base), { credentials: 'include', headers: authHeaders() });
-        // 401/403이어도 로컬 로그인 상태는 유지 (로그만 안 남게 그냥 반환)
         if (r.status === 401 || r.status === 403) {
           return;
         }
@@ -223,7 +222,7 @@ export default function Header() {
     }
   }
 
-  // 공용 동기화 헬퍼 (커스텀 이벤트/스토리지/포커스에서 공통 사용)
+  // 공용 동기화 헬퍼
   const syncAuth = () => {
     evaluateAuthFromLocal();
     void verifyRoleFromServerIfNeeded();
@@ -255,51 +254,46 @@ export default function Header() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-async function handleLogout() {
-  const base =
-    process.env.NEXT_PUBLIC_API_BASE ||
-    (typeof window !== 'undefined'
-      ? window.location.origin.replace(':3000', ':8000')
-      : '');
+  async function handleLogout() {
+    const base =
+      process.env.NEXT_PUBLIC_API_BASE ||
+      (typeof window !== 'undefined'
+        ? window.location.origin.replace(':3000', ':8000')
+        : '');
 
-  // 서버 세션/토큰 정리: 실패해도 넘어가도록 allSettled
-  try {
-    await Promise.allSettled([
-      fetch(new URL('/jwt/logout', base), {
-        method: 'POST',
-        credentials: 'include',
-        headers: authHeaders(),
-      }),
-      fetch(new URL('/member/logout', base), {
-        method: 'POST',
-        credentials: 'include',
-        headers: authHeaders(),
-      }),
-    ]);
-  } catch {}
+    // 서버 세션/토큰 정리: 실패해도 넘어가도록 allSettled
+    try {
+      await Promise.allSettled([
+        fetch(new URL('/jwt/logout', base), {
+          method: 'POST',
+          credentials: 'include',
+          headers: authHeaders(),
+        }),
+        fetch(new URL('/member/logout', base), {
+          method: 'POST',
+          credentials: 'include',
+          headers: authHeaders(),
+        }),
+      ]);
+    } catch {}
 
-  // 로컬 인증 흔적 정리 + 헤더 상태 반영
-  clearLocalAuth();
-  setMyOpen(false);
-  setSysOpen(false);
-  setAuthed(false);
-  setAdmin(false);
+    // 로컬 인증 흔적 정리 + 헤더 상태 반영
+    clearLocalAuth();
+    setMyOpen(false);
+    setSysOpen(false);
+    setAuthed(false);
+    setAdmin(false);
 
-  // 다른 탭/컴포넌트 동기화 (이미 리스너 있음)
-  try { window.dispatchEvent(new Event('auth-changed')); } catch {}
+    try { window.dispatchEvent(new Event('auth-changed')); } catch {}
 
-  // 홈으로 이동 → 메인 화면 노출 보장
-  // 1) 라우터로 즉시 이동
-  router.replace('/');
-
-  // 2) 혹시 잔여 클라이언트 상태가 남아있을 수 있으니, 아주 짧게 지연 후 하드 내비로 확실히 정리
-  setTimeout(() => {
-    if (typeof window !== 'undefined') {
-      window.scrollTo(0, 0);
-      window.location.replace('/'); // 메인으로 완전 이동
-    }
-  }, 50);
-}
+    router.replace('/');
+    setTimeout(() => {
+      if (typeof window !== 'undefined') {
+        window.scrollTo(0, 0);
+        window.location.replace('/');
+      }
+    }, 50);
+  }
 
   const helpActive =
     pathname === '/board/FAQ' ||
@@ -315,45 +309,29 @@ async function handleLogout() {
         <nav className="apn-auth">
           {!authed ? (
             <>
+              {/* 비로그인: JOIN | LOGIN */}
               <Link href="/member/signup">JOIN</Link>
               <span className="sep">|</span>
               <Link href="/member/login">LOGIN</Link>
             </>
+          ) : admin ? (
+            <>
+              {/* 관리자: MYPAGE(단일 링크 → INFO) | USER | SALES | INV | LOGOUT */}
+              <Link href="/member/info" className="btn-link">MYPAGE</Link>
+              <span className="sep">|</span>
+              <Link href="#" className="btn-link">USER</Link>
+              <span className="sep">|</span>
+              <Link href="#" className="btn-link">SALES</Link>
+              <span className="sep">|</span>
+              <Link href="#" className="btn-link">INV</Link>
+              <span className="sep">|</span>
+              <button type="button" className="btn-link" onClick={handleLogout}>
+                LOGOUT
+              </button>
+            </>
           ) : (
             <>
-              {admin && (
-                <>
-                  <div
-                    className="dropdown"
-                    ref={sysRef}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setSysOpen((v) => !v);
-                      setMyOpen(false);
-                    }}
-                  >
-                    <button type="button" className="btn-link" aria-haspopup="true" aria-expanded={sysOpen ? 'true' : 'false'}>
-                      SYSTEM
-                    </button>
-                    {sysOpen && (
-                      <div className="dropdown-menu" role="menu" aria-label="System submenu">
-                        <a href="#" className="dropdown-item" role="menuitem" onClick={(e) => { e.preventDefault(); setSysOpen(false); }}>
-                          USER
-                        </a>
-                        <a href="#" className="dropdown-item" role="menuitem" onClick={(e) => { e.preventDefault(); setSysOpen(false); }}>
-                          SALES
-                        </a>
-                        <a href="#" className="dropdown-item" role="menuitem" onClick={(e) => { e.preventDefault(); setSysOpen(false); }}>
-                          INV
-                        </a>
-                      </div>
-                    )}
-                  </div>
-                  <span className="sep">|</span>
-                </>
-              )}
-
+              {/* 일반 사용자: MYPAGE(드롭: INFO, ORDER, DEL) | CART | LOGOUT */}
               <div
                 className="dropdown"
                 ref={myRef}
@@ -361,7 +339,6 @@ async function handleLogout() {
                   e.preventDefault();
                   e.stopPropagation();
                   setMyOpen((v) => !v);
-                  setSysOpen(false);
                 }}
               >
                 <button type="button" className="btn-link" aria-haspopup="true" aria-expanded={myOpen ? 'true' : 'false'}>
@@ -383,7 +360,7 @@ async function handleLogout() {
               </div>
 
               <span className="sep">|</span>
-              <Link href="/cart">CART</Link>
+              <Link href="/cart" className="btn-link">CART</Link>
               <span className="sep">|</span>
               <button type="button" className="btn-link" onClick={handleLogout}>
                 LOGOUT

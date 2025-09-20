@@ -6,17 +6,18 @@
 :root {
   --apn-container: 1300px;   /* 본문 최대 너비 */
   --apn-logo-height: 200px;  /* 헤더 로고 높이 */
+  --apn-header-divider-color: #D9D9D9; /* (1) 헤더 하단 구분선 색 */
 }
 
 html, body { 
   margin: 0; 
   padding: 0; 
   font-family:
-    "Noto Sans KR",            /* 한글 */
-    "Prompt",                  /* 영문/숫자(1순위) */
-    "Chiron Hei HK",           /* 영문/숫자(2순위) */
-    "Apple SD Gothic Neo",     /* macOS 한글 폴백 */
-    "Malgun Gothic",           /* Windows 한글 폴백 */
+    "Noto Sans KR",            
+    "Prompt",                  
+    "Chiron Hei HK",           
+    "Apple SD Gothic Neo",     
+    "Malgun Gothic",           
     system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   font-weight: 400;
 }
@@ -54,7 +55,6 @@ p  { font-weight: 400; }
 .apn-auth .btn-link { background: none; border: 0; padding: 0; color: #333; cursor: pointer; font: inherit; }
 .apn-auth .btn-link:hover { text-decoration: underline; }
 
-
 /* 중앙 로고 */
 .apn-logo{
   display:flex; justify-content:center; align-items:center;
@@ -77,19 +77,47 @@ p  { font-weight: 400; }
   font-weight:800; letter-spacing:1px; text-decoration:none;
   box-shadow: 0 1px 0 rgba(0,0,0,0.08);
 }
+
+/* (2) 메뉴 탭 동일 폭 + 동일 높이(링크/버튼 혼재 보정) */
+.apn-header .apn-nav .pill {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:92px;
+  height:32px;       /* 세로 높이 고정 */
+  padding:0 14px;    /* 상하 0으로 맞춤 */
+  box-sizing:border-box;
+}
+
 .pill:hover { filter:brightness(0.97); }
 .pill--active{ outline:2px solid #2d2d2d; outline-offset:2px; }
 
-/* 색상(순서/클래스 둘 다 지원) */
-.apn-nav .pill:nth-child(1), .pill--notice { background:#fff1f1; } /* NOTICE */
-.apn-nav .pill:nth-child(2), .pill--store  { background:#fff8cc; } /* STORE  */
-.apn-nav .pill:nth-child(3), .pill--board  { background:#eaf2ff; } /* BOARD  */
-.apn-nav .pill:nth-child(4), .pill--help   { background:#ffeacc; } /* HELP   */
+/* 색상(순서/클래스 둘 다 지원) — 직자식/중첩 모두 지원 */
+.apn-nav > a:nth-child(1).pill,
+.apn-nav > :nth-child(1) .pill,
+.pill--notice { background:#fff1f1; } /* NOTICE */
 
-/* 얇은 하단 구분선 */
-.apn-divider { height:1px; background:#000000; }
+.apn-nav > a:nth-child(2).pill,
+.apn-nav > :nth-child(2) .pill,
+.pill--store  { background:#fff4e3; } /* STORE */
 
-/* HELP 드롭다운 */
+.apn-nav > a:nth-child(3).pill,
+.apn-nav > :nth-child(3) .pill,
+.pill--board  { background:#eaf2ff; } /* BOARD */
+
+.apn-nav > a:nth-child(4).pill,
+.apn-nav > :nth-child(4) .pill,
+.pill--help   { background:#fffce0; } /* HELP */
+
+/* (1) 얇은 하단 구분선 */
+.apn-divider { 
+  height:1px; 
+  margin-top: 15px;
+  margin-bottom: 20px;
+  background: #f5f5f5 !important;
+ }
+
+/* (3) 드롭다운 중앙 정렬 */
 .dropdown {
   position: relative;
   display: inline-block;
@@ -98,8 +126,9 @@ p  { font-weight: 400; }
 /* 기본은 숨김 */
 .dropdown-menu {
   position: absolute;
-  top: calc(100% - 1px);
-  left: 0;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
   min-width: 100px;
   padding: 8px 0;
   margin-top: 0px;
@@ -118,7 +147,6 @@ p  { font-weight: 400; }
   display: block;
 }
 
-
 /* 드롭다운 개별 항목 */
 .dropdown-item {
   display: block;
@@ -127,10 +155,8 @@ p  { font-weight: 400; }
   font-weight: 600;
   line-height: 1;
   white-space: nowrap;
-
-  /* 추가 */
-  text-align: center;   /* 오른쪽 정렬 */
-  color: #111;         /* 검정 글씨 */
+  text-align: center;
+  color: #111;
 }
 
 .dropdown-item:hover {
@@ -141,18 +167,11 @@ p  { font-weight: 400; }
 .dropdown::after {
   content: "";
   position: absolute;
-  top: 100%;   /* 트리거 바로 아래 */
+  top: 100%;   
   left: 0;
   right: 0;
-  height: 8px; /* 커서가 지나갈 완충 영역 */
-  /* 배경/테두리 없음: 눈에는 안 보임 */
+  height: 8px;
 }
-
-
-
-
-
-
 
 /* ================= Main ================= */
 .apn-main { min-height:30vh; padding:24px 24px 8px; }
@@ -160,27 +179,27 @@ p  { font-weight: 400; }
 .apn-home { padding:50px 0; text-align:center; color:rgb(0, 0, 0); }
 .apn-home h1 { font-size:32px; margin-bottom:12px; }
 
-
 /* ================= Footer ================= */
 .apn-footer{
   position:relative; overflow:hidden;
   background:#2e2e2e; color:#eee; padding:28px 0;
+  min-width:1200px; /* (7) 최소 폭 고정 */
 }
 
 /* 전체 워터마크/배경 비활성 */
 .apn-footer::before{ display:none !important; }
 
-/* 좌/우 영역: 왼쪽 유동, 오른쪽 고정폭(시안 기준) */
+/* 좌/우 영역 */
 .apn3-row{
   display:grid;
-  grid-template-columns: minmax(0,1fr) 850px; /* ← 필요 시 500~540px 조정 */
+  grid-template-columns: minmax(0,1fr) 850px; 
   gap:22px;
   align-items:flex-start;
 }
 
 /* 왼쪽 정보 영역 */
 .apn3-left{ padding:18px 18px; }
-.apn3-left::before{ display:none !important; } /* 과거 워터마크 완전 제거 */
+.apn3-left::before{ display:none !important; }
 .apn3-company p{ margin:4px 0; color:#e2e2e2; line-height:1.58; letter-spacing:.2px; }
 .apn3-copy p   { margin:6px 0; color:#cfcfcf; }
 
@@ -194,28 +213,34 @@ p  { font-weight: 400; }
   box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
 }
 
-/* ===== 시안 레이아웃: 그림(좌) + 텍스트(우) 2컬럼 ===== */
+/* 시안 레이아웃: 그림 + 텍스트 */
 .apn3-panel--grid{
   display:grid;
-  grid-template-columns: 360px 1fr;  /* ← 그림 폭 */
-  gap:14px;                          /* 간격 줄여 세로 길이 ↓ */
-  align-items:stretch;                   /* 그림 하단 정렬 */
+  grid-template-columns: 360px 1fr;
+  gap:14px;
+  align-items:stretch;
 }
 
-/* 제목은 전체폭 */
+/* 제목 */
 .apn3-heading{
   grid-column: 1 / -1;
   margin:0 0 6px;
 }
 
 /* 왼쪽 그림 */
-.apn3-illust{                    /* 그림 열을 행 높이만큼 늘리고 */
+.apn3-illust{
   align-self: stretch;
-  display: flex;                 /* 그 안에서 세로 중앙 정렬 */
+  display: flex;
   align-items: center;
-  justify-content: center;       /* 가로도 중앙(원하면 제거) */
+  justify-content: center;
 }
-.apn3-illust img{ display:block; width:260px; height:auto; }
+/* (7) 이미지 크기 고정 */
+.apn3-illust img{ 
+  display:block; 
+  width:260px !important; 
+  height:auto !important; 
+  max-width:none !important; 
+}
 
 /* 오른쪽 텍스트 */
 .apn3-team{ align-self: start; }
@@ -223,11 +248,14 @@ p  { font-weight: 400; }
 .apn3-team li{ margin:2px 0; color:#f0f0f0; }
 .apn3-note{ margin-top:4px; color:#bbb; font-style:italic; }
 
-/* === 과거 워터마크/스플릿 잔재 완전 무력화(충돌 방지) === */
+/* === 과거 잔재 제거 (문법 오류 수정됨) === */
 .apn3-panel--with-art,
 .apn3-panel--with-art::after,
-.apn3-art, .apn3-art img,
-.apn3-panel--split { display:none !important; }
+.apn3-art,
+.apn3-art img,
+.apn3-panel--split {
+  display: none !important;
+}
 
 /* ================= Responsive ================= */
 @media (max-width: 1100px){
@@ -245,15 +273,12 @@ p  { font-weight: 400; }
   .apn3-illust img{ width:220px; }
 }
 
-/* 리스트 안쪽에 붙는 남는 아이콘/불릿/밑줄 전부 제거(이 프로젝트 스코프에서만) */
-/* 리스트 내부 기본 링크/아이콘 스타일 무력화 */
+/* 리스트/링크 스타일 초기화 */
 .board-box a { color:#111 !important; text-decoration:none !important; }
 .board-box li::marker { content:'' !important; }
 .board-box li::before, .board-box a::before { content:none !important; }
 
-
-
-/* 3D 버튼 공통 (크기 바꾸고 싶으면 height / padding / font-size 수정) */
+/* 3D 버튼 공통 */
 .btn-3d{
   display:inline-flex;align-items:center;justify-content:center;
   height:36px;padding:0 12px;font-size:.875rem;border-radius:.375rem;
@@ -264,21 +289,18 @@ p  { font-weight: 400; }
 .btn-3d:active{ transform: translateY(1px); }
 .btn-white{ background:#fff; border-color:#E5E7EB; color:#111; }
 
-
-
-/* 테이블 안 링크 기본 스타일(파란색/밑줄 방지) */
+/* 테이블 안 링크 */
 .board-box a { color:#111; text-decoration:none; }
 
-/* 검색바 전용 스코프 */
+/* 검색바 */
 .search-bar .search-input{
-  border: 1px solid #E5E7EB !important; /* gray-200 */
+  border: 1px solid #E5E7EB !important;
   outline: none !important;
   box-shadow: none !important;
 }
 .search-bar .search-input:focus{
-  border-color: #D1D5DB !important;      /* gray-300 */
+  border-color: #D1D5DB !important;
 }
-
 
 .auth-wall{
   padding: 32px 16px;
@@ -325,7 +347,6 @@ p  { font-weight: 400; }
 
 .faq-bottom { display: flex; justify-content: flex-end; max-width: 820px; margin: 8px auto 36px; }
 
-
 /* FAQ/QNA 버튼 링크 밑줄 제거 */
 a.btn-3d,
 a.btn-3d:link,
@@ -339,3 +360,19 @@ a.faq-ask:hover,
 a.faq-ask:focus {
   text-decoration: none;
 }
+
+/* ================= Footer 고정형 보강 ================= */
+/* 회사 정보/저작권/정책 링크 줄바꿈 금지 */
+.apn3-company p,
+.apn3-copy p,
+.apn3-team li,
+.apn3-team a { white-space: nowrap; }
+
+/* 작은 화면에서도 2컬럼/이미지 크기 그대로 유지(반응형 무력화) */
+@media (max-width: 1100px), (max-width: 860px), (max-width: 768px) {
+  .apn3-row{ grid-template-columns: minmax(0,1fr) 850px !important; }
+  .apn3-panel--grid{ grid-template-columns: 360px 1fr !important; }
+  .apn3-illust{ justify-self: initial !important; }
+  .apn3-illust img{ width:260px !important; height:auto !important; max-width:none !important; }
+}
+
