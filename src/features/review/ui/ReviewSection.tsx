@@ -1,4 +1,3 @@
-// src/features/review/ui/ReviewSection.tsx
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -41,7 +40,7 @@ function authHeaders(init?: Record<string, string>, jsonAccept = true): Record<s
   return headers;
 }
 
-/** PageResponseDTO 정규화 (백엔드 값에 맞춤, end/boolean 사용 금지) */
+/** PageResponseDTO 정규화 */
 type ReviewRow = {
   reviewId?: number;
   memberId?: string | number;
@@ -56,21 +55,17 @@ type ReviewRow = {
   [k: string]: any;
 };
 type ReviewPage = {
-  totalElements: number; // 총 개수(백엔드 값 사용)
-  totalPages: number;    // 총 페이지(백엔드 값 사용)
-  pageNumber: number;    // 현재 페이지(1-base로 맞춤)
-  pageSize: number;      // 페이지 사이즈
+  totalElements: number;
+  totalPages: number;
+  pageNumber: number;
+  pageSize: number;
   content: ReviewRow[];
 };
 function normalizePage(raw: any) {
   const base = raw?.result ?? raw?.data?.result ?? raw?.data ?? raw;
-
   const dtoList = base?.dtoList ?? base?.content ?? base?.list ?? [];
-
   const sizeNum = Number(base?.size ?? base?.pageSize ?? 10) || 10;
   const totalNum = Number(base?.total ?? base?.totalElements ?? dtoList.length) || 0;
-
-  // 백엔드 page는 0-base 가능 → 1-base로 보정
   let pageNumber = Number(base?.pageNumber ?? base?.page ?? base?.number ?? 1);
   pageNumber = Number.isFinite(pageNumber) ? pageNumber : 1;
   if (pageNumber <= 0) pageNumber = pageNumber + 1;
@@ -80,7 +75,7 @@ function normalizePage(raw: any) {
 
   return {
     totalElements: totalNum,
-    totalPages: Math.max(1, Math.ceil(totalNum / Math.max(1, sizeNum))),
+    totalPages: Math.max(1, Math.ceil(totalNum / Math.max(1, sizeNum)) ),
     pageNumber,
     pageSize: sizeNum,
     content: Array.isArray(dtoList) ? dtoList : [],
@@ -93,7 +88,6 @@ function normalizePage(raw: any) {
 type SortOrder = 'rating' | 'date';
 type SortDirection = 'ASCENDING' | 'DESCENDING';
 type CombinedSort = 'date,desc' | 'date,asc' | 'rating,desc' | 'rating,asc';
-
 const SORTS: ReadonlyArray<{ label: string; value: CombinedSort }> = [
   { label: '최신순', value: 'date,desc' },
   { label: '등록일순', value: 'date,asc' },
@@ -196,7 +190,6 @@ export default function ReviewSection({ itemId }: { itemId: number }) {
     return () => { alive = false; };
   }, [base, itemId, query]);
 
-  const totalPages = data?.totalPages ?? 1;
   const list = data?.content ?? [];
 
   /* =========================
@@ -205,6 +198,7 @@ export default function ReviewSection({ itemId }: { itemId: number }) {
   const [canWrite, setCanWrite] = useState(false);
   const [targetOrdersId, setTargetOrdersId] = useState<number | null>(null);
 
+  // 주문 기준으로 등록 가능 여부 계산
   useEffect(() => {
     let stop = false;
     (async () => {
@@ -239,6 +233,13 @@ export default function ReviewSection({ itemId }: { itemId: number }) {
     return () => { stop = true; };
   }, [myId, itemId, base]);
 
+  // 이미 내가 쓴 리뷰가 목록에 있으면 버튼 숨김
+  useEffect(() => {
+    if (!myId || !list.length) return;
+    const mineExists = list.some((r) => String(r.memberId ?? r.writer ?? '') === String(myId));
+    if (mineExists) setCanWrite(false);
+  }, [list, myId]);
+
   /* =========================
      ▶ 리뷰 등록 폼 (모달)
      ========================= */
@@ -259,12 +260,7 @@ export default function ReviewSection({ itemId }: { itemId: number }) {
   function onPickFile(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0] ?? null;
     setFile(f || null);
-    if (f) {
-      const url = URL.createObjectURL(f);
-      setPreview(url);
-    } else {
-      setPreview('');
-    }
+    setPreview(f ? URL.createObjectURL(f) : '');
   }
   async function onSubmitReview(e: React.FormEvent) {
     e.preventDefault();
@@ -286,10 +282,120 @@ export default function ReviewSection({ itemId }: { itemId: number }) {
 
       closeForm();
       setPage(1);
+      setCanWrite(false);
     } catch (e: any) {
       alert(e?.message || '리뷰 등록에 실패했습니다.');
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  /* =========================
+     ▶ 리뷰 수정 폼 (모달) — 평점/사진/본문 모두 수정 + 이미지 삭제 가능
+     ========================= */
+  const [editOpen, setEditOpen] = useState(false);
+  const [editId, setEditId] = useState<number | null>(null);
+  const [editRating, setEditRating] = useState(5);
+  const [editContent, setEditContent] = useState('');
+  const [editFile, setEditFile] = useState<File | null>(null);
+  const [editPreview, setEditPreview] = useState<string>('');
+  const [editRemoveImage, setEditRemoveImage] = useState<boolean>(false); // 이미지 삭제 플래그
+  const [editing, setEditing] = useState(false);
+
+  function openEditModal(row: ReviewRow) {
+    const stars = Math.max(1, Math.min(5, Number(row.rating ?? 5)));
+    const text = (row.reviewContent ?? row.content ?? '').toString();
+    let img = row.imageUrl as string | undefined;
+    if (img) {
+      if (img.startsWith('/')) img = `${base}${img}`;
+      else if (!/^https?:\/\//i.test(img)) img = `${base}/${img.replace(/^\/+/, '')}`;
+    }
+    setEditId(Number(row.reviewId ?? 0));
+    setEditRating(stars);
+    setEditContent(text);
+    setEditFile(null);
+    setEditPreview(img || '');
+    setEditRemoveImage(false); // 열 때 항상 false
+    setEditOpen(true);
+  }
+  function closeEditModal() {
+    setEditOpen(false);
+    setEditId(null);
+    setEditRating(5);
+    setEditContent('');
+    setEditFile(null);
+    setEditPreview('');
+    setEditRemoveImage(false);
+  }
+  function onPickEditFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0] ?? null;
+    setEditFile(f || null);
+    setEditPreview(f ? URL.createObjectURL(f) : editPreview);
+    if (f) setEditRemoveImage(false); // 새 파일 선택 시 삭제 플래그 해제
+  }
+  // 이미지 삭제 버튼 동작
+  function onRemoveExistingImage() {
+    setEditFile(null);
+    setEditPreview('');        // 미리보기 제거
+    setEditRemoveImage(true);  // 삭제 플래그 ON
+  }
+
+  async function onSubmitEdit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editId) return;
+    setEditing(true);
+    try {
+      const fd = new FormData();
+
+      // ✅ 백엔드에 reviewId 포함(+ 이미지 삭제 플래그 같이 보냄)
+      const payload: any = {
+        reviewId: Number(editId),
+        content: editContent,
+        rating: editRating,
+      };
+      if (editRemoveImage) {
+        payload.removeImage = true; // ← 삭제 의사 (백엔드 반영 필요)
+      }
+      fd.append('json', new Blob([JSON.stringify(payload)], { type: 'application/json' }));
+
+      // 새 이미지를 올리는 경우에만 image 파트 포함
+      if (editFile) fd.append('image', editFile);
+
+      const resp = await fetch(`${base}/item/${itemId}/review/${editId}`, {
+        method: 'PUT',
+        headers: authHeaders({}, false), // Accept만
+        body: fd,
+        credentials: 'include',
+      });
+      const j = await resp.clone().json().catch(() => null as any);
+      if (!resp.ok) throw new Error(j?.message || j?.resMessage || `수정 실패 (${resp.status})`);
+
+      closeEditModal();
+      setPage(1);
+    } catch (e: any) {
+      alert(e?.message || '수정에 실패했습니다.');
+    } finally {
+      setEditing(false);
+    }
+  }
+
+  // 삭제 (기존 로직 유지)
+  async function onDelete(reviewId: number) {
+    if (!reviewId) return;
+    if (!confirm('이 리뷰를 삭제하시겠습니까?')) return;
+    try {
+      const resp = await fetch(`${base}/item/${itemId}/review/${reviewId}`, {
+        method: 'DELETE',
+        headers: authHeaders(),
+        credentials: 'include',
+      });
+      if (!resp.ok) {
+        const j = await resp.clone().json().catch(() => null as any);
+        throw new Error(j?.message || j?.resMessage || `삭제 실패 (${resp.status})`);
+      }
+      setPage(1);
+    } catch (e: any) {
+      alert(e?.message || '삭제에 실패했습니다.');
     }
   }
 
@@ -364,17 +470,35 @@ export default function ReviewSection({ itemId }: { itemId: number }) {
             const stars = Math.max(1, Math.min(5, Number(row.rating ?? 5)));
             const text = (row.reviewContent ?? row.content ?? '').toString();
 
+            // 이미지 URL 정규화
             let img = row.imageUrl as string | undefined;
             if (img) {
               if (img.startsWith('/')) img = `${base}${img}`;
               else if (!/^https?:\/\//i.test(img)) img = `${base}/${img.replace(/^\/+/, '')}`;
             }
 
-            return (
-              <li key={id} className="apn-card p-4 mb-3">
-                <div className="writer">{writer}</div>
+            const isOwner = myId && (String(row.memberId ?? row.writer ?? '') === String(myId));
+            const hasImg = !!img;
 
-                {/* 평점(리스트) */}
+            return (
+              <li key={id} className={`apn-card p-4 mb-3 ${!hasImg ? 'rv-textonly' : ''}`}>
+                {/* ── 카드 상단: 작성자(좌) + 액션(우) ── */}
+                <div className="rv-toprow">
+                  <div className="writer">{writer}</div>
+                  <div className="rv-actions-top mt-[10px] mr-[10px]">
+                    {isOwner && (
+                      <>
+                        <button className="btn" onClick={() => openEditModal(row)}>수정</button>
+                        <button className="btn" onClick={() => onDelete(id)}>삭제</button>
+                      </>
+                    )}
+                    {!isOwner && isAdmin && (
+                      <button className="btn" onClick={() => onDelete(id)}>삭제</button>
+                    )}
+                  </div>
+                </div>
+
+                {/* 평점 + 날짜 */}
                 <div className="meta-row">
                   <div className="rating-badge">
                     {Array.from({ length: 5 }, (_, i) => (
@@ -390,18 +514,22 @@ export default function ReviewSection({ itemId }: { itemId: number }) {
                   <div className="date">{when}</div>
                 </div>
 
-                <div className="grid grid-cols-[130px_1fr] gap-4 mt-2">
-                  <div>
-                    {img ? (
+                {/* (3) 사진 없는 리뷰: 왼쪽 칼럼 제거 */}
+                <div
+                  className="grid gap-4 mt-2"
+                  style={{ gridTemplateColumns: hasImg ? '130px 1fr' : '1fr' }}
+                >
+                  {hasImg ? (
+                    <div>
                       <a href={img} target="_blank" rel="noopener noreferrer" title="원본 보기">
-                        <img src={img} alt="리뷰 이미지" className="review-img" width={130} height={170} />
+                        <img src={img!} alt="리뷰 이미지" className="review-img" width={130} height={170} />
                       </a>
-                    ) : (
-                      <div className="review-img review-img--empty" />
-                    )}
-                  </div>
+                    </div>
+                  ) : null}
                   <div>
-                    <p className="review-content whitespace-pre-wrap leading-6">{text}</p>
+                    <p className={`review-content whitespace-pre-wrap leading-6 ${!hasImg ? 'rv-textonly__content' : ''}`}>
+                      {text}
+                    </p>
                   </div>
                 </div>
               </li>
@@ -410,29 +538,20 @@ export default function ReviewSection({ itemId }: { itemId: number }) {
         </ul>
       )}
 
+      {/* (1) 페이지네이션: 1개만 표시 + "버튼 자체" 흰바탕/회색테두리/3D 느낌 */}
       {(data && (data.totalPages > 1 || (data as any).prev || (data as any).next)) ? (
-        <Pagination
-          className="mt-6"
-          current={page}
-          total={data.totalElements}
-          size={size}
-          onPage={(p) => setPage(p)}
-        />
-      ) : null}
-
-      {totalPages > 1 && (
-        <div className="mt-3 flex items-center gap-2">
-          <button type="button" className="btn" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
-            이전
-          </button>
-          <span className="text-sm">
-            {page} / {totalPages}
-          </span>
-          <button type="button" className="btn" disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
-            다음
-          </button>
+        <div className="rv-paging-wrap">
+          <div className="rv-paging">
+            <Pagination
+              className="rv-paging__inner"
+              current={page}
+              total={data.totalElements}
+              size={size}
+              onPage={(p) => setPage(p)}
+            />
+          </div>
         </div>
-      )}
+      ) : null}
 
       {/* ▶ 리뷰 작성 모달 */}
       {showForm && (
@@ -442,7 +561,6 @@ export default function ReviewSection({ itemId }: { itemId: number }) {
             <h4 className="rv-modal__title ml-[5px]"> New Review</h4>
 
             <form onSubmit={onSubmitReview}>
-              {/* 평점(모달) — 5개 전체를 하나의 둥근 테두리로 감쌈 */}
               <div className="rv-field">
                 <div className="rv-label mt-[30px] "> 원하는 점수까지 발바닥을 눌러 선택합니다</div>
                 <div className="rv-stars mt-[5px] ">
@@ -463,7 +581,6 @@ export default function ReviewSection({ itemId }: { itemId: number }) {
                 </div>
               </div>
 
-              {/* 사진첨부 + 미리보기 */}
               <div className="rv-field">
                 <div className="rv-label  mt-[25px] ">사진</div>
                 <input className="rv-file mt-[5px]" type="file" accept="image/*" onChange={onPickFile} />
@@ -474,7 +591,6 @@ export default function ReviewSection({ itemId }: { itemId: number }) {
                 )}
               </div>
 
-              {/* 내용 */}
               <div className="rv-field">
                 <div className="rv-label mt-[35px] ">내용</div>
                 <textarea
@@ -488,10 +604,78 @@ export default function ReviewSection({ itemId }: { itemId: number }) {
               </div>
 
               <div className="rv-actions mr-[50px]">
-                 <button type="submit" className="btn" disabled={submitting || !targetOrdersId}>
+                <button type="submit" className="btn" disabled={submitting || !targetOrdersId}>
                   {submitting ? '등록 중…' : '등록하기'}
                 </button>
                 <button type="button" className="btn" onClick={closeForm} disabled={submitting}>취소</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ▶ 리뷰 수정 모달 (평점/사진/본문 모두 수정 가능) */}
+      {editOpen && (
+        <div className="rv-modal">
+          <div className="rv-modal__backdrop" onClick={editing ? undefined : closeEditModal} />
+          <div className="rv-modal__panel apn-card">
+            <h4 className="rv-modal__title ml-[5px]"> Edit Review</h4>
+
+            <form onSubmit={onSubmitEdit}>
+              <div className="rv-field">
+                <div className="rv-label mt-[30px] ">원하는 점수까지 발바닥을 눌러 선택합니다</div>
+                <div className="rv-stars mt-[5px] ">
+                  {Array.from({ length: 5 }, (_, i) => {
+                    const filled = i < editRating;
+                    return (
+                      <button
+                        key={i}
+                        type="button"
+                        className={`paw-icon ${filled ? 'paw--filled' : 'paw--empty'}`}
+                        onClick={() => setEditRating(i + 1)}
+                        aria-label={`${i + 1}점`}
+                      >
+                        <Paw />
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="rv-field">
+                <div className="rv-label  mt-[25px] ">사진</div>
+                <input className="rv-file mt-[5px]" type="file" accept="image/*" onChange={onPickEditFile} />
+                {editPreview && (
+                  <div className="rv-preview ml-[10px]">
+                    <img src={editPreview} alt="현재/미리보기" />
+                  </div>
+                )}
+                {editPreview && (
+                  <div className="mt-[8px] ml-[10px]">
+                    <button type="button" className="btn" onClick={onRemoveExistingImage}>
+                      이미지 삭제
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div className="rv-field">
+                <div className="rv-label mt-[35px] ">내용</div>
+                <textarea
+                  className="rv-textarea mt-[7px] "
+                  value={editContent}
+                  onChange={(e) => setEditContent(e.target.value)}
+                  rows={5}
+                  placeholder="리뷰 내용을 입력하세요."
+                  required
+                />
+              </div>
+
+              <div className="rv-actions mr-[50px]">
+                <button type="submit" className="btn" disabled={editing || !editId}>
+                  {editing ? '수정 중…' : '수정하기'}
+                </button>
+                <button type="button" className="btn" onClick={closeEditModal} disabled={editing}>취소</button>
               </div>
             </form>
           </div>
@@ -522,6 +706,10 @@ export default function ReviewSection({ itemId }: { itemId: number }) {
     border-radius:16px;
     box-shadow:0 2px 0 rgba(0,0,0,0.06);
   }
+
+  /* ==== 카드 상단: 작성자(좌) + 액션(우측 정렬) ==== */
+  .rv-toprow { display:flex; align-items:center; justify-content:space-between; }
+  .rv-actions-top { display:flex; gap:8px; }
 
   /* ==== 작성자 영역 ==== */
   .writer {
@@ -601,55 +789,58 @@ export default function ReviewSection({ itemId }: { itemId: number }) {
     font-size:16px; color:#111827; line-height:1.5; letter-spacing:0.02em; margin-left:50px;
   }
 
+  /* ======== (A) 사진 없는 리뷰 전용 여백 ======== */
+  /*
+   * ▶ 사진 없이 등록된 리뷰의 여백은 아래 4곳에서 조절합니다.
+   *    숫자(px)만 바꾸면 됩니다.
+   */
+  .rv-textonly { padding-top: 0px; padding-bottom: 18px; }         /* 카드 상/하 패딩 */
+  .rv-textonly .writer { margin-left: 20px; }                        /* 작성자 좌측 들여쓰기 */
+  .rv-textonly .meta-row { margin-left: 20px; }                      /* 평점/날짜 좌측 들여쓰기 */
+  .rv-textonly__content { margin-left: 20px; padding-right: 16px; }  /* 본문 좌/우 여백 */
+
   /* ==== 리뷰 리스트(불릿 제거) ==== */
   .review-list { list-style:none; padding-left:0; margin:0; }
   .review-list > li { list-style:none; }
   .review-list > li::marker { content:''; }
 
   /* =========================================================
-     (모달) 반응형 제거 + 세부 조절용 CSS 변수
+     (모달) 조절용 CSS 변수
      ========================================================= */
   .rv-modal {
-    /* 모달 패널 크기 */
-    --rv-modal-width: 600px;     /* 가로 */
-    --rv-modal-height: 620px;    /* 세로 */
-    --rv-panel-padding: 16px;    /* 내부 여백 */
-    --rv-panel-margin-top: 80px; /* 화면 상단에서 떨어진 거리 */
+    --rv-modal-width: 600px;
+    --rv-modal-height: 620px;
+    --rv-panel-padding: 16px;
+    --rv-panel-margin-top: 80px;
 
-    /* 폰트 */
     --rv-title-size: 18px;
     --rv-label-size: 14px;
     --rv-body-font-size: 14px;
 
-    /* ===== 평점(5개 전체 필) ===== */
-    --rv-star-size: 24px;          /* 발바닥 아이콘 크기 */
-    --rv-stars-gap: 10px;          /* 아이콘 간격 */
-    --rv-stars-pad-y: 8px;         /* 필 상하 패딩 */
-    --rv-stars-pad-x: 14px;        /* 필 좌우 패딩 */
-    --rv-stars-border: #e5e7eb;    /* 필 테두리 색 */
-    --rv-stars-border-width: 1.5px;/* 필 테두리 두께 */
-    --rv-stars-bg: transparent;    /* 배경 제거(투명). 흰 배경 원하면 #fff */
+    --rv-star-size: 24px;
+    --rv-stars-gap: 10px;
+    --rv-stars-pad-y: 8px;
+    --rv-stars-pad-x: 14px;
+    --rv-stars-border: #e5e7eb;
+    --rv-stars-border-width: 1.5px;
+    --rv-stars-bg: transparent;
 
-    /* 파일 미리보기 (고정 크기) */
     --rv-preview-w: 220px;
     --rv-preview-h: 220px;
     --rv-preview-radius: 8px;
     --rv-preview-border: #e5e7eb;
 
-    /* 내용 입력 박스 (고정 크기) */
-    --rv-textarea-w: 520px;  /* % 대신 px로 고정해도 됩니다 */
+    --rv-textarea-w: 520px;
     --rv-textarea-h: 200px;
     --rv-textarea-radius: 8px;
     --rv-textarea-border: #e5e7eb;
     --rv-textarea-padding: 10px;
     --rv-textarea-resize: none;
 
-    /* 액션버튼 간격 */
     --rv-actions-gap: 8px;
     --rv-actions-top: 14px;
   }
 
-  /* 모달 루트/배경/패널 */
   .rv-modal { position: fixed; inset: 0; z-index: 50; }
   .rv-modal__backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.35); }
   .rv-modal__panel {
@@ -666,14 +857,13 @@ export default function ReviewSection({ itemId }: { itemId: number }) {
   .rv-field { margin: 10px 0; font-size: var(--rv-body-font-size); }
   .rv-label { font-size: var(--rv-label-size); font-weight:600; margin-bottom:6px; }
 
-  /* ===== 평점(모달) — 5개 전체를 하나의 둥근 필로 감싸기 ===== */
   .rv-stars {
     display: inline-flex;
     align-items: center;
     gap: var(--rv-stars-gap);
     padding: var(--rv-stars-pad-y) var(--rv-stars-pad-x);
     border: var(--rv-stars-border-width) solid var(--rv-stars-border);
-    border-radius: 9999px;          /* 완전 둥근 필 */
+    border-radius: 9999px;
     background: var(--rv-stars-bg);
     line-height: 1;
   }
@@ -684,7 +874,7 @@ export default function ReviewSection({ itemId }: { itemId: number }) {
     align-items: center;
     justify-content: center;
     background: transparent;
-    border: 0;            /* 개별 링 제거 */
+    border: 0;
     padding: 0;
     cursor: pointer;
   }
@@ -693,10 +883,7 @@ export default function ReviewSection({ itemId }: { itemId: number }) {
     height: var(--rv-star-size);
   }
 
-  /* 파일 인풋(기본 유지) */
   .rv-file { }
-
-  /* 미리보기 — 고정 크기 */
   .rv-preview img {
     width: var(--rv-preview-w);
     height: var(--rv-preview-h);
@@ -706,7 +893,6 @@ export default function ReviewSection({ itemId }: { itemId: number }) {
     margin-top: 8px;
   }
 
-  /* 텍스트영역 — 고정 크기 */
   .rv-textarea {
     width: var(--rv-textarea-w);
     height: var(--rv-textarea-h);
@@ -717,43 +903,72 @@ export default function ReviewSection({ itemId }: { itemId: number }) {
     font-size: var(--rv-body-font-size);
   }
 
-  /* 액션 버튼 영역 */
-  .rv-actions { 
-  display:flex; justify-content:flex-end; 
-  gap:var(--rv-actions-gap); 
-  margin-top:var(--rv-actions-top); }
+  .rv-actions {
+    display:flex; justify-content:flex-end;
+    gap:var(--rv-actions-gap);
+    margin-top:var(--rv-actions-top);
+  }
 
+  /* 모달 내부 컨텐트 가운데 폭 고정 */
+  .rv-modal { --rv-inner-width: 540px; }
+  .rv-modal__title,
+  .rv-modal__panel form,
+  .rv-actions {
+    width: var(--rv-inner-width);
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
 
-  /* ===== 모달 안 내용(타이틀 + 폼 + 버튼 영역)만 정확히 가운데 정렬 ===== */
+  /* ======== (B) 페이징 버튼 디자인 — 흰바탕/회색 테두리/3D 느낌 ======== */
+  .rv-paging-wrap { display:flex; justify-content:center; margin-top:24px; }
+  /* 래퍼 테두리/배경 제거 (버튼만 보이게) */
+  .rv-paging { background:transparent; border:0; padding:0; }
 
-/* 1) 모달 내부 컨텐트 고정폭(패널 600px, 패딩 16px*2 => 최대 568px 이하로 설정) */
-.rv-modal { 
-  --rv-inner-width: 540px; /* 필요하면 560~568px 사이에서 조절 */
-}
+  /* 공용 Pagination 내부 nav 정렬 */
+  .rv-paging :global(nav) { display:flex; align-items:center; gap:6px; }
 
-/* 2) 타이틀과 폼(내용 전체)을 같은 폭으로 잡고 좌우 auto로 가운데 배치 */
-.rv-modal__title,
-.rv-modal__panel form {
-  width: var(--rv-inner-width);
-  margin-left: auto !important;
-  margin-right: auto !important;
-}
+  /* 버튼/링크 기본 스타일: 흰 바탕 + 회색 테두리 + 3D */
+  .rv-paging :global(nav > *),
+  .rv-paging :global(button),
+  .rv-paging :global(a),
+  .rv-paging :global([role="button"]) {
+    background:#fff;
+    border:1px solid #e5e7eb;
+    border-radius:6px;
+    padding:4px 10px;
+    line-height:1.2;
+    box-shadow: 0 2px 0 rgba(0,0,0,0.06);
+    transition: transform .02s ease, box-shadow .02s ease, background .15s ease;
+    cursor:pointer;
+  }
+  .rv-paging :global(button:hover),
+  .rv-paging :global(a:hover),
+  .rv-paging :global([role="button"]:hover) {
+    background:#fafafa;
+  }
+  .rv-paging :global(button:active),
+  .rv-paging :global(a:active),
+  .rv-paging :global([role="button"]:active) {
+    transform: translateY(1px);
+    box-shadow: 0 1px 0 rgba(0,0,0,0.06);
+  }
+  .rv-paging :global(.active),
+  .rv-paging :global(.current),
+  .rv-paging :global([aria-current="page"]) {
+    font-weight:600;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.12);
+    background:#fff;
+  }
+  .rv-paging :global(.disabled),
+  .rv-paging :global([aria-disabled="true"]) {
+    opacity:.5;
+    cursor:not-allowed;
+    background:#f9fafb;
+    box-shadow:none;
+  }
+      `}</style>
 
-/* 3) 버튼 영역도 같은 폭으로 맞추고, 기존 flex-end 정렬은 유지(오른쪽 끝에 붙음) */
-.rv-actions {
-  width: var(--rv-inner-width);
-  margin-left: auto !important;
-  margin-right: auto !important;
-}
-
-/* 4) 네가 넣어둔 mr-[50px] 때문에 왼쪽으로 치우치던 것 강제 해제 */
-.rv-actions { margin-right: auto !important; } /* 좌우 auto로 정확히 가운데 */
-
-
-
-`}</style>
-
-      {/* 버튼 스타일: 흰 배경 + 회색 둥근 테두리 (기존과 동일) */}
+      {/* 버튼 스타일: 흰 배경 + 회색 둥근 테두리 (공용 버튼 유지) */}
       <style jsx>{`
   .btn {
     border: 1px solid #e5e7eb;
@@ -761,10 +976,7 @@ export default function ReviewSection({ itemId }: { itemId: number }) {
     padding: 6px 10px;
     background: #fff;
   }
-
-
-
-`}</style>
+      `}</style>
 
     </section>
   );
