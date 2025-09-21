@@ -438,36 +438,32 @@ export default function ReviewSection({ itemId }: { itemId: number }) {
             <Paw className="w-[18px] h-[18px]" />&nbsp;
           </h3>
 
-          <button
-            type="button"
-            className="btn"
-            onClick={async () => {
-              try {
-                // 1) 서버 전체 페이지를 훑어 '내 리뷰' 존재여부 실시간 확인
-                const wrote = await alreadyWroteForItem();
+          {isLoggedIn && canWrite ? (
+  <button
+    type="button"
+    className="btn"
+    onClick={async () => {
+      try {
+        const wrote = await alreadyWroteForItem();
+        if (wrote) {
+          alert('이미 리뷰를 작성하셨습니다.');
+          return;
+        }
+        if (!canWrite || !targetOrdersId) {
+          alert('구매확정된 주문이 없거나, 해당 주문에 이 상품이 포함되어 있지 않습니다.');
+          return;
+        }
+        openForm();
+      } catch (e: any) {
+        alert(e?.message || '리뷰 작성 가능 여부 확인 중 오류가 발생했습니다.');
+      }
+    }}
+    aria-label="리뷰 등록"
+  >
+    리뷰 등록
+  </button>
+) : null}
 
-                // 2) 이미 작성한 경우 → 안내 후 종료
-                if (wrote) {
-                  alert('이미 리뷰를 작성하셨습니다.');
-                  return;
-                }
-
-                // 3) 기존 canWrite 정책(구매확정/주문검증)을 한 번 더 확인
-                if (!canWrite || !targetOrdersId) {
-                  alert('구매확정된 주문이 없거나, 해당 주문에 이 상품이 포함되어 있지 않습니다.');
-                  return;
-                }
-
-                // 4) 모두 통과 → 작성 모달 오픈
-                openForm();
-              } catch (e: any) {
-                alert(e?.message || '리뷰 작성 가능 여부 확인 중 오류가 발생했습니다.');
-              }
-            }}
-            aria-label="리뷰 등록"
-          >
-            리뷰 등록
-          </button>
         </div>
 
         {/* 오른쪽: 정렬 드롭다운 */}

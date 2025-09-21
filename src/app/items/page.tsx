@@ -28,6 +28,10 @@ const SORTS: ReadonlyArray<{ label: string; value: ItemListQuery['sort'] }> = [
   { label: '등록일순', value: 'date,asc' },
   { label: '높은가격순', value: 'price,desc' },
   { label: '낮은가격순', value: 'price,asc' },
+  { label: '판매높은순', value: 'sales,desc' },
+  { label: '판매낮은순', value: 'sales,asc' },
+
+  
 ] as const;
 
 /** KRW 포맷 */
@@ -176,7 +180,7 @@ export default function ItemsPage() {
   const IMG_BASE = resolveImgBase();
 
   return (
-    <main className={WRAP}>
+    <main className={WRAP} style={{ paddingBottom: 50 }}>
       <div className="store-head text-center">
         <h1 className="store-title"><span className="ml-1"></span></h1>
       </div>

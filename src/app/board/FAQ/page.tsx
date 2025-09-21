@@ -1,3 +1,4 @@
+//src/app/baord/FAQ/page.tsx
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -288,10 +289,12 @@ export default function FAQPage() {
   if (error) return <div className={WRAP}>FAQ 로딩 오류가 발생했어요</div>;
 
   return (
-    <main className={WRAP}>
+    <main className={WRAP} style={{ paddingBottom: 100 }}>
       {/* 타이틀/설명 */}
       <section className="faq-head">
-        <h1 className="faq-title">FAQ <PawIcon/></h1>
+        <h1 className="faq-title" style={{ marginTop: '0px  !important', marginBottom: 8 }}>
+  FAQ <PawIcon />
+</h1>
         <p className="faq-sub"></p>
 
         {/* 카테고리 버튼 */}

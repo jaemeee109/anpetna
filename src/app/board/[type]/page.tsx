@@ -1,7 +1,7 @@
 // src/app/board/[type]/page.tsx
 "use client";
 
-import { use, useMemo } from "react"; // ✅ useMemo 추가
+import { use, useMemo } from "react"; 
 import { useSearchParams, useRouter } from "next/navigation";
 import { useBoardList } from "@/features/board/hooks/useBoards";
 import { BoardViewSwitcher } from "@/features/board/ui/BoardViewSwitcher";
@@ -136,7 +136,7 @@ export default function BoardListPage({
   const pickNumber = (v: any): number =>
     typeof v === "number" && Number.isFinite(v) ? v : 0;
 
-  // ✅ 안전 매핑 (백엔드 응답 케이스 총망라: null → [] 처리)
+  //  안전 매핑 (백엔드 응답 케이스 총망라: null → [] 처리)
   const rawItems =
     pickArray((data as any)?.dtoList) ||
     pickArray((data as any)?.page?.dtoList) ||
@@ -145,13 +145,13 @@ export default function BoardListPage({
     pickArray((data as any)?.list) ||
     pickArray((data as any)?.content);
 
-  // ✅ 프런트에서 타입 필터 (혹시 다른 타입이 섞여 들어올 경우 대비)
+  //  프런트에서 타입 필터 (혹시 다른 타입이 섞여 들어올 경우 대비)
   const safeItems = rawItems.filter((it: any) => {
     const t = (it?.boardType ?? it?.type ?? "").toUpperCase();
     return !boardType || t === boardType;
   });
 
-  // ✅ total 값도 관대하게 해석 (없거나 0이면 아이템 길이로 대체)
+  //  total 값도 관대하게 해석 (없거나 0이면 아이템 길이로 대체)
   const reportedTotal =
     pickNumber((data as any)?.total) ||
     pickNumber((data as any)?.page?.total) ||
@@ -162,7 +162,7 @@ export default function BoardListPage({
 
   const safeTotal = reportedTotal > 0 ? reportedTotal : safeItems.length;
 
-  // ✅ 공지(noticeFlag) 우선 정렬 (bno는 변형하지 않음)
+  //  공지(noticeFlag) 우선 정렬 (bno는 변형하지 않음)
   const itemsSorted = useMemo(() => {
     const list = Array.isArray(safeItems) ? safeItems : [];
     const notices = list.filter((b: any) => !!b?.noticeFlag);

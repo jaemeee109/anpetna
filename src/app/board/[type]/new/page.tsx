@@ -13,6 +13,7 @@ export default function NewBoardPage() {
   const [title, setTitle] = React.useState("");
   const [content, setContent] = React.useState("");
   const [pinned, setPinned] = React.useState(false);
+  const isAdmin = (typeof window !== 'undefined') && ((localStorage.getItem('memberRole') || '').toUpperCase().includes('ADMIN'));
   const [secret, setSecret] = React.useState(false);
 
   const [files, setFiles] = React.useState<File[]>([]);
@@ -212,17 +213,27 @@ export default function NewBoardPage() {
         )}
       </div>
 
-      {/* 고정/비밀 체크 */}
-      <div className="mt-5 mb-10 flex justify-center gap-3">
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={pinned} onChange={(e) => setPinned(e.target.checked)} />
-          고정글
-        </label>
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={secret} onChange={(e) => setSecret(e.target.checked)} />
-          비밀글
-        </label>
-      </div>
+      {/* 고정글/비밀글 — 관리자만 '고정글' 노출, 일반회원은 '비밀글'만 가운데 정렬 */}
+      {isAdmin ? (
+        <div className="flex gap-12" style={{ alignItems: 'center' }}>
+          <label className="flex items-center gap-2 text-gray-600">
+            <input type="checkbox" checked={pinned} onChange={(e) => setPinned(e.target.checked)} />
+            고정글
+          </label>
+          <label className="flex items-center gap-2 text-gray-600">
+            <input type="checkbox" checked={secret} onChange={(e) => setSecret(e.target.checked)} />
+            비밀글
+          </label>
+        </div>
+      ) : (
+        <div className="flex" style={{ alignItems: 'center', justifyContent: 'center' }}>
+          <label className="flex items-center gap-2 text-gray-600 mt-[40px] mb-[30px]">
+            <input type="checkbox" checked={secret} onChange={(e) => setSecret(e.target.checked)} />
+            비밀글
+          </label>
+        </div>
+      )}
+
 
       <form onSubmit={onSubmit} className="mb-16 flex justify-center gap-3">
         <button className="btn-3d btn-white px-4 py-2 text-sm" disabled={createMut.isPending}>

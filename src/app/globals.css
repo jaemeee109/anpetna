@@ -376,3 +376,8 @@ a.faq-ask:focus {
   .apn3-illust img{ width:260px !important; height:auto !important; max-width:none !important; }
 }
 
+.apn-divider {
+  margin-top: 4px;
+  margin-bottom: 20px; /* 원하는 px 값으로 줄이기 */
+}
+
