@@ -22,6 +22,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.server.ResponseStatusException;
+import com.anpetna.member.repository.MemberRepository;
+import com.anpetna.member.domain.MemberEntity;
+import com.anpetna.member.constant.MemberRole;
+
+
+
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -33,8 +39,12 @@ import java.util.List;
 @Log4j2
 public class AdminBlacklistServiceImpl implements AdminBlacklistService {
 
+
+
+
     /*의존성 주입*/
     private final AdminBlacklistJpaRepository adminBlacklistJpaRepository;
+    private final MemberRepository memberRepository;  // ★ 추가
 
     /* 관리자 여부만 true/false 로 확인 */
     private boolean isAdmin() {
@@ -99,7 +109,17 @@ public class AdminBlacklistServiceImpl implements AdminBlacklistService {
         log.info("블랙리스트 생성: id={}, memberId={}, duration={}, untilAt={}, adminId={}",
                 saved.getId(), memberId, duration, untilAt, adminId);
 
+// ★ 블랙리스트 저장 직후, 회원 ROLE = BLACKLIST 로 동기화
+        MemberEntity member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "존재하지 않는 회원입니다. memberId=" + memberId));
+
+        if (member.getMemberRole() != MemberRole.BLACKLIST) {
+            member.setMemberRole(MemberRole.BLACKLIST);
+        }
+
         return saved.getId();
+
     }
 
     /*======================================================================================================*/
@@ -251,4 +271,27 @@ public class AdminBlacklistServiceImpl implements AdminBlacklistService {
                 .untilAtAfter(adminBlacklistEntity.getUntilAt())
                 .build();
     }
+
+    /* 블랙리스트 -> 일반회원으로 복귀 메서드 추가 */
+    public void deactivateAllActiveForMember(String memberId) {
+        if (!isAdmin()) throw new AccessDeniedException("관리자 권한이 필요합니다.");
+
+        final ZoneId KST = ZoneId.of("Asia/Seoul");
+        LocalDateTime now = LocalDateTime.now(KST);
+
+        // 활성 블랙리스트 모두 비활성화
+        adminBlacklistJpaRepository.deactivateActiveForMember(memberId, now);
+
+        // ROLE → USER 복귀
+        MemberEntity member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "존재하지 않는 회원입니다. memberId=" + memberId));
+        if (member.getMemberRole() != MemberRole.USER) {
+            member.setMemberRole(MemberRole.USER);
+        }
+    }
+
+
+
+
 }

@@ -37,4 +37,6 @@ public interface AdminBlacklistService {
      * @return 생성된 블랙리스트 PK
      */
     DeleteBlacklistRes deleteBlacklistRes(Long id);
+
+    void deactivateAllActiveForMember(String memberId); // ★ 추가
 }

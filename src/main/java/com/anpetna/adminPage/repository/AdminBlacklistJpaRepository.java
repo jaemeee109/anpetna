@@ -4,6 +4,7 @@ import com.anpetna.adminPage.domain.AdminBlacklistEntity;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -55,4 +56,16 @@ public interface AdminBlacklistJpaRepository extends JpaRepository<AdminBlacklis
      * 특정 회원 이력만 (정렬 포함 JPA 메서드)
      */
     Page<AdminBlacklistEntity> findByMemberIdOrderByIdDesc(String memberId, Pageable pageable);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+UPDATE AdminBlacklistEntity b
+   SET b.untilAt = :now
+ WHERE b.memberId = :memberId
+   AND (b.untilAt IS NULL OR b.untilAt > :now)
+""")
+    int deactivateActiveForMember(@Param("memberId") String memberId, @Param("now") LocalDateTime now);
+
+
+
 }
