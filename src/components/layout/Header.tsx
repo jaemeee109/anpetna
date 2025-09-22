@@ -319,12 +319,12 @@ export default function Header() {
               {/* 관리자: MYPAGE(단일 링크 → INFO) | USER | SALES | INV | LOGOUT */}
               <Link href="/member/info" className="btn-link">MYPAGE</Link>
               <span className="sep">|</span>
-              <Link href="#" className="btn-link">USER</Link>
+              <Link href="/member/list" className="btn-link">USERS</Link>
               <span className="sep">|</span>
-              <Link href="#" className="btn-link">SALES</Link>
+              <Link href="#" className="btn-link">SALES & INVENTORY</Link>
               <span className="sep">|</span>
-              <Link href="#" className="btn-link">INV</Link>
-              <span className="sep">|</span>
+              {/*<Link href="#" className="btn-link">INVENTORY</Link>
+              <span className="sep">|</span>*/}
               <button type="button" className="btn-link" onClick={handleLogout}>
                 LOGOUT
               </button>
