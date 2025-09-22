@@ -90,7 +90,6 @@ sourceSets {
         java {
             srcDirs = [
                     "$projectDir/src/main/java",
-                    "$projectDir/build/generated",
                     "$buildDir/generated/sources/annotationProcessor/java/main"
             ]
         }

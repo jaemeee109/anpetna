@@ -94,6 +94,7 @@ public class AdminMemberServiceImpl implements AdminMemberService {
                 .name(memberEntity.getMemberName())
                 .email(memberEntity.getMemberEmail())
                 .role(memberEntity.getMemberRole())
+                .phone(memberEntity.getMemberPhone())
                 .build();
     }
 
