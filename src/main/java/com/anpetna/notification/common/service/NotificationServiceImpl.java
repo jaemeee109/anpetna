@@ -47,7 +47,7 @@ public class NotificationServiceImpl implements NotificationService {
                 : repo.findByReceiver_MemberId(receiverMemberId, pageable);
 
         // 엔티티 페이지 → DTO 페이지로 변환 (PageResponseDTO.toDTO가 map & 메타 데이터 조립)
-        return PageResponseDTO.toDTO(page, NotificationDTO::from);
+        return PageResponseDTO.toDTO(page, NotificationDTO::from, pageable);
     }
 
     @Override

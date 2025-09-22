@@ -313,7 +313,7 @@ public class ReviewServiceImpl implements ReviewService {
 
         Page<ReviewDTO> mapped = page.map(e -> reviewMapper.rReviewMapRes().map(e));
 
-        return new PageResponseDTO<>(mapped);
+        return new PageResponseDTO<>(mapped, pageable);
     }
 
 
