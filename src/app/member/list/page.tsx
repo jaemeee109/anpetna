@@ -1,6 +1,6 @@
 // src/app/member/list/page.tsx
 'use client';
-
+import { createPortal } from 'react-dom';
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Paw from '@/components/icons/Paw';
@@ -57,6 +57,58 @@ function Pager({
 
 type Role = 'USER' | 'ADMIN' | 'BLACKLIST';
 type Term = 'D3' | 'D5' | 'D7' | 'INDEFINITE';
+
+/* ────────────────────────────────────────────────────────────
+   모달 내용 (디자인/클래스 그대로)
+   ────────────────────────────────────────────────────────────*/
+function BulkModalContent(props: {
+  onClose: () => void;
+  bulkRole: Role;
+  setBulkRole: (r: Role) => void;
+  bulkTerm: Term;
+  setBulkTerm: (t: Term) => void;
+  applyBulkToListOnly: () => void;
+}) {
+  const { onClose, bulkRole, setBulkRole, bulkTerm, setBulkTerm, applyBulkToListOnly } = props;
+  return (
+    <div className="fixed inset-0 flex items-center justify-center" style={{ zIndex: 2147483647 }}>
+      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
+      <div className="relative z-10 w-[360px] rounded-lg bg-white p-4 shadow">
+        <div className="mb-3 font-semibold">변경할 권한</div>
+        <select
+          className="dropdown w-full mb-3"
+          value={bulkRole}
+          onChange={(e) => setBulkRole(e.target.value as Role)}
+        >
+          <option value="USER">회원</option>
+          <option value="ADMIN">관리자</option>
+          <option value="BLACKLIST">블랙리스트</option>
+        </select>
+
+        {bulkRole === 'BLACKLIST' && (
+          <div className="mb-3">
+            <div className="mb-1">기간</div>
+            <select
+              className="dropdown w-full"
+              value={bulkTerm}
+              onChange={(e) => setBulkTerm(e.target.value as Term)}
+            >
+              <option value="D3">3일</option>
+              <option value="D5">5일</option>
+              <option value="D7">7일</option>
+              <option value="INDEFINITE">영구</option>
+            </select>
+          </div>
+        )}
+
+        <div className="mt-4 flex justify-end gap-2">
+          <button className="btn-3d btn-white" onClick={onClose}>취소</button>
+          <button className="btn-3d btn-primary" onClick={applyBulkToListOnly}>확인</button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function AdminUsersPage() {
   const searchParams = useSearchParams();
@@ -191,10 +243,8 @@ export default function AdminUsersPage() {
         const cur = (data?.dtoList || []).find(m => m.memberId === memberId)?.role;
         if (cur && cur !== nextRole) {
           const term = pendingTerm[memberId]; // BLACKLIST일 때만 의미
-          // applyRole의 시그니처(2 or 3 인자)와 무관하게 타입 에러 없이 호출
           await (applyRole as unknown as (id: string, role: any, term?: any) => Promise<void>)(memberId, nextRole, term);
         } else if (nextRole === 'BLACKLIST') {
-          // 같은 BLACKLIST라도 TERM만 바뀐 경우를 커버
           const term = pendingTerm[memberId] ?? 'INDEFINITE';
           await (applyRole as unknown as (id: string, role: any, term?: any) => Promise<void>)(memberId, nextRole, term);
         }
@@ -213,32 +263,51 @@ export default function AdminUsersPage() {
   }
 
   // ---------------- 일괄변경 모달 ----------------
+  // ① 상태 추가 (디자인 변경 없음)
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkRole, setBulkRole] = useState<Role>('USER');
   const [bulkTerm, setBulkTerm] = useState<Term>('INDEFINITE');
 
-const openBulk = () => {
-  setBulkOpen(true);
-};
+  // ② SSR 하이드레이션 불일치 회피용 플래그
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
+const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
+useEffect(() => {
+  const el = document.getElementById('__bulk_modal_root') as HTMLElement | null;
+  setPortalTarget(el);
+}, []); // mounted 의존성 제거
+
+
+
+  // 버튼 클릭 시 모달 오픈 (디버그 로그 포함)
+  const openBulk = () => {
+    console.log('[Bulk] openBulk() clicked');
+    setBulkOpen(true);
+  };
+
+  // 모달 확인 시: 리스트에만 먼저 반영(저장은 onSaveChanges에서)
   const applyBulkToListOnly = () => {
-  const ids = rows.filter(r => selected[r.memberId]).map(r => r.memberId);
-  if (ids.length === 0) {
-    alert('선택된 회원이 없습니다.');
-    return; // 팝업을 닫지 않고 유지
-  }
-    setPending(prev => {
-      const nxt = { ...prev };
-      ids.forEach(id => { nxt[id] = bulkRole; });
-      return nxt;
-    });
-    setPendingTerm(prev => {
-      const nxt = { ...prev };
-      ids.forEach(id => {
-        if (bulkRole === 'BLACKLIST') nxt[id] = bulkTerm;
-        else delete nxt[id];
-      });
-      return nxt;
-    });
+    const ids = rows.filter(r => selected[r.memberId]).map(r => r.memberId);
+    if (ids.length === 0) {
+      alert('선택된 회원이 없습니다.');
+      return; // 팝업 유지
+    }
+ setPending(prev => {
+  const nxt = { ...prev };
+  ids.forEach(id => { nxt[id] = bulkRole; });
+  return nxt;
+});
+setPendingTerm(prev => {
+  const nxt = { ...prev };
+  ids.forEach(id => {
+    if (bulkRole === 'BLACKLIST') nxt[id] = bulkTerm;
+    else delete nxt[id];
+  });
+  return nxt;
+});
+
+
     setBulkOpen(false); // 리스트에만 우선 반영, 저장은 onSaveChanges에서
   };
 
@@ -387,15 +456,16 @@ const openBulk = () => {
           <Pager current={page} totalPages={totalPages} onPage={(p) => setPage(p)} />
         </div>
         <div className="flex justify-end gap-2">
-         <button
-  type="button"
-  className="btn-3d btn-white"
-  onClick={openBulk}
-  disabled={bulkSaving}
-  title={bulkSaving ? '저장 중입니다' : '선택 없이도 설정할 수 있습니다'}
->
-  일괄변경
-</button>
+          {/* ③ “일괄변경” 버튼에 클릭 핸들러 추가 */}
+          <button
+            type="button"
+            className="btn-3d btn-white"
+            onClick={openBulk}
+            disabled={bulkSaving}
+            title={bulkSaving ? '저장 중입니다' : '선택 없이도 설정할 수 있습니다'}
+          >
+            일괄변경
+          </button>
           <button
             type="button"
             className="btn-3d btn-primary "
@@ -408,46 +478,17 @@ const openBulk = () => {
         </div>
       </div>
 
-      {/* (4) 일괄변경 모달 */}
-    {bulkOpen && (
-  <div className="fixed inset-0 z-[9999] flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/30" onClick={() => setBulkOpen(false)} />
-          <div className="relative z-10 w-[360px] rounded-lg bg-white p-4 shadow">
-            <div className="mb-3 font-semibold">변경할 권한</div>
-            <select
-              className="dropdown w-full mb-3"
-              value={bulkRole}
-              onChange={(e) => setBulkRole(e.target.value as Role)}
-            >
-              <option value="USER">회원</option>
-              <option value="ADMIN">관리자</option>
-              <option value="BLACKLIST">블랙리스트</option>
-            </select>
-
-            {bulkRole === 'BLACKLIST' && (
-              <div className="mb-3">
-                <div className="mb-1">기간</div>
-                <select
-                  className="dropdown w-full"
-                  value={bulkTerm}
-                  onChange={(e) => setBulkTerm(e.target.value as Term)}
-                >
-                  <option value="D3">3일</option>
-                  <option value="D5">5일</option>
-                  <option value="D7">7일</option>
-                  <option value="INDEFINITE">영구</option>
-                </select>
-              </div>
-            )}
-
-            <div className="mt-4 flex justify-end gap-2">
-              <button className="btn-3d btn-white" onClick={() => setBulkOpen(false)}>취소</button>
-              <button className="btn-3d btn-primary" onClick={applyBulkToListOnly}>
-                확인
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* (4) 일괄변경 모달 — 잼이님 기존 디자인 유지 */}
+      {mounted && bulkOpen && portalTarget && createPortal(
+        <BulkModalContent
+          onClose={() => setBulkOpen(false)}
+          bulkRole={bulkRole}
+          setBulkRole={setBulkRole}
+          bulkTerm={bulkTerm}
+          setBulkTerm={setBulkTerm}
+          applyBulkToListOnly={applyBulkToListOnly}
+        />,
+        portalTarget
       )}
 
       {/* 페이지 한정 스타일 (원본 그대로 유지) */}
@@ -624,7 +665,6 @@ const openBulk = () => {
 .admin-bottom-row {
   margin-bottom: var(--pager-margin-bottom);
 }
-
 
  /* ────────────────────────────────────────────────────────────
     7) 목록 행(Grid) — 본문 라인 스타일

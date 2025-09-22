@@ -25,6 +25,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <main className="apn-main">{children}</main>
         </Providers>
         <Footer />
+        {/* ▼ 모달 포털 루트*/}
+        <div id="__bulk_modal_root" />
       </body>
     </html>
   );

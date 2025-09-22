@@ -49,31 +49,18 @@ export async function createBlacklist(opts: { memberId: string; reason?: string;
   await http.post('/adminPage/create/blacklist', { memberId, reason, duration });
 }
 
-/** 활성 블랙리스트 단건 조회(키워드=memberId) */
-async function findActiveBlacklistId(memberId: string): Promise<number | null> {
-  const r = await http.get('/adminPage/readAll/blacklist', {
-    params: { keyword: memberId, activeOnly: true, page: 0, size: 1 },
-  });
-  const dtoList = r.data?.result?.dtoList || r.data?.result?.content || [];
-  const row = dtoList[0];
-  return row?.id ?? null; // 컨트롤러가 id 필드로 내려줍니다.
-}
 
-/** 블랙리스트 해제 - POST /adminPage/delete/blacklist/{id} */
+/** 블랙리스트 해제(활성 전체 비활성화 + ROLE=USER 복귀) */
 export async function deleteActiveBlacklist(memberId: string) {
-  const id = await findActiveBlacklistId(memberId);
-  if (id != null) {
-    await http.post(`/adminPage/delete/blacklist/${id}`);
-  }
+  await http.post(`/adminPage/blacklist/active/${encodeURIComponent(memberId)}/deactivate`);
 }
 
-/** 선택한 권한으로 반영(회원/관리자/블랙리스트)
- *  duration: 'D3'|'D5'|'D7'|'INDEFINITE' (BLACKLIST일 때만 사용)
- */
+
+// 블랙 리스트 기간
 export async function applyRole(
   memberId: string,
   target: 'USER' | 'ADMIN' | 'BLACKLIST',
-  duration?: 'D3' | 'D5' | 'D7' | 'INDEFINITE'
+  term?: 'D3' | 'D5' | 'D7' | 'INDEFINITE'
 ) {
   if (target === 'ADMIN') {
     await deleteActiveBlacklist(memberId);
@@ -86,5 +73,6 @@ export async function applyRole(
     return;
   }
   // BLACKLIST
-  await createBlacklist({ memberId, duration: duration ?? 'INDEFINITE' });
+  await createBlacklist({ memberId, duration: term ?? 'INDEFINITE' });
 }
+
