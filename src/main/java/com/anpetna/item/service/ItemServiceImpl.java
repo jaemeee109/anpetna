@@ -18,7 +18,6 @@ import com.anpetna.item.dto.registerItem.RegisterItemReq;
 import com.anpetna.item.dto.registerItem.RegisterItemRes;
 import com.anpetna.item.dto.searchAllItem.SearchAllItemsReq;
 import com.anpetna.item.dto.searchAllItem.SearchAllItemsRes;
-import com.anpetna.item.dto.searchAllItem.SearchItemsSalesRank;
 import com.anpetna.item.dto.searchOneItem.SearchOneItemReq;
 import com.anpetna.item.dto.searchOneItem.SearchOneItemRes;
 import com.anpetna.item.repository.ItemRepository;
@@ -28,7 +27,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.modelmapper.ModelMapper;
 import org.springframework.data.domain.*;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
@@ -43,7 +41,7 @@ public class ItemServiceImpl implements ItemService {
     private final ItemMapper itemMapper;
     private final ItemRepository itemRepository;
     private final ImageRepository imageRepository;
-    private final RedisTemplate<String, SearchAllItemsRes> redisTemplate;
+
 
     @Override
     @Transactional
@@ -192,14 +190,6 @@ public class ItemServiceImpl implements ItemService {
         }, pageable);
     }
 
-    @Override
-    public PageResponseDTO<SearchAllItemsRes> getSalesRank(SearchItemsSalesRank req){
-        Pageable pageable = PageRequest.of(req.getPage(), req.getSize());
-        String key = "sales:ranking:" + req.getPeriod() + ":" + req.getItemCategory();
-        List<SearchAllItemsRes> listRanking = redisTemplate.opsForZSet().reverseRange(key, 0, -1).stream().toList();
-        Page<SearchAllItemsRes> pageRanking= new PageImpl<>(listRanking, pageable, req.getSize());
-        return new PageResponseDTO<>(pageRanking, pageable);
-    }
 
 
     // --- 상품 등록 ---

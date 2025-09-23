@@ -33,5 +33,4 @@ public interface ItemService {
 
     SearchOneItemRes getOneItem(SearchOneItemReq req);
 
-    PageResponseDTO<SearchAllItemsRes> getSalesRank(SearchItemsSalesRank req);
 }
