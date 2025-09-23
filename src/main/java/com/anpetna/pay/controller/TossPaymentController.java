@@ -160,7 +160,7 @@ public class TossPaymentController {
         order.setStatus(OrdersStatus.PAID);
         ordersRepository.save(order);
 
-        orderNotificationService.notifyOrderSuccess(memberId, clientAmount, orderId);
+
 
         return ResponseEntity.ok(Map.of("isSuccess", true, "result", result));
     }
