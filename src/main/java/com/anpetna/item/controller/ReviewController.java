@@ -14,13 +14,16 @@ import com.anpetna.item.dto.searchAllReview.SearchAllReviewsReq;
 import com.anpetna.item.dto.searchOneReview.SearchOneReviewReq;
 import com.anpetna.item.dto.searchOneReview.SearchOneReviewRes;
 import com.anpetna.item.service.ReviewService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.hibernate.query.SortDirection;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -34,25 +37,43 @@ public class ReviewController {
 
     private final ReviewService reviewService;
 
-    @PostMapping
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("isAuthenticated()")
-    public ApiResult<RegisterReviewRes> registerReview(@PathVariable Long itemId, @RequestBody RegisterReviewReq req) {
-        var res = reviewService.registerReview(itemId, req);
-        return new ApiResult<>(res);
+    public ApiResult<RegisterReviewRes> registerReview(
+            @PathVariable Long itemId,
+            @RequestPart("json") @Valid RegisterReviewReq req,
+            @RequestPart(value = "image", required = false) MultipartFile image
+    ) {
+        var postResult = reviewService.registerReview(itemId, req, image);
+        return new ApiResult<>(postResult);
     }
 
-    @PutMapping("/{reviewId}")
-    public ApiResult<ModifyReviewRes> updateReview(@PathVariable Long itemId, @PathVariable Long reviewId, @RequestBody ModifyReviewReq req) {
-        var putResult = reviewService.modifyReview(itemId, reviewId, req);
+    @PutMapping(value = "/{reviewId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("isAuthenticated()")
+    public ApiResult<ModifyReviewRes> updateReview(
+            @PathVariable Long itemId,
+            @PathVariable Long reviewId,
+            @RequestPart("json") @Valid ModifyReviewReq req,
+            @RequestPart(value = "image", required = false) MultipartFile image
+    ) {
+        var putResult = reviewService.modifyReview(itemId, reviewId, req, image);
         return new ApiResult<>(putResult);
     }
 
-    @DeleteMapping
+
+    @DeleteMapping("/{reviewId}")
     @PreAuthorize("isAuthenticated()")
-    public ApiResult<DeleteReviewRes> deleteReview(@PathVariable Long itemId, @RequestBody DeleteReviewReq req) {
+    public ApiResult<DeleteReviewRes> deleteReview(
+            @PathVariable Long itemId,
+            @PathVariable Long reviewId
+    ) {
+        DeleteReviewReq req = new DeleteReviewReq();
+        req.setReviewId(reviewId);
         var deleteResult = reviewService.deleteReview(itemId, req);
         return new ApiResult<>(deleteResult);
     }
+
+
 
     @GetMapping("/{reviewId}")
     public ApiResult<SearchOneReviewRes> searchOneReview(@PathVariable Long reviewId, @PathVariable String itemId) {
@@ -63,7 +84,7 @@ public class ReviewController {
     }
 
     @GetMapping
-    @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
+   // @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
     public ApiResult<PageResponseDTO<ReviewDTO>> searchAllReviews(
             @PathVariable Long itemId,
             @ModelAttribute PageRequestDTO pageRequestDTO,

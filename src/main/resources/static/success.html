@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head><meta charset="UTF-8"><title>결제 성공</title></head>
+<body>
+<h2>결제 승인 중…</h2>
+<script>
+    (async function () {
+        const qs = new URLSearchParams(location.search);
+        const paymentKey = qs.get("paymentKey");
+        const orderId    = qs.get("orderId");
+        const amount     = qs.get("amount");
+
+        try {
+            const resp = await fetch("/api/pay/toss/confirm", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({ paymentKey, orderId, amount: Number(amount) })
+            });
+            const json = await resp.json();
+            if (!resp.ok || json?.isSuccess !== true) throw new Error(JSON.stringify(json));
+            document.body.insertAdjacentHTML("beforeend", "<p>결제가 승인되었습니다.</p>");
+        } catch (e) {
+            document.body.insertAdjacentHTML("beforeend", "<p>승인 실패: " + (e?.message ?? e) + "</p>");
+        }
+    })();
+</script>
+</body>
+</html>

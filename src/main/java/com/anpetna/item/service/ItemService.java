@@ -10,6 +10,7 @@ import com.anpetna.item.dto.registerItem.RegisterItemReq;
 import com.anpetna.item.dto.registerItem.RegisterItemRes;
 import com.anpetna.item.dto.searchAllItem.SearchAllItemsReq;
 import com.anpetna.item.dto.searchAllItem.SearchAllItemsRes;
+import com.anpetna.item.dto.searchAllItem.SearchItemsSalesRank;
 import com.anpetna.item.dto.searchOneItem.SearchOneItemReq;
 import com.anpetna.item.dto.searchOneItem.SearchOneItemRes;
 import org.springframework.data.domain.Page;
@@ -31,4 +32,5 @@ public interface ItemService {
     PageResponseDTO<SearchAllItemsRes> getAllItems(SearchAllItemsReq req);
 
     SearchOneItemRes getOneItem(SearchOneItemReq req);
+
 }

@@ -41,4 +41,8 @@ public class ReviewEntity {
     @JoinColumn(name = "member_id", nullable = false, referencedColumnName = "member_id")
     private MemberEntity memberId;
 
+    @OneToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    @JoinColumn(name = "image")
+    private ImageEntity image;
+
 }

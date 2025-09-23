@@ -2,7 +2,6 @@ package com.anpetna.order;
 
 import com.anpetna.order.domain.OrderEntity;
 import com.anpetna.order.repository.OrderRepository;
-import com.anpetna.order.service.OrderServiceImpl;
 import lombok.extern.log4j.Log4j2;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

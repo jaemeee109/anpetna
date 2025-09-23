@@ -17,4 +17,6 @@ public class SearchOneReviewRes {
 
     private Long itemId;
 
+    private String imageUrl;
+
 }

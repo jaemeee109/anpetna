@@ -167,7 +167,20 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String uri = request.getRequestURI();
-        return uri.startsWith("/jwt/");  // 리프레시/로그아웃 등 JWT 관리 엔드포인트는 필터 스킵 → 컨트롤러에서 처리
+
+        // 1) CORS 프리플라이트 요청은 무조건 패스
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+            return true;
+        }
+
+        // 2) JWT 필터에서 제외할 경로들
+        return uri.startsWith("/jwt/") ||
+                uri.startsWith("/api/pay/toss/prepare") ||
+                uri.startsWith("/api/pay/toss/confirm") ||
+                uri.startsWith("/api/pay/toss/client-key") ||
+                uri.startsWith("/toss-success.html") ||
+                uri.startsWith("/toss-fail.html") ||
+                uri.startsWith("/toss-test.html");
     }
 
     // payload 에서 sub 만 안전하게 추출 (로그용)

@@ -4,7 +4,7 @@ import lombok.*;
 
 @Getter
 @Setter
-@Builder
+//@Builder
 @AllArgsConstructor
 @NoArgsConstructor
 public class LoginMemberReq {

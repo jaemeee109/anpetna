@@ -12,6 +12,7 @@ import com.anpetna.order.dto.readOneOrderDTO.ReadOneOrdersRes;
 import com.anpetna.order.service.OrdersService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -44,10 +45,9 @@ public class OrderController {
     ) {
         // ★ CHANGED: 로그인한 사용자 id(String) → MemberEntity 로드(연관관계 지연 로딩 안전)
         String loginId = authentication.getName();
-        MemberEntity member = memberRepository.getReferenceById(loginId);
         // 참고) 존재 보장 필요하면 findById(loginId).orElseThrow(...) 사용
 
-        CreateOrderRes body = ordersService.create(member, req);
+        CreateOrderRes body = ordersService.create(loginId, req);
         return new ApiResult<>(body);
     }
 
@@ -69,6 +69,20 @@ public class OrderController {
         return new ApiResult<>(body); // 200 OK
     }
 
+    @GetMapping("/admin/erp")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResult<ReadAllOrdersRes> getAdminOrders(
+            @RequestParam String from,  // yyyy-MM-dd
+            @RequestParam String to,    // yyyy-MM-dd (포함)
+            @RequestParam(required = false) OrdersStatus status, // 선택 필터
+            @RequestParam(required = false) String memberId,     // 선택 필터
+            @PageableDefault(size = 50, sort = "ordersId", direction = Sort.Direction.DESC)
+            Pageable pageable
+    ){
+        ReadAllOrdersRes erp = ordersService.erp(from, to, status, memberId, pageable);
+        return new ApiResult<>(erp);
+    }
+
     /**
      * 특정 회원의 주문서(계산서) 목록 조회
      *
@@ -82,9 +96,9 @@ public class OrderController {
             Pageable pageable
     ) {
         // ★ CHANGED: memberId(String) → MemberEntity 변환
-        MemberEntity member = memberRepository.getReferenceById(memberId);
+      //  MemberEntity member = memberRepository.getReferenceById(memberId);
 
-        ReadAllOrdersRes body = ordersService.getSummariesByMember(member, pageable);
+        ReadAllOrdersRes body = ordersService.getSummariesByMember(memberId, pageable);
         return new ApiResult<>(body); // 200 OK
     }
 
@@ -119,6 +133,18 @@ public class OrderController {
         ReadOneOrdersRes body = ordersService.updateStatus(ordersId, next);
         return new ApiResult<>(body); // 200 OK
     }
+
+    //관리자 상태 변경
+    @PostMapping("/admin/{ordersId}/status")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResult<ReadOneOrdersRes> adminChangeStatus(
+            @PathVariable("ordersId") @Min(1) Long ordersId,
+            @RequestParam @NotNull OrdersStatus next,
+            @RequestParam(required = false) String reason) {
+        ReadOneOrdersRes adminStatus = ordersService.adminStatus(ordersId,next,reason);
+        return new ApiResult<>(adminStatus);
+    }
+
 
     // ==============================================================
 

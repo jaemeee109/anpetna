@@ -28,7 +28,7 @@ public class ReadAllOrdersRes {
 
         private Long ordersId;        // 주문 ID
 
-        private MemberEntity memberId;      // 회원 ID
+        private String memberId;      // 회원 ID
 
         private int itemQuantity;     // 주문 총 수량
 
@@ -42,5 +42,7 @@ public class ReadAllOrdersRes {
 
         private String thumbnailUrl;  // 대표 썸네일 (주문 헤더용)
     }
+
+
 
 }
