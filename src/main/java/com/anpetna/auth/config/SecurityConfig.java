@@ -142,6 +142,9 @@ public class SecurityConfig {
                         .requestMatchers("/order/**").permitAll()
                         .requestMatchers("/admin/**").hasRole("ADMIN")
 
+                        // --- Home ---
+                        .requestMatchers("/home/**").permitAll()
+
                         .anyRequest().authenticated()
                 )
 

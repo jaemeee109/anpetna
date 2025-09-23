@@ -35,7 +35,7 @@ public class AdminBlacklistController {
      * POST /adminPage/create/Blacklist?memberId=유저 ID
      * memberId는 쿼리스트링으로, 나머지는 Body 로 받음
      */
-    @PreAuthorize("hasRole('ROLE_ADMIN')") // 1차 가드
+    @PreAuthorize("hasRole('ADMIN')") // 1차 가드
     @PostMapping(value = "/create/blacklist")
     public ApiResult<CreateBlacklistRes> createBlacklistRes(
             @RequestBody @Valid CreateBlacklistReq createBlacklistReq) {
@@ -50,7 +50,7 @@ public class AdminBlacklistController {
     /*
      * 블랙리스트 목록 조회 (관리자만)
      */
-    @PreAuthorize("hasRole('ROLE_ADMIN')")  // 1차 가드
+    @PreAuthorize("hasRole('ADMIN')")  // 1차 가드
     @GetMapping("/readAll/blacklist")
     public ApiResult<ReadBlacklistRes> list(ReadBlacklistReq readBlacklistReq,
                                             @PageableDefault(size = 20, sort = "id", direction = Sort.Direction.DESC)
@@ -65,7 +65,7 @@ public class AdminBlacklistController {
      * body: { "reason": "...", "duration": "D3|D5|D7|INDEFINITE" }
      * 둘 중 하나만 보내도 됨
      */
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/update/blacklist/{id}")
     public ApiResult<UpdateBlacklistRes> update(
             @PathVariable("id") Long id,
@@ -80,7 +80,7 @@ public class AdminBlacklistController {
      * 블랙리스트 삭제(해지)
      * 블랙리스트였었다는 기록은 남음
      */
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/delete/blacklist/{id}")
     public ApiResult<DeleteBlacklistRes> delete(@PathVariable Long id) {
         return new ApiResult<>(adminBlacklistService.deleteBlacklistRes(id));
