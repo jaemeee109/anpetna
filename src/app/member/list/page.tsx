@@ -267,6 +267,10 @@ export default function AdminUsersPage() {
   const [page, setPage] = useState<number>(() => Number(searchParams.get('page') || 1));
   const size = 10;
 
+  // ✅ 검색 인풋 전용 상태(디자인 변경 없음): URL q와 분리
+  const [keyword, setKeyword] = useState('');
+  useEffect(() => { setKeyword(q); }, [q]);
+
   const [role, setRole] = useState<'ADMIN' | 'USER' | 'BLACKLIST' | 'NONE'>('ADMIN');
   const [roleEnabled, setRoleEnabled] = useState(false);
 
@@ -402,9 +406,10 @@ export default function AdminUsersPage() {
     setPendingTerm(prev => ({ ...prev, [memberId]: term }));
   }
 
+  // ✅ 검색 실행: 입력 상태 사용(디자인 변경 없음)
   function onSearch() {
     setPage(1);
-    setQ((q || '').trim());
+    setQ((keyword || '').trim());
   }
 
   // 저장 버튼 클릭 시: 변경된 것만 서버 반영 (ROLE + TERM)
@@ -521,13 +526,13 @@ export default function AdminUsersPage() {
           <option value="BLACKLIST">블랙리스트</option>
         </select>
 
-        {/* 기존 검색창 유지 */}
+        {/* 기존 검색창 유지 (디자인 변경 없음) */}
         <div className="admin-search">
           <input
             className="admin-input"
             placeholder="회원 ID, 이름, 이메일 등으로 검색"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
+            value={keyword}                            
+            onChange={(e) => setKeyword(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') onSearch(); }}
             aria-label="검색어"
           />

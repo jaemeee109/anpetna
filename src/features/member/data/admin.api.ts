@@ -22,14 +22,27 @@ export interface PageRes<T> {
   next?: boolean;
 }
 
+
 /** 회원 목록 (검색/페이징) - GET /adminPage/AllMembers */
 export async function listAdminMembers(params: { q?: string; page?: number; size?: number }) {
   const { q, page = 1, size = 10 } = params || {};
-  const resp = await http.get('/adminPage/AllMembers', {
-    params: { searchKeyword: q ?? '', page: Math.max(0, page - 1), size },
-  });
+  const trimmed = (q ?? '').trim();
+
+  const queryParams: Record<string, any> = {
+    page: Math.max(0, page - 1),
+    size,
+  };
+  if (trimmed !== '') {
+    // ✅ 서버가 받는 공식 파라미터명만 전송
+    queryParams.searchKeyword = trimmed;
+  }
+
+  const resp = await http.get('/adminPage/AllMembers', { params: queryParams });
   return resp.data?.result as PageRes<AdminMemberRow>;
 }
+
+
+
 
 
 // 관리자 권한 부여 - POST /adminPage/members/{memberId}/grant-admin
