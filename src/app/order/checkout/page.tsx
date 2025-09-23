@@ -89,7 +89,8 @@ export default function CheckoutPage() {
     return params.get('itemId') ? 'item' : 'cart';
   }, [params]);
   const itemIdParam = params.get('itemId');
-  const qtyParam = Math.max(1, parseInt(String(params.get('qty') || '1'), 10) || 1);
+  const qtyParam = Math.max(1, parseInt(String(params.get('qty') ?? params.get('quantity') ?? '1'), 10) || 1);
+
 
   // cartItems=1,2,3 -> 숫자 배열
   const selectedIds = useMemo(() => {

@@ -66,66 +66,84 @@ export const itemApi = {
    * - orderByPrice: 'ASC' | 'DESC'
    */
   async list(params: ItemListQuery & { excludeSoldOut?: boolean }): Promise<PageRes<ItemDTO>> {
-    const base = normalizeBase(process.env.NEXT_PUBLIC_API_BASE as any);
-    const url = new URL('/item', base || '');
+  // 베이스 URL (기존 normalizeBase 사용)
+  const base = normalizeBase(process.env.NEXT_PUBLIC_API_BASE as any);
+  // window.origin 대체 (개발 3000→8000 스와프까지 고려하고 싶으면 필요에 맞게 조정)
+  const origin =
+    base ||
+    (typeof window !== 'undefined' ? window.location.origin : '');
 
-    // 카테고리: 'ALL' 또는 빈값이면 전달하지 않음(=전체)
-    const rawCat = (params.category ?? '').toString().toUpperCase();
-    const itemCategory = rawCat === 'ALL' || rawCat === '' ? undefined : rawCat;
+  // URL에 직접 쿼리스트링 작성 (axios params 사용하지 않음)
+  const url = new URL('/item', origin);
 
-    // 페이지: UI가 1-base → 서버는 0-base
-    const page0 = Math.max(0, Number(params.page ?? 1) - 1);
-    const size = Math.max(1, Number(params.size ?? 12));
+  // 카테고리: 'ALL'/빈값이면 미전달 → 전체 조회
+  const rawCat = (params.category ?? '').toString().toUpperCase();
+  if (rawCat && rawCat !== 'ALL') {
+    url.searchParams.set('itemCategory', rawCat);
+  }
 
-    // 정렬 파라미터 파싱
-    const { key, dir } = (function parseSort(sort?: string) {
-      if (!sort) return {} as any;
-      const [k, d] = String(sort).split(',').map(s => s.trim().toLowerCase());
-      const dirc = d === 'asc' || d === 'desc' ? d : undefined;
-      return { key: (k === 'date' || k === 'price' || k === 'sales') ? (k as 'date'|'price'|'sales') : undefined, dir: dirc as 'asc'|'desc'|undefined };
-    })(params.sort);
+  // 검색어
+  const q = (params.q ?? '').toString().trim();
+  if (q) url.searchParams.set('keyword', q);
 
-    const orderByDate  = key === 'date'  || !key ? (dir ?? 'desc').toUpperCase() : undefined;
-    const orderByPrice = key === 'price' ? (dir ?? 'desc').toUpperCase() : undefined;
+  // 정렬 파싱 (기존 로직 준수)
+  const [k, d] = String(params.sort ?? '').split(',').map(s => s.trim().toLowerCase());
+  const key = (k === 'date' || k === 'price' || k === 'sales') ? k : undefined;
+  const dir = (d === 'asc' || d === 'desc') ? d : undefined;
+  const orderByDate  = key === 'date'  || !key ? (dir ?? 'desc').toUpperCase() : undefined;
+  const orderByPrice = key === 'price' ? (dir ?? 'desc').toUpperCase() : undefined;
+  const orderBySales = key === 'sales' ? (dir ?? 'desc').toUpperCase() : undefined;
 
-    // 품절 제외 옵션(백엔드가 itemSellStatus를 받는다면 사용)
-    const itemSellStatus = params.excludeSoldOut ? 'SELL' : undefined;
+  if (orderByDate)  url.searchParams.set('orderByDate',  orderByDate);
+  if (orderByPrice) url.searchParams.set('orderByPrice', orderByPrice);
+  if (orderBySales) url.searchParams.set('orderBySales', orderBySales);
 
-    // ✅ GET + params
-    const r: any = await (http as any).get(url.toString(), {
-      params: {
-        ...(itemCategory ? { itemCategory } : {}),
-        ...(params.q ? { keyword: String(params.q) } : {}),
-        page: page0,
-        size,
-        ...(orderByDate ? { orderByDate } : {}),
-        ...(orderByPrice ? { orderByPrice } : {}),
-        ...(itemSellStatus ? { itemSellStatus } : {}),
-      },
-    });
+  // 페이지: UI 1-base → 서버 0-base
+  const page0 = Math.max(0, Number(params.page ?? 1) - 1);
+  const size  = Math.max(1, Number(params.size ?? 12));
+  url.searchParams.set('page', String(page0));
+  url.searchParams.set('size', String(size));
 
-    const data = r?.data ?? r;
-    const payload = data?.result ?? data;
+  // 품절 제외 옵션(선택)
+  if (params.excludeSoldOut) {
+    url.searchParams.set('itemSellStatus', 'SELL');
+  }
 
-    const dtoList = toArray<ItemDTO>(payload);
-    const pageNum0 = Number(payload?.page ?? payload?.pageable?.pageNumber ?? page0);
-    const sizeNum = Number(payload?.size ?? payload?.pageable?.pageSize ?? size);
-    const totalElements = Number(payload?.totalElements ?? payload?.total ?? 0);
-    const totalPages = Number(payload?.totalPages ?? (totalElements ? Math.ceil((totalElements || 1) / (sizeNum || 1)) : 1));
+  // 실제 호출 (params 쓰지 않고, 쿼리스트링 포함된 URL만 사용)
+  const r: any = await (http as any).get(url.toString());
+  const data = r?.data ?? r;
+  const payload = data?.result ?? data;
 
-    // 1-base로 맞춰 반환
-    const page1 = pageNum0 + 1;
+  // 리스트 추출 (기존 toArray 유틸 존중)
+  const dtoList = toArray<ItemDTO>(payload);
 
-    return {
-      page: page1,
-      size: sizeNum,
-      total: totalPages,
-      start: 1,
-      end: totalPages,
-      prev: page1 > 1,
-      next: page1 < totalPages,
-      dtoList,
-    } as PageRes<ItemDTO>;
-  },
+  // 페이지 정보 표준화
+  const pageNum0 = Number(payload?.page ?? payload?.pageable?.pageNumber ?? page0);
+  const sizeNum = Number(payload?.size ?? payload?.pageable?.pageSize ?? size);
+  const totalElements = Number(payload?.totalElements ?? payload?.total ?? 0);
+  const totalPages = Number(payload?.totalPages ?? (totalElements ? Math.ceil((totalElements || 1) / (sizeNum || 1)) : 1));
+
+  // 1-base
+  const page1 = pageNum0 + 1;
+
+  
+return {
+  page: page1,               
+  size: sizeNum,
+  total: totalElements,       
+  start: 1,
+  end: totalPages,
+  prev: page1 > 1,
+  next: page1 < totalPages,
+
+
+  totalPages,
+  totalElements,
+
+  dtoList,
+} as any;
+
+}
+
 };
 

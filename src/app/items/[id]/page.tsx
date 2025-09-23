@@ -351,12 +351,14 @@ export default function ItemDetailPage() {
                   alert('품절된 상품입니다');
                   return;
                 }
-                // 현재 페이지 params에서 [id] 추출 (네 기존 로직 유지)
+                // 현재 페이지 params에서 [id] 추출 (기존 로직 유지)
                 const m = location.pathname.match(/\/items\/(\d+)/);
                 const id = m ? Number(m[1]) : 0;
-                const q = 1; // (기존 로직 유지) 필요 시 qty로 바꾸고 싶으면 여기만 qty로 교체
+
+                // ✅ 선택 수량 그대로 전달 + 파라미터 키는 'qty'
+                const q = Math.max(1, Number(qty || 1));
                 if (id > 0) {
-                  location.href = `/order/checkout?itemId=${id}&quantity=${q}`;
+                  location.href = `/order/checkout?itemId=${id}&qty=${q}`;
                 } else {
                   alert('상품 정보를 확인할 수 없습니다.');
                 }
@@ -388,17 +390,15 @@ export default function ItemDetailPage() {
 
       <div className="divider mb-[20px]" />
 
-      
-{/* 리뷰 영역 */}
-<ReviewSection itemId={Number(id)} />
+      {/* 리뷰 영역 */}
+      <ReviewSection itemId={Number(id)} />
 
-<hr className="faq-sep" />
+      <hr className="faq-sep" />
 
-{/* 고정 안내문구 */}
-<p className="text-[13px] text-gray-600 mt-3">
-  ※ 상품 리뷰는 구매자 본인 작성 원칙이며, 운영정책에 따라 수정/삭제될 수 있습니다.
-</p>
-
+      {/* 고정 안내문구 */}
+      <p className="text-[13px] text-gray-600 mt-3">
+        ※ 상품 리뷰는 구매자 본인 작성 원칙이며, 운영정책에 따라 수정/삭제될 수 있습니다.
+      </p>
 
       {/* 고정 안내문 (모든 상세페이지) */}
       <section className="policy mt-[30px] mb-[30px]">

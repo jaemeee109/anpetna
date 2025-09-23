@@ -64,6 +64,7 @@ function isAdminClient(): boolean {
 const WRAP = 'apn-main mx-auto px-4 max-w-[1220px]';
 
 /** Pager(디자인 클래스 유지) */
+/** Pager(디자인 클래스 유지) */
 function Pager({
   current, totalPages, onPage,
 }: { current: number; totalPages: number; onPage: (p: number) => void; }) {
@@ -90,8 +91,24 @@ function Pager({
 
   return (
     <nav className={`flex items-center justify-center ${WRAP_GAP}`}>
-      <button type="button" className={`${BTN} ${startPage === 1 ? DISABLED : ''}`} onClick={() => goto(1)} disabled={startPage === 1}>처음</button>
-      <button type="button" className={`${BTN} ${startPage === 1 ? DISABLED : ''}`} onClick={() => goto(startPage - 1)} disabled={startPage === 1}>이전</button>
+      {/* 처음/이전: 현재 페이지 기준으로 비활성 제어 */}
+      <button
+        type="button"
+        className={`${BTN} ${cur === 1 ? DISABLED : ''}`}
+        onClick={() => goto(1)}
+        disabled={cur === 1}
+      >
+        처음
+      </button>
+      <button
+        type="button"
+        className={`${BTN} ${cur === 1 ? DISABLED : ''}`}
+        onClick={() => goto(cur - 1)}
+        disabled={cur === 1}
+      >
+        이전
+      </button>
+
       <div className={`flex ${NUM_GAP} ${NUM_SIDE_MARGIN}`}>
         {pages.map((p) =>
           p === cur ? (
@@ -101,11 +118,28 @@ function Pager({
           )
         )}
       </div>
-      <button type="button" className={`${BTN} ${endPage === totalPages ? DISABLED : ''}`} onClick={() => goto(endPage + 1)} disabled={endPage === totalPages}>다음</button>
-      <button type="button" className={`${BTN} ${endPage === totalPages ? DISABLED : ''}`} onClick={() => goto(totalPages)} disabled={endPage === totalPages}>마지막</button>
+
+      {/* 다음/마지막: 현재 페이지 기준으로 비활성 제어 */}
+      <button
+        type="button"
+        className={`${BTN} ${cur === totalPages ? DISABLED : ''}`}
+        onClick={() => goto(cur + 1)}
+        disabled={cur === totalPages}
+      >
+        다음
+      </button>
+      <button
+        type="button"
+        className={`${BTN} ${cur === totalPages ? DISABLED : ''}`}
+        onClick={() => goto(totalPages)}
+        disabled={cur === totalPages}
+      >
+        마지막
+      </button>
     </nav>
   );
 }
+
 
 /** 이미지 절대경로 베이스 계산 */
 function resolveImgBase(): string {
@@ -135,17 +169,20 @@ export default function ItemsPage() {
   useEffect(() => setIsAdmin(isAdminClient()), []);
 
   /** 검색어가 있으면 카테고리 파라미터 전송 안 함(전체 검색) */
-  const query = useMemo<ItemListQuery>(() => {
-    const qTrim = q.trim();
-    const effectiveCategory = qTrim ? undefined : (cat as ItemCategory);
-    return {
-      category: effectiveCategory,
-      q: qTrim || undefined,
-      sort,
-      page,
-      size,
-    };
-  }, [cat, q, sort, page, size]);
+const query = useMemo<ItemListQuery>(() => {
+  const qTrim = q.trim();
+  // ✅ 서버(Pageable)는 0-based이므로, UI의 1-based page를 0-based로 변환해서 전송
+  const backendPage = Math.max(0, (page ?? 1) - 1);
+
+  return {
+    category: cat === 'ALL' ? undefined : (cat as ItemCategory),
+    q: qTrim || undefined,
+    sort,
+    page: backendPage, // ← 여기만 바뀜
+    size,
+  };
+}, [cat, q, sort, page, size]);
+
 
   const { data, isLoading, isError } = useItemList(query);
 
@@ -167,13 +204,25 @@ export default function ItemsPage() {
     return withIdx.map(x => x.it);
   }, [items]);
 
-  // 페이지 수
-  const totalPages =
-    Number((data as any)?.total) ||
-    Number((data as any)?.totalPages) ||
-    Number((data as any)?.page?.totalPages) ||
-    Number((data as any)?.result?.totalPages) ||
-    1;
+// 페이지 수 (TS 안전 + NaN 방지)
+const totalElements = Number(
+  (data as any)?.total ??
+  (data as any)?.totalElements ??
+  0
+);
+
+const pagesFromTotals = Math.ceil(totalElements / Math.max(1, size));
+
+const rawTotalPages =
+  (data as any)?.totalPages ??
+  (data as any)?.page?.totalPages ??
+  pagesFromTotals;
+
+const tpNum = Number(rawTotalPages);
+const totalPages = Number.isFinite(tpNum) && tpNum > 0 ? tpNum : 1;
+
+
+
 
   // 검색 실행
   const onSearch = () => { setPage(1); setQ(keyword.trim()); };
@@ -189,15 +238,20 @@ export default function ItemsPage() {
       {/* 카테고리 탭 */}
       <div className="store-catbar flex gap-[10px] justify-center">
         {CATS.map((c) => (
-          <button
-            key={c.value}
-            onClick={() => { setCat(c.value); setPage(1); }}
-            className={`pill ${cat === c.value ? 'pill--active' : ''}`}
-            type="button"
-          >
-            {c.label}
-          </button>
-        ))}
+<button
+  key={c.value}
+  onClick={() => {
+    setCat(c.value);
+    setPage(1);
+  }}
+  className={`pill ${cat === c.value ? 'pill--active' : ''}`}
+  type="button"
+>
+  {c.label}
+</button>
+
+))}
+
       </div>
 
       {/* 옵션/검색 줄 */}
