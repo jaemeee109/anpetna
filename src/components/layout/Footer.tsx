@@ -38,15 +38,14 @@ export default function Footer() {
     <div className="apn3-team">
       <ul>
         <b>Project Team : AnPetNa (Animal Pet & Me)</b>
-        <li>Team Lead : 이 재 은</li>
-        <li>Deputy Lead : 오 승 환</li>
-        <li>Member & Auth : 양 지 민, 전 우 신</li>
-        <li>Item Service : 이 채 윤</li>
-         <li>Cart Service : 오 승 환</li>
-        <li>Order Service : 김 수 아</li>
-        <li>Board (Customer Service) : 이 재 은, 박 희 진</li>
-        <li>Repository Maintainer : 이 채 윤</li>
-        <li>Frontend : 이 재 은</li>
+        <li>[Team Lead] Board(C/S) & Frontend : 이 재 은</li>
+        <li>[Deputy Lead] Cart & Release  : 오 승 환</li>
+        <li> Board(C/S) & Comment & U.M & Main :  박 희 진</li>
+        <li> Member & Auth & Pay & Sales Mgmt : 양 지 민</li>
+         <li> Member & Auth & Review  : 전 우 신</li>
+         <li>Order & Project Documentation : 김 수 아</li>
+        <li>Item & Repository Maintainer : 이 채 윤</li>
+
          <p className="apn3-note">All members are Backend Developers</p>
       </ul>
      
