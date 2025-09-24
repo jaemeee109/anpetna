@@ -12,7 +12,6 @@ type Props = {
 
 export function Pagination({ current, total, size, onPage, className = "" }: Props) {
   useEffect(() => {
-    // 브라우저 콘솔에서 이 로그가 보여야 **정확히 이 파일**이 쓰이는 것
     console.debug("[Pagination] v2 mounted");
   }, []);
 
@@ -29,18 +28,13 @@ export function Pagination({ current, total, size, onPage, className = "" }: Pro
   const end = Math.min(totalPages, cur + 2);
   for (let p = start; p <= end; p++) pages.push(p);
 
-  // ✅ 전역 CSS가 덮어써도 이기도록 ! 사용
   const BTN =
-    "inline-flex items-center rounded !border !border-gray-300 !bg-white !text-gray-900 " +
-    "px-3 py-1 text-xs shadow-sm " +
-    "hover:!bg-gray-50 hover:shadow-md " +
-    "active:translate-y-[1px] active:shadow-none " +
-    "focus:outline-none focus:ring-0";
+    "btn-3d btn-white text-xs";
   const BTN_DISABLED = "opacity-60 cursor-not-allowed";
-  const BTN_ACTIVE = "!border-gray-400 shadow-md"; // 현재 페이지 강조
 
   return (
-    <nav className={`flex items-center justify-center gap-2 ${className}`}>
+    <nav className={`flex items-center justify-center gap-3 ${className}`}>
+      {/* 처음 / 이전 */}
       <button
         type="button"
         className={`${BTN} ${cur === 1 ? BTN_DISABLED : ""}`}
@@ -58,18 +52,24 @@ export function Pagination({ current, total, size, onPage, className = "" }: Pro
         이전
       </button>
 
-      {pages.map((p) => (
-        <button
-          key={p}
-          type="button"
-          onClick={() => goto(p)}
-          className={`${BTN} ${p === cur ? BTN_ACTIVE : ""}`}
-          aria-current={p === cur ? "page" : undefined}
-        >
-          {p}
-        </button>
-      ))}
+      {/* 숫자 페이지 (텍스트 전용) */}
+      <div className="flex items-center gap-4">
+        {pages.map((p) => (
+          <span
+            key={p}
+            onClick={() => goto(p)}
+            className={`cursor-pointer select-none transition mr-[10px] ml-[10px] mx-[3px] ${
+              p === cur
+                ? "font-bold text-black text-base"
+                : "text-gray-500 text-sm hover:text-black"
+            }`}
+          >
+            {p}
+          </span>
+        ))}
+      </div>
 
+      {/* 다음 / 마지막 */}
       <button
         type="button"
         className={`${BTN} ${cur === totalPages ? BTN_DISABLED : ""}`}
