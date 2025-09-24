@@ -145,6 +145,10 @@ public class SecurityConfig {
                         // --- Home ---
                         .requestMatchers("/home/**").permitAll()
 
+                        // --- Venue ---
+                        .requestMatchers(HttpMethod.GET, "/venue/**").permitAll()
+
+
                         .anyRequest().authenticated()
                 )
 
