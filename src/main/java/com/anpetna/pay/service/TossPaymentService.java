@@ -27,8 +27,7 @@ import java.util.Map;
 @Service
 @RequiredArgsConstructor
 public class TossPaymentService {
-    @Value("${toss.client-key}")
-    private String tossClientKey;
+
     @Value("${toss.secret-key}")
     private String tossSecretKey;
 
