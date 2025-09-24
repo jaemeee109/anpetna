@@ -1,313 +1,386 @@
-// features/order/ui/InventoryTable.tsx
+// src/features/order/ui/InventoryTable.tsx
 'use client';
-import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import Link from 'next/link';
+
+import { useEffect, useMemo, useState } from 'react';
 import http from '@/shared/data/http';
-
-type ItemRow = {
-  itemId: number;
-  itemName: string;
-  itemCategory: string;
-  itemStock: number;
+import { Pagination } from '@/components/layout/Pagination'; // ERP와 동일 컴포넌트 사용
+import Paw from '@/components/icons/Paw';
+/** 공통: API 베이스 (http 모듈 baseURL 사용) */
+const API = {
+  items: (page = 0, size = 30) => `/item?page=${page}&size=${size}`, // 0-base, 30개/페이지
+  erp: (q: { status?: string; page?: number; size?: number; from?: string; to?: string } = {}) => {
+    const p = new URLSearchParams();
+    if (q.status) p.set('status', q.status);
+    if (q.from) p.set('from', q.from);
+    if (q.to) p.set('to', q.to);
+    p.set('page', String(q.page ?? 0));   // ★ 0-base
+    p.set('size', String(q.size ?? 100));
+    return `/order/admin/erp?${p.toString()}`;
+  },
+  orderDetail: (ordersId: number) => `/order/${ordersId}`,
+  putStock: (itemId: number) => `/item/${itemId}/stock`,
 };
 
-type ItemsPage = {
-  list: ItemRow[];
-  totalElements: number;
-};
-
-type InventoryRow = ItemRow & {
-  sold: number;
-  remain: number;
-};
-
-const CATEGORIES = [
-  { label: '전체', value: '' },
-  { label: '사료', value: 'FEED' },
-  { label: '간식', value: 'SNACKS' },
-  { label: '의류', value: 'CLOTHING' },
-  { label: '욕실용품', value: 'BATH_PRODUCT' },
-  { label: '미용용품', value: 'BEAUTY_PRODUCT' },
-  { label: '장난감', value: 'TOY' },
-  { label: '기타', value: 'OTHERS' },
-];
-
-async function fetchItems(page: number, size: number, category: string): Promise<ItemsPage> {
-  const qs = new URLSearchParams();
-  qs.set('page', String(Math.max(0, page - 1)));
-  qs.set('size', String(size));
-  if (category) qs.set('itemCategory', category);
-
-  const resp = await http.get(`/item?${qs.toString()}`);
-  const data = (resp as any)?.data ?? resp;
-  const p = data?.result ?? data;
-
-  const rawList: any[] = p?.dtoList ?? [];
-  const list: ItemRow[] = rawList.map((x: any): ItemRow => ({
-    itemId: Number(x.itemId ?? 0),
-    itemName: String(x.itemName ?? x.name ?? ''),
-    itemCategory: String(x.itemCategory ?? x.category ?? ''),
-    itemStock: Number(x.itemStock ?? 0),
-  }));
-
-  const totalElements = Number(p?.total ?? list.length);
-  return { list, totalElements };
+/** 응답 모양이 상황마다 content/dtoList/list로 섞여올 수 있으므로 안전 변환 */
+function toArray<T = any>(input: any): T[] {
+  if (!input) return [];
+  if (Array.isArray(input)) return input;
+  if (Array.isArray(input.content)) return input.content;
+  if (Array.isArray(input.dtoList)) return input.dtoList;
+  if (Array.isArray(input.list)) return input.list;
+  if (Array.isArray(input.items)) return input.items;
+  return [];
 }
 
-type Props = { from?: string; to?: string };
+/** 숫자 표시 */
+const nf = (n?: number) => (Number.isFinite(Number(n)) ? Number(n).toLocaleString('ko-KR') : '0');
 
-export default function InventoryTable({ from, to }: Props) {
-  const [page, setPage] = useState(1);
-  const size = 10;
+/** 타입 */
+type ItemRow = {
+  itemId: number;
+  itemCategory: string;
+  itemName: string;
+  itemStock: number; // DB 등록 수량(초기/현재 저장값)
+};
 
-  const [category, setCategory] = useState('');
+type OrderLine = {
+  itemId: number;
+  orderQuantity: number;
+};
 
-  const { data: soldMap } = useQuery({
-    queryKey: ['erp-soldmap', from, to],
-    queryFn: async (): Promise<Map<number, number>> => {
-      const map = new Map<number, number>();
-      const qs = new URLSearchParams();
-      if (from) qs.set('from', from);
-      if (to) qs.set('to', to);
-      qs.set('status', 'CONFIRMATION');
-      qs.set('page', '0');
-      qs.set('size', '100');
+type InventoryProps = { from?: string; to?: string };
 
-      const fetchPage = async (pageIdx: number) => {
-        qs.set('page', String(pageIdx));
-        const r = await http.get(`/order/admin/erp?${qs.toString()}`);
-        const d = (r as any)?.data ?? r;
-        return d?.result ?? d;
-      };
+export default function InventoryTable({ from, to }: InventoryProps) {
+  /** 목록 페이징(30개/페이지 고정) */
+  const [page, setPage] = useState(1); // 유저에게 1-base로 보이고, 전송은 0-base
+  const size = 30;
 
-      const first = await fetchPage(0);
-      const totalPages: number = Number(first?.totalPages ?? 1);
+  /** 로딩/데이터 */
+  const [loading, setLoading] = useState(true);
+  const [items, setItems] = useState<ItemRow[]>([]);
+  const [total, setTotal] = useState(0);
 
-      const allOrderIds: number[] = [];
-      const eatOrderIds = (content: any[]) => {
-        for (const row of content ?? []) {
-          const oid = Number(row?.ordersId ?? 0);
-          if (oid > 0) allOrderIds.push(oid);
-        }
-      };
-      eatOrderIds(first?.content ?? first?.list ?? []);
+  /** 구매확정 집계 */
+  const [soldByItem, setSoldByItem] = useState<Record<number, number>>({});
 
-      for (let p = 1; p < totalPages; p++) {
-        const pay = await fetchPage(p);
-        eatOrderIds(pay?.content ?? pay?.list ?? []);
+  /** 추가입고 임시값 */
+  const [extraIn, setExtraIn] = useState<Record<number, number>>({});
+
+  /** 카테고리 필터(클라이언트) */
+  const [category, setCategory] = useState<string>('');
+
+  /** 1) 아이템 목록 로드: /item (0-base 전송) */
+  async function fetchItems(pg0: number) {
+    const resp = await http.get(API.items(pg0, size));
+    const data = (resp as any)?.data ?? resp;
+    const list = toArray<any>(data?.result ?? data).map((x) => ({
+      itemId: Number(x.itemId ?? x.id),
+      itemCategory: String(x.itemCategory ?? x.category ?? ''),
+      itemName: String(x.itemName ?? x.title ?? x.name ?? ''),
+      itemStock: Number(x.itemStock ?? x.stock ?? 0),
+    })) as ItemRow[];
+
+    // 총 건수 추출(여러 필드 케이스 방어)
+    const totalElements =
+      Number(
+        (data?.result ?? data)?.totalElements ??
+          (data?.result ?? data)?.total ??
+          (data?.page?.totalElements ?? (data?.totalCount ?? 0))
+      ) || 0;
+
+    return { list, totalElements };
+  }
+
+  /** 2) 구매확정 주문(ERP) → 모든 라인아이템을 itemId별로 합산 */
+  async function buildSoldQtyByItem(): Promise<Record<number, number>> {
+    let pg0 = 0;          // ★ 0-base 시작 (중요)
+    const sz = 200;
+    const ordersIds: number[] = [];
+
+    for (let i = 0; i < 50; i++) {
+      // ★ from/to는 필수
+      const resp = await http.get(
+        API.erp({ status: 'CONFIRMATION', page: pg0, size: sz, from, to })
+      );
+      const data = (resp as any)?.data ?? resp;
+      const pagePayload = data?.result ?? data;
+
+      const rows = toArray<any>(pagePayload);
+      if (rows.length === 0) break;
+
+      for (const r of rows) {
+        const oid = Number(r.ordersId ?? r.id ?? r.orders_id);
+        const status = String(r.status ?? r.ordersStatus ?? '').toUpperCase();
+        if (oid > 0 && status === 'CONFIRMATION') ordersIds.push(oid);
       }
 
-      for (const oid of allOrderIds) {
-        const r = await http.get(`/order/${oid}`);
-        const d = (r as any)?.data ?? r;
-        const detail = d?.result ?? d;
-        const items: any[] = detail?.ordersItems ?? [];
-        for (const it of items) {
-          const id = Number(it?.itemId ?? it?.item?.itemId ?? 0);
-          const q = Number(it?.quantity ?? 0);
-          if (!id || !q) continue;
-          map.set(id, (map.get(id) ?? 0) + q);
-        }
+      const totalPages =
+        Number(
+          pagePayload?.totalPages ??
+            pagePayload?.page?.totalPages ??
+            pagePayload?.total_pages ??
+            1
+        ) || 1;
+      if (pg0 >= totalPages - 1) break; // 마지막 페이지 도달
+      pg0 += 1;
+    }
+
+    // 주문 상세 합산
+    const acc: Record<number, number> = {};
+    for (const oid of ordersIds) {
+      const resp = await http.get(API.orderDetail(oid));
+      const data = (resp as any)?.data ?? resp;
+      const payload = data?.result ?? data;
+
+      const lines: OrderLine[] = toArray<any>(payload?.orderItems ?? payload?.ordersItems).map(
+        (li) => ({
+          itemId: Number(li.itemId ?? li.item?.itemId ?? li.item_id),
+          orderQuantity: Number(li.orderQuantity ?? li.quantity ?? li.order_quantity ?? 0),
+        })
+      );
+
+      for (const li of lines) {
+        if (!li.itemId || !Number.isFinite(li.orderQuantity)) continue;
+        acc[li.itemId] = (acc[li.itemId] ?? 0) + Math.max(0, li.orderQuantity);
       }
-      return map;
-    },
-    staleTime: 30_000,
-  });
+    }
 
-  const { data, refetch } = useQuery({
-    queryKey: ['items-all', page, size, category],
-    queryFn: (): Promise<ItemsPage> => fetchItems(page, size, category),
-    staleTime: 30_000,
-  });
+    return acc;
+  }
 
-  const totalPages = useMemo(() => {
-    const total = data?.totalElements ?? 0;
-    return Math.max(1, Math.ceil(total / size));
-  }, [data?.totalElements, size]);
+  /** 최초 및 의존성 변경 로드 */
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        setLoading(true);
+        // 목록은 현재 페이지, 집계는 기간(from/to)에 대해 전체
+        const [{ list, totalElements }, sold] = await Promise.all([
+          fetchItems(Math.max(0, page - 1)),
+          buildSoldQtyByItem(),
+        ]);
+        if (!alive) return;
+        setItems(list);
+        setTotal(totalElements);
+        setSoldByItem(sold);
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [page, from, to]); // 페이지/기간 바뀌면 재조회
 
-  const rowsBase: InventoryRow[] = useMemo(() => {
-    const list = data?.list ?? [];
-    return list.map((x: ItemRow): InventoryRow => {
-      const sold = (soldMap as Map<number, number> | undefined)?.get(x.itemId) ?? 0;
-      // ✅ 요구사항: 잔여재고 = 현재재고 (판매수량과 무관)
-      const remain = x.itemStock ?? 0;
-      return { ...x, sold, remain };
+  /** 화면 표시용 rows (등록수량-구매확정수량) + 카테고리 필터 적용 */
+  const rows = useMemo(() => {
+    const baseRows = items.map((it) => {
+      const base = Number(it.itemStock ?? 0);          // 등록/저장된 수량
+      const sold = Number(soldByItem[it.itemId] ?? 0); // 구매확정 누적 판매수량
+      const current = Math.max(0, base - sold);        // 화면상 현재 재고(요구사항)
+      return {
+        itemId: it.itemId,
+        category: it.itemCategory,
+        name: it.itemName,
+        base,
+        sold,
+        current,
+      };
     });
-  }, [data, soldMap]);
+    return category ? baseRows.filter((r) => r.category === category) : baseRows;
+  }, [items, soldByItem, category]);
 
-  const [edited, setEdited] = useState<Record<number, number>>({});
-  const [saving, setSaving] = useState(false);
+  /** 카테고리 목록 (현재 페이지 아이템 기준, 중복 제거) */
+  const categoryOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const it of items) {
+      if (it.itemCategory) set.add(it.itemCategory);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'ko'));
+  }, [items]);
 
-  const rows: InventoryRow[] = useMemo(() => {
-    return rowsBase.map((r) => {
-      const curStock = edited[r.itemId] ?? r.itemStock;
-      // ✅ 요구사항: 잔여재고 = 현재재고
-      const remain = curStock;
-      return { ...r, itemStock: curStock, remain };
-    });
-  }, [rowsBase, edited]);
-
+  /** “추가입고 → 전체 저장” */
   async function saveAll() {
-    const changes = Object.entries(edited)
-      .map(([k, v]) => [Number(k), Math.max(0, Number(v))] as [number, number])
-      .filter(([itemId, next]) => {
-        const base = rowsBase.find((x) => x.itemId === itemId);
-        return base && base.itemStock !== next;
-      });
-
-    if (changes.length === 0) return alert('변경된 재고가 없습니다.');
-
+    // 변경 있는 아이템만 추출
+    const tasks: Promise<any>[] = [];
+    for (const r of rows) {
+      const add = Number(extraIn[r.itemId] ?? 0);
+      if (!Number.isFinite(add) || add === 0) continue;
+      // DB 저장 값은 itemStock(등록수량) 기준으로 +추가입고
+      const nextStock = Math.max(0, r.base + add);
+      tasks.push(http.put(API.putStock(r.itemId), { itemStock: nextStock }));
+    }
+    if (tasks.length === 0) {
+      alert('변경된 재고가 없습니다.');
+      return;
+    }
+    await Promise.all(tasks);
+    // 저장 후 목록 재조회 + 입력값 초기화
+    setExtraIn({});
+    // 현재 페이지 다시 불러오기
+    setLoading(true);
     try {
-      setSaving(true);
-      for (const [itemId, nextStock] of changes) {
-        await http.put(`/item/${itemId}/stock`, { itemStock: nextStock });
-      }
-      await refetch();
-      setEdited({});
-      alert(`재고가 저장되었습니다. (총 ${changes.length}건)`);
-    } catch (e: any) {
-      alert(e?.message || '재고 저장 중 오류가 발생했습니다.');
+      const [{ list, totalElements }, sold] = await Promise.all([
+        fetchItems(Math.max(0, page - 1)),
+        buildSoldQtyByItem(),
+      ]);
+      setItems(list);
+      setTotal(totalElements);
+      setSoldByItem(sold);
+      alert('재고가 저장되었습니다.');
     } finally {
-      setSaving(false);
+      setLoading(false);
     }
   }
 
+  if (loading) return <div className="text-center py-12 text-gray-500">로딩중…</div>;
+
   return (
-    <section className="apn-inventory mt-8">
-      <div className="admin-head text-center">
-        <h2 className="admin-title-sm">
-          <span>Inventory</span>
-        </h2>
-      </div>
+    <>
+      <section className="mt-[20px]">
+        {/* 상단 타이틀 */}
+        <div className="admin-head text-center">
+          <h1 className="admin-title">
+            <span>INVENTORY</span>
+             <Paw className="apn-title-ico" />
+          </h1>
+        </div>
 
-      {/* 필터 바 */}
-      <div className="inv-actions flex items-center justify-center gap-2 mt-[12px]">
-        <label className="text-sm">카테고리</label>
-        <select
-          className="dropdown"
-          value={category}
-          onChange={(e) => {
-            setCategory(e.target.value);
-            setPage(1);
-          }}
-        >
-          {CATEGORIES.map((c) => (
-            <option key={c.value} value={c.value}>
-              {c.label}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div className="admin-sep" />
-
-      {/* 테이블 (모두 가운데 정렬) */}
-      <div className="overflow-x-auto">
-        <table className="admin-table min-w-full text-sm">
-          <thead>
-            <tr>
-              <th className="w-24">상품 ID</th>
-              <th className="w-32">카테고리</th>
-              <th>상품명</th>
-              <th className="w-28">현재 재고</th>
-              <th className="w-28">판매수량(확정)</th>
-              <th className="w-28">잔여 재고</th>
-              <th className="w-28">관리</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.itemId}>
-                <td>{r.itemId}</td>
-                <td>{r.itemCategory}</td>
-                <td>{r.itemName}</td>
-                <td>
-                  <input
-                    type="number"
-                    value={edited[r.itemId] !== undefined ? edited[r.itemId] : r.itemStock}
-                    min={0}
-                    className="admin-input w-24 text-center"
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      setEdited((m) => ({ ...m, [r.itemId]: v === '' ? 0 : Number(v) }));
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') saveAll();
-                    }}
-                  />
-                </td>
-                <td>{r.sold}</td>
-                <td>{r.remain}</td>
-                <td>
-                  <Link className="link" href={`/items/${r.itemId}`}>
-                    상품보기
-                  </Link>
-                </td>
-              </tr>
+        {/* 카테고리 필터 (ERP 톤, 가운데 정렬) */}
+        <div className="inv-actions">
+          <label className="inv-label">카테고리</label>
+          <select
+            className="dropdown inv-select"
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+          >
+            <option value="">전체</option>
+            {categoryOptions.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
             ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* 하단: 저장(우측) + 페이징(가운데) */}
-      <div className="mt-3 grid grid-cols-[1fr_auto] items-center">
-        {/* 페이징: 가운데 정렬 */}
-        <div className="flex justify-center">
-          <div className="flex items-center gap-2">
+          </select>
+          {category && (
             <button
-              className="btn-3d btn-white"
-              disabled={page <= 1}
-              onClick={() => setPage(page - 1)}
+              type="button"
+              className="btn-3d btn-white inv-reset"
+              onClick={() => setCategory('')}
+              aria-label="카테고리 초기화"
             >
-              이전
+              초기화
             </button>
-            <span className="text-sm">
-              {page} / {Math.max(1, Math.ceil((data?.totalElements ?? 0) / size))}
-            </span>
-            <button
-              className="btn-3d btn-white"
-              disabled={page >= Math.max(1, Math.ceil((data?.totalElements ?? 0) / size))}
-              onClick={() => setPage(page + 1)}
-            >
-              다음
+          )}
+        </div>
+
+        <div className="admin-sep" />
+
+        {/* 테이블 (모두 가운데 정렬) */}
+        <div className="mt-3 overflow-x-auto">
+          <table className="admin-table min-w-full text-sm">
+            <thead>
+              <tr>
+                <th className="w-20">상품 ID</th>
+                <th className="w-32">카테고리</th>
+                <th className="w-[360px]">상품명</th>
+                <th className="w-24">재고수</th>
+                <th className="w-36">출고</th>
+                <th className="w-28">추가입고</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.itemId}>
+                  <td>{r.itemId}</td>
+                  <td>{r.category}</td>
+                  <td>{r.name}</td>
+                  <td>{nf(r.current)}</td>
+                  <td>{nf(r.sold)}</td>
+                  <td>
+                    <input
+                      type="number"
+                      className="border rounded px-2 py-1 w-[90px] text-center"
+                      placeholder="0"
+                      min={0}
+                      value={extraIn[r.itemId] ?? ''}
+                      onChange={(e) =>
+                        setExtraIn((prev) => ({
+                          ...prev,
+                          [r.itemId]:
+                            e.target.value === '' ? ('' as any) : Number(e.target.value),
+                        }))
+                      }
+                    />
+                  </td>
+                </tr>
+              ))}
+              {rows.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="py-8 text-gray-500">
+                    데이터가 없습니다.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="admin-sep" />
+
+        {/* 페이징(가운데) + 저장(오른쪽) */}
+        <div className="grid grid-cols-[1fr_auto] items-center">
+          <div className="flex justify-center">
+            <Pagination current={page} total={total} size={size} onPage={(p) => setPage(p)} />
+          </div>
+          <div className="flex items-center gap-2 justify-end">
+            <button className="btn-3d btn-primary" type="button" onClick={saveAll}>
+              저장
             </button>
           </div>
         </div>
+      </section>
 
-        {/* 저장: 우측 정렬 */}
-        <div className="flex justify-end">
-          <button className="btn-3d btn-primary" disabled={saving} onClick={saveAll}>
-            저장
-          </button>
-        </div>
-      </div>
-
-      {/* 페이지 한정 스타일 */}
+      {/* 이 컴포넌트 전용 스타일 */}
       <style jsx>{`
-        .admin-title-sm { font-size: 22px; font-weight: 600; color: #000; }
-        .admin-sep { border-top: 1px solid #e5e7eb; margin: 16px 0; }
-        .admin-input {
-          height: 36px; padding: 0 10px; border: 1px solid #e5e7eb; border-radius: 10px; outline: none;
+        .admin-title {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 24px;
+          font-weight: 600;
+          color: #000;
+        }
+        .admin-sep {
+          border-top: 1px solid #e5e7eb;
+          margin: 16px 0;
+        }
+
+        /* 필터 바 */
+        .inv-actions {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          margin-top: 10px;
+        }
+        .inv-label {
+          font-size: 14px;
+        }
+        .inv-select {
+          height: 36px;
+          border: 1px solid #e5e7eb;
+          border-radius: 10px;
+          padding: 0 10px;
           background: #fff;
-        }
-        .dropdown {
-          height: 36px; border: 1px solid #e5e7eb; border-radius: 10px; padding: 0 10px; background: #fff;
           text-align: center;
+          min-width: 180px;
         }
-        .btn-3d {
-          display: inline-flex; align-items: center; justify-content: center;
-          height: 36px; padding: 0 12px; border-radius: 10px; border: 1px solid #e5e7eb; cursor: pointer;
-          transition: transform .02s ease;
+        .inv-reset {
+          height: 36px;
+          padding: 0 12px;
         }
-        .btn-3d:active { transform: translateY(1px); }
-        .btn-white { background: #fff; color: #111; }
-        .btn-primary { background: #fff color: #111;  }
 
-        /* (4) 링크 스타일: 검정, 밑줄 제거 */
-        .link { color: #111; text-decoration: none; }
-
-        /* (1) 테이블 + 셀 모두 가운데 정렬 */
+        /* 테이블 전체/모든 셀 중앙 정렬 */
         .admin-table {
           border-collapse: separate;
           border-spacing: 0;
@@ -315,14 +388,27 @@ export default function InventoryTable({ from, to }: Props) {
           text-align: center;
         }
         .admin-table thead tr {
-          background: #fafafa;
+          background: #fafafa; /* ERP 톤 */
           font-weight: 600;
         }
-        .admin-table th, .admin-table td {
-          padding: 10px 8px; border-bottom: 1px solid #e5e7eb; text-align: center;
+        .admin-table th,
+        .admin-table td {
+          padding: 10px 8px;
+          border-bottom: 1px solid #e5e7eb;
+          text-align: center;
+          vertical-align: middle;
         }
-        .admin-table tbody tr:hover { background: #f9fafb; }
+        .admin-table tbody tr:hover {
+          background: #f9fafb;
+        }
+        /* 입력 박스 숫자 중앙 표시 */
+        .admin-table input[type='number'] {
+          text-align: center;
+          border-color: #e5e7eb;
+          border-radius: 5px;
+          
+        }
       `}</style>
-    </section>
+    </>
   );
 }
