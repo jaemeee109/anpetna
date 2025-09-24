@@ -8,11 +8,12 @@ import {
   createBoard,
   createBoardByFormData,
   updateBoard,
+  updateBoardByFormData,
   removeBoard,
   likeBoard,
-  updateBoardByFormData,
   type FetchBoardsParams,
-} from '@/features/board/data/board.api';
+} from "@/features/board/data/board.api";
+
 import type { UpdateBoardReq } from '@/features/board/data/board.types';
 
 type UpdateBoardArg = UpdateBoardReq & { images?: File[] };
