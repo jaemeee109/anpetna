@@ -26,6 +26,7 @@ public class ReadMemberOneRes {
     private String memberEmail;//이메일
     private String memberPhone;//전화번호
     private String memberRoadAddress;//주소
+    private String memberDetailAddress;
     private String memberZipCode;//우편번호
     private boolean social;//소셜로그인
     private String memberHasPet;//반려동물유무
@@ -48,6 +49,7 @@ public class ReadMemberOneRes {
                 .memberEmail(memberEntity.getMemberEmail())
                 .memberPhone(memberEntity.getMemberPhone())
                 .memberRoadAddress(memberEntity.getMemberRoadAddress())
+                .memberDetailAddress(memberEntity.getMemberDetailAddress())
                 .memberZipCode(memberEntity.getMemberZipCode())
                 .social(memberEntity.isMemberSocial())
                 .memberHasPet(memberEntity.getMemberHasPet())
@@ -57,5 +59,4 @@ public class ReadMemberOneRes {
                 .build();
 
     }
-
 }

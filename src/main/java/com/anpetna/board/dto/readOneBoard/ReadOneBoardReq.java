@@ -17,6 +17,7 @@ import java.util.List;
 public class ReadOneBoardReq {
 
     private Long bno;
+    private String memberId;
     private List<ImageDTO> images;
 
 }

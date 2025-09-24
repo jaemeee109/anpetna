@@ -12,7 +12,7 @@ public class WebConfig implements WebMvcConfigurer {
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/**")
-                .allowedOrigins("http://localhost:3000")
+                .allowedOrigins("http://localhost:3000", "http://192.168.0.160:3000")
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS")
                 .allowedHeaders("*")
                 .allowCredentials(true);
@@ -30,4 +30,10 @@ public class WebConfig implements WebMvcConfigurer {
         registry.addResourceHandler("/files/**")
                 .addResourceLocations(location);
     }
+
+    //실제 파일 위치와 URL 매핑 구분
+    //브라우저가 GET /files/test.png 호출
+    //서버는 /tmp/uploads/test.png 읽어서 반환
+    //즉, /images/**는 "가짜 URL prefix", uploadPath는 "실제 물리 경로".
+
 }

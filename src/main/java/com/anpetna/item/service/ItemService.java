@@ -10,6 +10,7 @@ import com.anpetna.item.dto.registerItem.RegisterItemReq;
 import com.anpetna.item.dto.registerItem.RegisterItemRes;
 import com.anpetna.item.dto.searchAllItem.SearchAllItemsReq;
 import com.anpetna.item.dto.searchAllItem.SearchAllItemsRes;
+import com.anpetna.item.dto.searchAllItem.SearchItemsSalesRank;
 import com.anpetna.item.dto.searchOneItem.SearchOneItemReq;
 import com.anpetna.item.dto.searchOneItem.SearchOneItemRes;
 import org.springframework.data.domain.Page;
@@ -22,13 +23,14 @@ import java.util.List;
 
 public interface ItemService {
 
-    RegisterItemRes registerItem(RegisterItemReq req,  List<MultipartFile> files) throws IOException;
+    RegisterItemRes registerItem(RegisterItemReq req, MultipartFile thumb, List<MultipartFile> files);
 
-    ModifyItemRes modifyItem(ModifyItemReq req,  List<MultipartFile> files);
+    ModifyItemRes modifyItem(ModifyItemReq req);
 
     DeleteItemRes deleteItem(DeleteItemReq req);
 
     PageResponseDTO<SearchAllItemsRes> getAllItems(SearchAllItemsReq req);
 
     SearchOneItemRes getOneItem(SearchOneItemReq req);
+
 }

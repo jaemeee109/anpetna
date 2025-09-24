@@ -1,22 +1,20 @@
 package com.anpetna.image.dto;
 
-import com.anpetna.image.constant.ImageUsage;
 import com.anpetna.image.domain.ImageEntity;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import org.springframework.web.multipart.MultipartFile;
 import java.util.UUID;
 
 @Getter
 @Builder
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 public class ImageDTO {
 
     private UUID uuid;        // 이미지 고유 ID
-    private String ext;
+
+    private String ext;         // 확장자
 
     private String fileName;     // 저장 파일명 (UUID + 확장자)
 
@@ -24,25 +22,18 @@ public class ImageDTO {
 
     private String contentType;  // MIME 타입 (image/png 등)
 
-    private String url;          // 접근 가능한 URL(실제 서비스에서는 CDN/S3 기반 URL 매핑)
-
-    @Builder.Default
-    private ImageUsage usage = ImageUsage.ETC;
+    private String url;          // 접근 가능한 URL  <img src="{thumbnailUrl}">
 
     private Integer sortOrder;   // 정렬 순서 (옵션)
 
-    public ImageDTO(MultipartFile file) {
+    public ImageDTO(MultipartFile file, Integer sortOrder) {
         // 새 파일명 생성
         this.uuid = UUID.randomUUID();
         this.originalName = file.getOriginalFilename();
         this.ext = file.getOriginalFilename().substring(file.getOriginalFilename().lastIndexOf(".")); //확장자
         this.fileName = uuid+ext;
         this.contentType = "image/" + ext.substring(ext.lastIndexOf(".") + 1);
-    }
-
-    public ImageDTO setUrl(String urlBase) {
-        this.url = urlBase;
-        return this;
+        this.sortOrder = sortOrder;
     }
 
     // Entity -> DTO 변환 생성자

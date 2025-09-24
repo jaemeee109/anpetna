@@ -1,5 +1,8 @@
 package com.anpetna.item.controller;
 
+import com.anpetna.ApiResult;
+import com.anpetna.core.coreDto.PageRequestDTO;
+import com.anpetna.core.coreDto.PageResponseDTO;
 import com.anpetna.item.dto.ReviewDTO;
 import com.anpetna.item.dto.deleteReview.DeleteReviewReq;
 import com.anpetna.item.dto.deleteReview.DeleteReviewRes;
@@ -11,17 +14,21 @@ import com.anpetna.item.dto.searchAllReview.SearchAllReviewsReq;
 import com.anpetna.item.dto.searchOneReview.SearchOneReviewReq;
 import com.anpetna.item.dto.searchOneReview.SearchOneReviewRes;
 import com.anpetna.item.service.ReviewService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
+import org.hibernate.query.SortDirection;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
 @RestController
-@RequestMapping("/review")
+@RequestMapping("/item/{itemId}/review")
 @Log4j2
 @RequiredArgsConstructor
 public class ReviewController {
@@ -30,38 +37,63 @@ public class ReviewController {
 
     private final ReviewService reviewService;
 
-    @PostMapping
-    //컨트롤러나 서비스 메서드 실행 전에 SpEL(Security Expression Language)로 권한 검증
-    public ResponseEntity<RegisterReviewRes> registerReview(@RequestBody RegisterReviewReq req) {
-        var postResult = reviewService.registerReview(req);
-        return new ResponseEntity<>(postResult, HttpStatus.OK);
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("isAuthenticated()")
+    public ApiResult<RegisterReviewRes> registerReview(
+            @PathVariable Long itemId,
+            @RequestPart("json") @Valid RegisterReviewReq req,
+            @RequestPart(value = "image", required = false) MultipartFile image
+    ) {
+        var postResult = reviewService.registerReview(itemId, req, image);
+        return new ApiResult<>(postResult);
     }
 
-    @PutMapping
-    public ResponseEntity<ModifyReviewRes> updateReview(@RequestBody ModifyReviewReq req) {
-        var putResult = reviewService.modifyReview(req);
-        return new ResponseEntity<>(putResult, HttpStatus.OK);
+    @PutMapping(value = "/{reviewId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("isAuthenticated()")
+    public ApiResult<ModifyReviewRes> updateReview(
+            @PathVariable Long itemId,
+            @PathVariable Long reviewId,
+            @RequestPart("json") @Valid ModifyReviewReq req,
+            @RequestPart(value = "image", required = false) MultipartFile image
+    ) {
+        var putResult = reviewService.modifyReview(itemId, reviewId, req, image);
+        return new ApiResult<>(putResult);
     }
 
-    @DeleteMapping
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<DeleteReviewRes> deleteReview(@RequestBody DeleteReviewReq req) {
-        var deleteResult = reviewService.deleteReview(req);
-        return new ResponseEntity<>(deleteResult, HttpStatus.OK);
+
+    @DeleteMapping("/{reviewId}")
+    @PreAuthorize("isAuthenticated()")
+    public ApiResult<DeleteReviewRes> deleteReview(
+            @PathVariable Long itemId,
+            @PathVariable Long reviewId
+    ) {
+        DeleteReviewReq req = new DeleteReviewReq();
+        req.setReviewId(reviewId);
+        var deleteResult = reviewService.deleteReview(itemId, req);
+        return new ApiResult<>(deleteResult);
     }
 
-    @GetMapping("/{ItemId}")
-    @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
-    public ResponseEntity<SearchOneReviewRes> searchOneReview(@RequestBody SearchOneReviewReq req) {
+
+
+    @GetMapping("/{reviewId}")
+    public ApiResult<SearchOneReviewRes> searchOneReview(@PathVariable Long reviewId, @PathVariable String itemId) {
+        var req = new SearchOneReviewReq();
+        req.setReviewId(reviewId);
         var getOneResult = reviewService.getOneReview(req);
-        return new ResponseEntity<>(getOneResult, HttpStatus.OK);
+        return new ApiResult<>(getOneResult);
     }
 
-    @GetMapping("/{sortItem}")
-    @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
-    public ResponseEntity<List<ReviewDTO>> searchAllReviews(@RequestBody SearchAllReviewsReq req) {
-        var getAllResult = reviewService.getAllReviews(req);
-        return new ResponseEntity<>(getAllResult, HttpStatus.OK);
+    @GetMapping
+   // @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
+    public ApiResult<PageResponseDTO<ReviewDTO>> searchAllReviews(
+            @PathVariable Long itemId,
+            @ModelAttribute PageRequestDTO pageRequestDTO,
+            @RequestParam(name = "order", defaultValue = "date") String order,
+            @RequestParam(name = "direction", required = false)SortDirection sortDirection) {
+        var req = new SearchAllReviewsReq();
+        req.setItemId(itemId);
+        req.setDirection(sortDirection);
+        var getAllResult = reviewService.getAllReviews(req, pageRequestDTO, order);
+        return new ApiResult<>(getAllResult);
     }
-    //  @PreAuthorize("#id == principal.id")            // 요청 파라미터 id와 로그인 사용자 id 같을 때만 허용
 }

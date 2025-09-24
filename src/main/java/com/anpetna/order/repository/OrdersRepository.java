@@ -1,63 +1,91 @@
 package com.anpetna.order.repository;
 
-import com.anpetna.order.domain.OrderEntity;
+import com.anpetna.member.domain.MemberEntity;
+import com.anpetna.order.constant.OrdersStatus;
 import com.anpetna.order.domain.OrdersEntity;
-import com.anpetna.order.dto.OrdersDTO;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface OrdersRepository extends JpaRepository<OrdersEntity, Long> {
+public interface  OrdersRepository extends JpaRepository<OrdersEntity, Long> {
 
-
-
-    // 주문 헤더 + 품목 + 아이템까지 한번에 로딩
-    @EntityGraph(attributePaths = { "orderItems", "orderItems.itemEntity" })
-    // @EntityGraph: 연관된 컬렉션/엔티티를 즉시 함께 가져오도록 지시(N+1 문제 완화).
-    // attributePaths 경로 문법:
-    //   - "orderItems"                : OrdersEntity.orderItems 컬렉션
-    //   - "orderItems.itemEntity"     : 각 주문 품목(OrderEntity)이 가리키는 상품(ItemEntity)
-    // 결과적으로 orders 한 건을 조회할 때, 그 안의 품목들과 품목이 가리키는 아이템까지 한 번에 가져옵니다.
-    // 반환 타입 Optional: 결과가 없을 수도 있으니 null 대신 Optional로 받습니다.
+    // 주문 단건 상세 조회 (주문 헤더 + 품목 + 아이템 + 이미지까지 한번에 로딩)
+    @EntityGraph(attributePaths = {"orderItems", "orderItems.item", "orderItems.item.images"})
     Optional<OrdersEntity> findByOrdersId(Long ordersId);
 
-    // 회원별 주문 목록 페이지 (연관까지 로딩)
-    @EntityGraph(attributePaths = { "orderItems", "orderItems.itemEntity" })
-    //                               orderItems : OrdersEntity.orderItems 컬렉션
-    //                                             orderItems.itemEntity : 각 주문 품목(OrderEntity)이 가리키는 상품 (ItemEntity)
-    // 결과적으로 orders 한 건을 조회할 때, 그 안의 품목들과 품목이 가리키는 아이템까지 한 번에 가져옴
-    Page<OrdersEntity> findByMemberId(String memberId, Pageable pageable);
-    // Page<OrderEntity> : 한 번에 전부가 아닌 한 페이지 분량만 가져옴
-    // pageable : 페이지 번호, 크기, 정렬 정보를 담은 파라미터 (컨트롤러나 서비스에서 주입)
+    // 특정 회원의 주문 페이징 처리로
+    @EntityGraph(attributePaths = {"orderItems", "orderItems.item", "orderItems.item.images"})
+    Page<OrdersEntity> findByMemberId_MemberId(String memberId, Pageable pageable);
 
-    // 요약 DTO 계산 (리포지토리 default 메서드 — JPQL 없이 자바 코드로 합계 구함)
-    default Optional<OrdersDTO> findSummaryById(Long ordersId) {
-        return findByOrdersId(ordersId).map(o -> {
-            // 총 수량 계산 : orderItems가 null이면 0, 아니면 각 품목의 quantity를 모두 합산
-            int totalQty = o.getOrderItems() == null ? 0 :
-                    o.getOrderItems().stream()
-                            .mapToInt(OrderEntity::getQuantity)
-                            .sum();
+    //
+    @Query("""
+        select o from OrdersEntity o
+        where (:from is null or o.createDate >= :from)
+          and (:to   is null or o.createDate <  :to)
+          and (:status is null or o.status = :status)
+          and (:memberId is null or o.memberId.memberId = :memberId)
+    """)
+    Page<OrdersEntity> findErpList(
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to,
+            @Param("status") OrdersStatus status,
+            @Param("memberId") String memberId,
+            Pageable pageable
+    );
+    //총액 + 총 수량
+    @Query("""
+        select
+          coalesce(sum(o.totalAmount - o.shippingFee),0),
+          coalesce(sum(o.shippingFee),0),
+          coalesce(sum(o.totalAmount),0),
+          coalesce(sum(o.itemQuantity),0)
+        from OrdersEntity o
+        where (:from is null or o.createDate >= :from)
+          and (:to   is null or o.createDate <  :to)
+          and (:status is null or o.status = :status)
+          and (:memberId is null or o.memberId.memberId = :memberId)
+    """)
+    List<Object[]> sumErp(
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to,
+            @Param("status") OrdersStatus status,
+            @Param("memberId") String memberId
+    );
 
-            return OrdersDTO.builder()
-                    .ordersId(o.getOrdersId())
-                    .memberId(o.getMemberId())
-                    .cardId(o.getCardId())
-                    .totalPrice(o.getTotalAmount())
-                    .itemQuantity(totalQty)
-                    .build();
-        });
-    }
+    //스프링 데이터 JPA에선 연관 엔티티의 내부 속성으로 검색할 때 “프로퍼티 경로”를 씁니다.
+// 즉 OrdersEntity.memberId(=MemberEntity).memberId(=String)을 의미하도록 
+// 메서드명을 findByMemberId_MemberId(...)로 변경
 
-    // 사용 팁:
-    // - 상세 화면: findByOrdersId(ordersId) 로딩 → 품목/아이템까지 한 번에 사용 가능
-    // - 목록 화면: findByMemberId(memberId, pageable) → 페이징 + 연관 로딩
-    // - 요약 필요: findSummaryById(ordersId) → DTO로 바로 전달 (서비스/컨트롤러가 가벼워짐)
+//    @EntityGraph(attributePaths = { "orderItems", "orderItems.itemEntity" })
+//    Page<OrdersEntity> findByMemberId(String memberId, Pageable pageable);
+//
+//    default Optional<OrdersDTO> findSummaryById(Long ordersId) {
+//        return findByOrdersId(ordersId).map(o -> {
+//            // 총 수량 계산 : orderItems가 null이면 0, 아니면 각 품목의 quantity를 모두 합산
+//            int totalQty = o.getOrderItems() == null ? 0 :
+//                    o.getOrderItems().stream()
+//                            .mapToInt(OrderEntity::getQuantity)
+//                            .sum();
+//
+//            return OrdersDTO.builder()
+//                    .ordersId(o.getOrdersId())
+//                    .memberId(o.getMemberId())
+//                    .cardId(o.getCardId())
+//                    .totalPrice(o.getTotalAmount())
+//                    .itemQuantity(totalQty)
+//                    .build();
+//        });
+//    }
 
+    Optional<OrdersEntity> findByOrdersIdAndMemberId_MemberId(Long ordersId, String memberId);
 
 }

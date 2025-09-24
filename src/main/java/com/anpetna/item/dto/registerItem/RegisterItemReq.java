@@ -1,16 +1,17 @@
 package com.anpetna.item.dto.registerItem;
 
-import com.anpetna.image.dto.ImageListDTO;
+import com.anpetna.image.dto.ImageDTO;
 import com.anpetna.item.constant.ItemCategory;
 import com.anpetna.item.constant.ItemSellStatus;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @Builder
 @Getter
-public class RegisterItemReq extends ImageListDTO {
+@ToString
+public class RegisterItemReq {
 
     private String itemName; // 상품명
 
@@ -23,5 +24,11 @@ public class RegisterItemReq extends ImageListDTO {
     private ItemSellStatus itemSellStatus; // 상품 판매상태
 
     private ItemCategory itemCategory; // 상품 카테고리
+
+    private final List<ImageDTO> images = new ArrayList<>();
+
+    public void addImage(ImageDTO imageDTO) {
+        this.images.add(imageDTO);
+    }
 
 }

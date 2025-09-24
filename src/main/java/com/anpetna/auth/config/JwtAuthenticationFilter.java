@@ -1,5 +1,6 @@
 package com.anpetna.auth.config;
 
+import com.anpetna.adminPage.repository.AdminBlacklistJpaRepository;
 import com.anpetna.auth.service.BlacklistServiceImpl;
 import com.anpetna.auth.dto.TokenRequest;
 import com.anpetna.member.constant.MemberRole;
@@ -19,28 +20,34 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.web.filter.OncePerRequestFilter;
+
 import java.io.IOException;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 
 @RequiredArgsConstructor
 @Slf4j
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 전달사항 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 전달사항 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     //return : return 없으면 아래 JWT 검증 로직까지 계속 실행되어 불필요하게 예외가 발생할 수 있음
     //다음 필터로 넘어가는 부분, 예외처리 부분에 로그처리 다 했습니다.
-    //Deprecated 래퍼내의 메서드들 리펙토링 진행했습니다.
     //SecurityContextHolder 주입 로직에 dev/pro 구분해놓았으니 주석처리로 사용 부탁드립니다.
     //🔴➡️는 예외처리 경로이니 참고해주세요
-    //case1 : access 만료 -> jwt/refresh  |  case2 : 서명 위조, null 토큰 -> 401 Unauthorized 다시 나눠놨습니다.
-    //validateAccessToken() boolean 제거 → try-catch로 만료/위조 구분
+    //validateAccessToken() boolean 수정 요함 → try-catch로 만료/위조 구분
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     private final JwtProvider jwtProvider;
     private final BlacklistServiceImpl blacklistService;   // 토큰 블랙리스트(로그아웃 등)
     private final MemberRepository memberRepository;       // 사용자 상태(BLACKLISTED) 확인
+    private final AdminBlacklistJpaRepository adminBlacklistJpaRepository;    // ★추가
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain) throws IOException, ServletException {
@@ -61,7 +68,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         // 토큰 파싱========================================================================
         String access = header.substring(7);
         TokenRequest tokenRequest = TokenRequest.builder().accessToken(access).build();
-        try{
+        try {
 
             // 2) 블랙리스트 토큰 체크=========================================================
             if (blacklistService.isBlacklisted(tokenRequest)) {//🔴➡️ 엑세스 토큰 비어있음
@@ -94,7 +101,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 JWT 변조 가능성 : 변조된 토큰에서 null memberId가 들어올 수 있음 → 인증 우회 시도 가능*/
 
 
-            // 4) SecurityContextHolder에 인증이 없다면 주입=====================================
+            // 블랙리스트에 있는지 검증==========================================================
+            // ★ 계정 블랙리스트(현재 활성) 차단 — untilAt is null(무기한) or untilAt > now
+            LocalDateTime nowKst = LocalDateTime.now(ZoneId.of("Asia/Seoul"));
+            if (adminBlacklistJpaRepository.existsActiveByMemberId(memberId, nowKst)) {
+                log.warn("Blocked by account blacklist: memberId={}, uri={}", memberId, request.getRequestURI());
+                response.sendError(HttpServletResponse.SC_FORBIDDEN, "블랙리스트 상태(계정)"); // 403
+                return;
+            }
+
+            // 4) SecurityContextHolder 에 인증이 없다면 주입=====================================
             if (SecurityContextHolder.getContext().getAuthentication() == null) {
                 //dev~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
                 /*var roles = new ArrayList<GrantedAuthority>();
@@ -110,9 +126,29 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     response.sendError(HttpServletResponse.SC_FORBIDDEN, "User is blacklisted");  // 🔴➡️
                     return;
                 }
-                Authentication auth = jwtProvider.getAuthentication(access);
-                SecurityContextHolder.getContext().setAuthentication(auth);
+                // 5) SecurityContext 에 인증 주입 — DB 기반 권한 부여
+                Collection<? extends GrantedAuthority> authorities = List.of(
+                        new SimpleGrantedAuthority(
+                                status.name().startsWith("ROLE_") ? status.name() : "ROLE_" + status.name()
+                        )
+                );
+                UserDetails user = User.withUsername(memberId)
+                        .password("") // 사용 안함
+                        .authorities(authorities)
+                        .build();
+
+                Authentication authentication =
+                        new UsernamePasswordAuthenticationToken(user, "", authorities);
+                SecurityContextHolder.getContext().setAuthentication(authentication);
                 //end~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                /*.accountExpired(false)
+                        .accountLocked(false)
+                        .credentialsExpired(false)
+                        .disabled(false)
+                        .build();
+
+                var authDb = new UsernamePasswordAuthenticationToken(principal, null, authorities);
+                authDb.setDetails(new WebAuthenticationDetailsSource().buildDetails(request)); */
 
             }
             chain.doFilter(request, response);
@@ -131,10 +167,23 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String uri = request.getRequestURI();
-        return uri.startsWith("/jwt/");  // 리프레시/로그아웃 등 JWT 관리 엔드포인트는 필터 스킵 → 컨트롤러에서 처리
+
+        // 1) CORS 프리플라이트 요청은 무조건 패스
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+            return true;
+        }
+
+        // 2) JWT 필터에서 제외할 경로들
+        return uri.startsWith("/jwt/") ||
+                uri.startsWith("/api/pay/toss/prepare") ||
+                uri.startsWith("/api/pay/toss/confirm") ||
+                uri.startsWith("/api/pay/toss/client-key") ||
+                uri.startsWith("/toss-success.html") ||
+                uri.startsWith("/toss-fail.html") ||
+                uri.startsWith("/toss-test.html");
     }
 
-    // payload에서 sub만 안전하게 추출 (로그용)
+    // payload 에서 sub 만 안전하게 추출 (로그용)
     private String safeSub(String jwt) {
         try {
             return jwtProvider.parseClaims(jwt).getSubject();

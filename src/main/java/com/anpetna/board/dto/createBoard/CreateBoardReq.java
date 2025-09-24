@@ -53,7 +53,7 @@ public class CreateBoardReq {
     private Integer bLikeCount = 0;
 
     @Size(max = 50)
-    private String faqCategory; // ★ 추가
+    private String category; // ★ 추가
 
 }
 

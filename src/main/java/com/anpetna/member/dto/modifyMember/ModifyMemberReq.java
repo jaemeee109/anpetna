@@ -2,14 +2,12 @@ package com.anpetna.member.dto.modifyMember;
 
 import com.anpetna.member.constant.MemberRole;
 import com.anpetna.member.dto.MemberDTO;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.util.List;
 
 @Getter
+@Setter
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
@@ -21,6 +19,7 @@ public class ModifyMemberReq {
     private String memberEmail;//이메일
     private String memberPhone;//전화번호
     private String memberRoadAddress;//주소
+    private String memberDetailAddress;
     private String memberZipCode;//우편번호
     private String memberHasPet;//반려동물유무
 

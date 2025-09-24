@@ -16,7 +16,7 @@ import java.util.List;
         name = "anpetna_board"
         // ★ 선택: 성능 위해 보드타입+카테고리 인덱스 추가
         , indexes = {
-        @Index(name = "idx_board_type_category", columnList = "board_type, faq_category")
+        @Index(name = "idx_board_type_category", columnList = "board_type, category")
 }
 )
 @Getter
@@ -54,14 +54,15 @@ public class BoardEntity extends BaseEntity {
     @Enumerated(EnumType.STRING)
     private BoardType boardType;    // 게시물 종류
 
-    @Column(nullable = false) @Builder.Default
+    @Column(nullable = false)
+    @Builder.Default
     private Boolean noticeFlag = false;        // 상단 고정 여부
 
     @Column(nullable = false)
     private Boolean isSecret;        // 비밀글 여부
 
-    @Column(name = "faq_category", length = 50)
-    private String faqCategory; // ★ 추가
+    @Column(name = "category", length = 50)
+    private String category; // ★ 추가
 
     @Builder.Default
     @OneToMany(mappedBy = "board", cascade = CascadeType.ALL, orphanRemoval = true)
@@ -70,9 +71,9 @@ public class BoardEntity extends BaseEntity {
 
 
     public void addImage(ImageEntity image) {
-        images.add(image);
-        image.setBoard(this); // ImageEntity에 setBoard(…) 존재해야 함
-    }
+            images.add(image);
+            image.setBoard(this); // ImageEntity에 setBoard(…) 존재해야 함
+        }
 
     public void removeImage(ImageEntity image) {
         images.remove(image);

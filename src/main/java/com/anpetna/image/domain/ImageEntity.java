@@ -1,16 +1,13 @@
 package com.anpetna.image.domain;
 
-
 import com.anpetna.board.domain.BoardEntity;
-import com.anpetna.image.constant.ImageUsage;
 import com.anpetna.item.domain.ItemEntity;
 import com.anpetna.item.domain.ReviewEntity;
 import com.anpetna.member.domain.MemberEntity;
 import jakarta.persistence.*;
-import lombok.AccessLevel;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.util.UUID;
 
@@ -22,8 +19,14 @@ import java.util.UUID;
 public class ImageEntity {
 
     @Id
-    @Column(name = "image_uuid")
+    @JdbcTypeCode(SqlTypes.CHAR)                        // CHAR(36)로 저장
+    @Column(name = "image_uuid", length = 36, nullable = false, updatable = false)
     private UUID uuid;
+    //이미지 등록시 uuid서비스에서 생성...GeneratedValue에 IDENTITY/AUTO에 코드를 맞추면 DB에 들어가고 나서야 UUID를 활용할 수 있음
+
+    //@GeneratedValue
+    //Hibernate가 UUID를 자동 생성하도록 설정.
+    //기본 전략은 JPA AUTO → Hibernate가 UUIDGenerator 사용 가능.
 
     @Column(name = "image_ext")
     private String ext;
@@ -36,10 +39,6 @@ public class ImageEntity {
 
     @Column(name = "image_url")
     private String url;
-
-    @Column(name = "image_usage")
-    @Enumerated(EnumType.STRING)
-    private ImageUsage usage;
 
     @Column(name = "image_contentType")
     private String contentType;
@@ -60,9 +59,6 @@ public class ImageEntity {
     @JoinColumn(name = "item_id", foreignKey = @ForeignKey(name = "fk_image_item"))
     private ItemEntity item;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = true)
-    @JoinColumn(name = "review_id",foreignKey = @ForeignKey(name = "fk_image_review"))
-    private ReviewEntity review;
 
 
     // ====== 편의 메서드: 부모 연결은 한 번에 하나만 ======
@@ -70,28 +66,18 @@ public class ImageEntity {
         this.board = b;
         this.member = null;
         this.item = null;
-        this.review= null;
         if (b != null) b.getImages().add(this);
     }
     public void attachToMember(MemberEntity m) {
         this.board = null;
         this.member = m;
         this.item = null;
-        this.review= null;
         if (m != null) m.getImages().add(this);
     }
     public void attachToItem(ItemEntity i) {
         this.board = null;
         this.member = null;
         this.item = i;
-        this.review = null;
-        if (i != null) i.getImages().add(this);
-    }
-    public void attachToReview(ReviewEntity i) {
-        this.board = null;
-        this.member = null;
-        this.item = null;
-        this.review = i;
         if (i != null) i.getImages().add(this);
     }
 
@@ -103,7 +89,14 @@ public class ImageEntity {
         if (board  != null) cnt++;
         if (member != null) cnt++;
         if (item   != null) cnt++;
-        if (review != null) cnt++;
+
+        // 리뷰 전용 이미지(ReviewEntity가 image FK로 참조)인 경우에는
+        // board/member/item 부모가 없어도 정상으로 본다.
+        if (cnt == 0) {
+            return;
+        }
+
+
         if (cnt != 1) {
             throw new IllegalStateException("Image must be attached to exactly ONE parent (board|member|item|review).");
         }
@@ -132,14 +125,6 @@ public class ImageEntity {
         img.setUrl(url);
         img.setSortOrder(order == null ? 0 : order);
         img.attachToItem(i);
-        return img;
-    }
-    public static ImageEntity forReview(String fileName, String url, ReviewEntity r, Integer order) {
-        ImageEntity img = new ImageEntity();
-        img.setFileName(fileName);
-        img.setUrl(url);
-        img.setSortOrder(order == null ? 0 : order);
-        img.attachToReview(r);
         return img;
     }
 }

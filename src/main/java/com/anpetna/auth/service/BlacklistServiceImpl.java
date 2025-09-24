@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
@@ -84,6 +85,7 @@ public class BlacklistServiceImpl implements BlacklistService {
     // 만료된 블랙리스트를 주기적으로 청소
     // 매시 정각(주기 = 1시간)에 실행됨
     @Scheduled(cron = "0 0 * * * *")
+    @Transactional
     @Override
     public void purgeExpired() {
         blacklistRepo.deleteByExpiresAtBefore(Instant.now());

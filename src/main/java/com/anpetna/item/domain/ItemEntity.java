@@ -1,6 +1,5 @@
 package com.anpetna.item.domain;
 
-
 import com.anpetna.image.domain.ImageEntity;
 import com.anpetna.core.coreDomain.BaseEntity;
 import com.anpetna.item.constant.ItemCategory;
@@ -23,7 +22,7 @@ public class ItemEntity extends BaseEntity {
 
     @Id
     @Column(name="item_id")
-    @GeneratedValue(strategy= GenerationType.AUTO)
+    @GeneratedValue(strategy= GenerationType.IDENTITY)
     private Long itemId; // 상품코드
 
     @Column(name="item_name", nullable=false,length=50)
@@ -52,8 +51,14 @@ public class ItemEntity extends BaseEntity {
 
     @Builder.Default
     @OneToMany(mappedBy = "item", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("sortOrder ASC")
     private List<ImageEntity> images = new ArrayList<>();
 
+    //JPA의 컬렉션 매핑(@OneToMany)
+    //List<ImageEntity>는 DB에서 정렬 조건이 없으면 임의 순서로 가져올 수 있음
+    //기본적으로 @OneToMany는 @OrderColumn 없으면 순서 보장 안 됨
+
+    //images 컬렉션 관리용 메서드
     public void addImage(ImageEntity image) {
         images.add(image);
         image.setItem(this);
@@ -62,4 +67,11 @@ public class ItemEntity extends BaseEntity {
         images.remove(image);
         image.setItem(null);
     }
+    public void setImage(ImageEntity image, int sortOrder) {
+        images.add(sortOrder,image);
+        image.setItem(this);
+    }
+    //삭제: images.remove(image) → flush 시점에 delete.
+    //추가: images.add(newImage) → flush 시점에 insert.
+    //순서 변경: Collections.sort(images, comparator) → flush 시점에 sortOrder 컬럼 update.
 }

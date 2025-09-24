@@ -18,6 +18,7 @@ public class SearchAllItemsReq {
     private Sort.Direction orderByDate; // 최신순 / 오래된 순
     private Sort.Direction orderByPrice; // 가격 높은 순 /가격 낮은 순
     private Sort.Direction orderBySales; // 판매량 높은 순 / 판매량 낮은 순
+    private String keyword;
 
     //  Pagenation
     @Builder.Default

@@ -1,23 +1,42 @@
 package com.anpetna.order.service;
 
-import com.anpetna.order.dto.OrdersDTO;
-import org.springframework.data.domain.Page;
+import com.anpetna.member.domain.MemberEntity;
+import com.anpetna.order.constant.OrdersStatus;
+import com.anpetna.order.dto.AddressDTO;
+import com.anpetna.order.dto.createOrderDTO.CreateOrderReq;
+import com.anpetna.order.dto.createOrderDTO.CreateOrderRes;
+import com.anpetna.order.dto.readAllOrderDTO.ReadAllOrdersRes;
+import com.anpetna.order.dto.readOneOrderDTO.ReadOneOrdersRes;
 import org.springframework.data.domain.Pageable;
+import org.springframework.transaction.annotation.Transactional;
 
 public interface OrdersService {
 
-    // 주문 단건 상세
-    OrdersDTO getDetail(Long ordersId);
+    // 추가=========================================================
 
-    // 회원별 주문 요약 페이지(해당 회원의 모든 주문)
-    Page<OrdersDTO> getSummariesByMember(String memberId, Pageable pageable);
-
-    // getSummary -> 특정 주문 1건의 요약 정보만 반환
-    // getSummariesByMember -> 나의 주문 화면 목록, 특정 회원의 주문들을 페이지 단위로 요약 리스트 반환
-
-    // 한 건의 주문서 내에 있는 것들 전체 삭제
-    void delete(Long ordersId);
+    CreateOrderRes create(String memberId, CreateOrderReq req);
+    // =====================================================
 
 
+    // 배송 상태 변경
+    ReadOneOrdersRes updateStatus(Long ordersId, OrdersStatus nextStatus);
+
+    //관리자 전용 상태 변경
+    ReadOneOrdersRes adminStatus(Long ordersId, OrdersStatus next, String reason);
+    // 배송지 변경 추가
+    ReadOneOrdersRes updateAddress(Long ordersId, AddressDTO address);
+
+
+    // 주문서 단건 상세 보기
+    ReadOneOrdersRes getDetail(Long ordersId);
+
+
+    // 전체 계산서 목록 요약 보기
+    ReadAllOrdersRes getAllOrders(Pageable pageable);
+    //회계(erp
+    ReadAllOrdersRes erp(String from, String to, OrdersStatus status, String memberId, Pageable pageable);
+
+    // 특정 회원의 계산서 목록 요약 보기
+    ReadAllOrdersRes getSummariesByMember(String memberId, Pageable pageable);
 
 }

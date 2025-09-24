@@ -19,5 +19,4 @@ public class ImageListDTO {
     public void addImage(ImageDTO imageDTO) {
         images.add(imageDTO);
     }
-
 }
