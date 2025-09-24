@@ -9,6 +9,7 @@ import com.anpetna.image.repository.ImageRepository;
 import com.anpetna.image.service.LocalStorage;
 import com.anpetna.item.config.ItemMapper;
 import com.anpetna.item.domain.ItemEntity;
+import com.anpetna.item.dto.ItemSalesDTO;
 import com.anpetna.item.dto.deleteItem.DeleteItemReq;
 import com.anpetna.item.dto.deleteItem.DeleteItemRes;
 import com.anpetna.item.dto.modifyItem.ModifyItemReq;
@@ -29,8 +30,8 @@ import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
+import com.anpetna.item.constant.ItemSellStatus;
+
 
 @Service
 @RequiredArgsConstructor
@@ -42,6 +43,7 @@ public class ItemServiceImpl implements ItemService {
     private final ItemMapper itemMapper;
     private final ItemRepository itemRepository;
     private final ImageRepository imageRepository;
+
 
     @Override
     @Transactional
@@ -169,20 +171,44 @@ public class ItemServiceImpl implements ItemService {
         return res;
     }
 
+
+    @Override
+    @Transactional
+    public void updateStock(Long itemId, Integer itemStock) {
+        if (itemId == null) throw new IllegalArgumentException("itemId는 필수입니다.");
+        int next = (itemStock == null ? 0 : Math.max(0, itemStock));
+
+        ItemEntity item = itemRepository.findById(itemId)
+                .orElseThrow(() -> new EntityNotFoundException("Item not found with id " + itemId));
+
+        item.setItemStock(next);
+        // ✅ SELL / SOLD_OUT만 존재
+        item.setItemSellStatus(next <= 0 ? ItemSellStatus.SOLD_OUT : ItemSellStatus.SELL);
+    }
+
+
     @Override
     public PageResponseDTO<SearchAllItemsRes> getAllItems(SearchAllItemsReq req){
         Pageable pageable = PageRequest.of(req.getPage(), req.getSize());
-        Page<ItemEntity> searchAll = itemRepository.orderBy(pageable, req);
+        Page<ItemEntity> searchAll = null;
+        if (req.getOrderBySales() == null){
+            searchAll = itemRepository.orderBy(pageable, req);
+        }else{
+            List<ItemSalesDTO> itemList = itemRepository.rankSalesQuantity();
+            itemList.forEach(itemSalesDTO -> log.info(itemSalesDTO.getQuantity()+itemSalesDTO.getItem().toString()));
+            List<ItemEntity> itemEntityList = itemList.stream().map(ItemSalesDTO::getItem).toList();
+            searchAll = new PageImpl<>(itemEntityList, pageable, itemEntityList.size());
+        }
 
-        PageResponseDTO<SearchAllItemsRes> res = PageResponseDTO.toDTO(searchAll, itemEntity -> {
+        return PageResponseDTO.toDTO(searchAll, itemEntity -> {
             SearchAllItemsRes resEach = modelMapper.map(itemEntity, SearchAllItemsRes.class);
             String entityUrl = itemEntity.getImages().get(0).getUrl();
             resEach.setThumbnailUrl(entityUrl);
             return resEach;
         }, pageable);
-
-        return res;
     }
+
+
 
     // --- 상품 등록 ---
     // 파일 업로드 + DB 저장 전체를 하나의 트랜잭션으로

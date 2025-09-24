@@ -5,7 +5,7 @@ import com.anpetna.cart.repository.CartRepository;
 import com.anpetna.item.domain.ItemEntity;
 import com.anpetna.item.repository.ItemRepository;
 import com.anpetna.member.domain.MemberEntity;
-import com.anpetna.member.repository.MemberRepository;            // ✅ ADDED
+import com.anpetna.member.repository.MemberRepository;
 import com.anpetna.order.constant.OrdersStatus;
 import com.anpetna.order.domain.AddressEntity;
 import com.anpetna.order.domain.OrderEntity;
@@ -25,6 +25,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import com.anpetna.item.constant.ItemSellStatus;
+
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -177,12 +179,14 @@ public class OrdersServiceImpl implements OrdersService {
 
     //상태(관리자)
     private static final Map<OrdersStatus, Set<OrdersStatus>> ALLOWED = Map.of(
-            OrdersStatus.PAID,            Set.of(OrdersStatus.SHIPMENT_READY),
-            OrdersStatus.SHIPMENT_READY,  Set.of(OrdersStatus.SHIPPED),
-            OrdersStatus.SHIPPED,         Set.of(OrdersStatus.DELIVERED)
+            OrdersStatus.PAID,           Set.of(OrdersStatus.SHIPMENT_READY, OrdersStatus.CANCELLED, OrdersStatus.REFUNDED, OrdersStatus.CONFIRMATION),
+            OrdersStatus.SHIPMENT_READY, Set.of(OrdersStatus.SHIPPED, OrdersStatus.CANCELLED),
+            OrdersStatus.SHIPPED,        Set.of(OrdersStatus.DELIVERED, OrdersStatus.REFUNDED, OrdersStatus.CONFIRMATION),
+            OrdersStatus.DELIVERED,      Set.of(OrdersStatus.CONFIRMATION, OrdersStatus.REFUNDED)
     );
 
-    //관리자 상태 변경
+
+
     @Override
     @Transactional
     public ReadOneOrdersRes adminStatus(Long ordersId, OrdersStatus next, String reason) {
@@ -196,19 +200,36 @@ public class OrdersServiceImpl implements OrdersService {
                     "허용되지 않은 전이: " + o.getStatus() + " -> " + next);
         }
 
-        switch (next) {
-            case SHIPMENT_READY ->
-                o.setStatus(OrdersStatus.SHIPMENT_READY);
-                // 필요시 포장 준비 로직만 추가
-            case SHIPPED        -> o.setStatus(OrdersStatus.SHIPPED);
-            case DELIVERED ->
-                o.setStatus(OrdersStatus.DELIVERED);
-            default -> throw new ResponseStatusException(HttpStatus.CONFLICT, "이 메서드로는 처리 불가");
+        // ★ 이전 상태 보관
+        OrdersStatus prev = o.getStatus();
+
+        // 1) 상태 변경
+        o.setStatus(next);
+
+        // 구매확정으로 처음 전이될 때만 차감
+        if (prev != OrdersStatus.CONFIRMATION && next == OrdersStatus.CONFIRMATION) {
+            OrdersEntity orders = ordersRepository.findByOrdersId(ordersId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "주문을 찾을 수 없습니다."));
+
+            orders.getOrderItems().forEach(oi -> {
+                ItemEntity item = oi.getItem();
+                if (item == null) return;
+
+                int cur = item.getItemStock();
+                int left = cur - Math.max(0, oi.getQuantity());
+                if (left < 0) left = 0;
+
+                item.setItemStock(left);
+                // ✅ SELL / SOLD_OUT만 존재
+                item.setItemSellStatus(left <= 0 ? ItemSellStatus.SOLD_OUT : ItemSellStatus.SELL);
+            });
         }
 
-        o.setStatus(next);
         return toReadOne(o);
     }
+
+
+
 
     private ReadOneOrdersRes toReadOne(OrdersEntity o) { /* 매핑 */ return null; }
 
