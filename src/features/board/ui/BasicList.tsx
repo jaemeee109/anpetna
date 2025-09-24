@@ -26,6 +26,13 @@ function isLoggedIn() {
 }
 
 export function BasicList({ type, page, size, total, items, isLoading }: Props) {
+  /** ✅ Hook은 컴포넌트 최상단(조기 return보다 위)에서 호출 */
+  const [authed, setAuthed] = useState(false);
+  useEffect(() => {
+    setAuthed(isLoggedIn());
+  }, []);
+
+  /** 조기 반환은 Hook 이후에 */
   if (isLoading) return <div>로딩중…</div>;
   if (!items?.length) return <div className="text-gray-500">게시글이 없습니다</div>;
 
@@ -47,11 +54,6 @@ export function BasicList({ type, page, size, total, items, isLoading }: Props) 
   const ordered = [...pinnedList, ...normalList];
 
   // ✅ 비회원의 NOTICE/FREE 상세 진입을 프론트에서 1차 차단
-  const [authed, setAuthed] = useState(false);
-  useEffect(() => {
-    setAuthed(isLoggedIn());
-  }, []);
-
   const boardTypeUpper = String(type ?? '').toUpperCase();
   const loginRequired = boardTypeUpper === 'NOTICE' || boardTypeUpper === 'FREE';
 
