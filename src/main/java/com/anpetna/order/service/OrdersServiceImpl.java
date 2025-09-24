@@ -180,7 +180,7 @@ public class OrdersServiceImpl implements OrdersService {
     //상태(관리자)
     private static final Map<OrdersStatus, Set<OrdersStatus>> ALLOWED = Map.of(
             OrdersStatus.PAID,           Set.of(OrdersStatus.SHIPMENT_READY, OrdersStatus.CANCELLED, OrdersStatus.REFUNDED, OrdersStatus.CONFIRMATION),
-            OrdersStatus.SHIPMENT_READY, Set.of(OrdersStatus.SHIPPED, OrdersStatus.CANCELLED),
+            OrdersStatus.SHIPMENT_READY, Set.of(OrdersStatus.PAID, OrdersStatus.SHIPPED, OrdersStatus.CANCELLED),
             OrdersStatus.SHIPPED,        Set.of(OrdersStatus.DELIVERED, OrdersStatus.REFUNDED, OrdersStatus.CONFIRMATION),
             OrdersStatus.DELIVERED,      Set.of(OrdersStatus.CONFIRMATION, OrdersStatus.REFUNDED)
     );
@@ -191,42 +191,54 @@ public class OrdersServiceImpl implements OrdersService {
     @Transactional
     public ReadOneOrdersRes adminStatus(Long ordersId, OrdersStatus next, String reason) {
 
+        // 주문 로드
         OrdersEntity o = ordersRepository.findById(ordersId).orElseThrow(() ->
                 new ResponseStatusException(HttpStatus.NOT_FOUND, "주문 없음: " + ordersId));
 
-        // 허용 전이 검증
-        if (!ALLOWED.getOrDefault(o.getStatus(), Set.of()).contains(next)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "허용되지 않은 전이: " + o.getStatus() + " -> " + next);
+        // 허용 전이 검증(기존 ALLOWED 맵 사용)
+        OrdersStatus prev = o.getStatus();
+        if (!ALLOWED.getOrDefault(prev, Set.of()).contains(next)) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "허용되지 않은 전이: " + prev + " -> " + next
+            );
         }
 
-        // ★ 이전 상태 보관
-        OrdersStatus prev = o.getStatus();
-
-        // 1) 상태 변경
+        // 상태 변경
         o.setStatus(next);
 
-        // 구매확정으로 처음 전이될 때만 차감
+        // 구매확정으로 '처음' 전이될 때만 재고 차감
         if (prev != OrdersStatus.CONFIRMATION && next == OrdersStatus.CONFIRMATION) {
-            OrdersEntity orders = ordersRepository.findByOrdersId(ordersId)
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "주문을 찾을 수 없습니다."));
+            if (o.getOrderItems() != null) {
+                for (OrderEntity oi : o.getOrderItems()) {
+                    ItemEntity item = oi.getItem();
+                    if (item == null) continue;
 
-            orders.getOrderItems().forEach(oi -> {
-                ItemEntity item = oi.getItem();
-                if (item == null) return;
+                    final int qty = Math.max(0, oi.getQuantity());
+                    if (qty == 0) continue;
 
-                int cur = item.getItemStock();
-                int left = cur - Math.max(0, oi.getQuantity());
-                if (left < 0) left = 0;
+                    final int cur = Math.max(0, item.getItemStock());
+                    final int nextStock = cur - qty;
 
-                item.setItemStock(left);
-                // ✅ SELL / SOLD_OUT만 존재
-                item.setItemSellStatus(left <= 0 ? ItemSellStatus.SOLD_OUT : ItemSellStatus.SELL);
-            });
+                    // 음수 재고 방지: 모자라면 실패 처리
+                    if (nextStock < 0) {
+                        throw new ResponseStatusException(
+                                HttpStatus.CONFLICT,
+                                "재고 부족: itemId=" + item.getItemId() + " (현재 " + cur + ", 차감 " + qty + ")"
+                        );
+                    }
+
+                    item.setItemStock(nextStock);
+                    // 0 이하면 SOLD_OUT, 그 외 SELL
+                    item.setItemSellStatus(nextStock <= 0 ? ItemSellStatus.SOLD_OUT : ItemSellStatus.SELL);
+                }
+            }
         }
 
-        return toReadOne(o);
+        // 최종 응답(파일 내 존재하는 변환 메서드 사용)
+        return toReadOneOrdersRes(o);
     }
+
 
 
 
