@@ -30,6 +30,8 @@ import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
+import com.anpetna.item.constant.ItemSellStatus;
+
 
 @Service
 @RequiredArgsConstructor
@@ -168,6 +170,22 @@ public class ItemServiceImpl implements ItemService {
 
         return res;
     }
+
+
+    @Override
+    @Transactional
+    public void updateStock(Long itemId, Integer itemStock) {
+        if (itemId == null) throw new IllegalArgumentException("itemId는 필수입니다.");
+        int next = (itemStock == null ? 0 : Math.max(0, itemStock));
+
+        ItemEntity item = itemRepository.findById(itemId)
+                .orElseThrow(() -> new EntityNotFoundException("Item not found with id " + itemId));
+
+        item.setItemStock(next);
+        // ✅ SELL / SOLD_OUT만 존재
+        item.setItemSellStatus(next <= 0 ? ItemSellStatus.SOLD_OUT : ItemSellStatus.SELL);
+    }
+
 
     @Override
     public PageResponseDTO<SearchAllItemsRes> getAllItems(SearchAllItemsReq req){

@@ -5,7 +5,7 @@ import com.anpetna.cart.repository.CartRepository;
 import com.anpetna.item.domain.ItemEntity;
 import com.anpetna.item.repository.ItemRepository;
 import com.anpetna.member.domain.MemberEntity;
-import com.anpetna.member.repository.MemberRepository;            // ✅ ADDED
+import com.anpetna.member.repository.MemberRepository;
 import com.anpetna.order.constant.OrdersStatus;
 import com.anpetna.order.domain.AddressEntity;
 import com.anpetna.order.domain.OrderEntity;
@@ -25,6 +25,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import com.anpetna.item.constant.ItemSellStatus;
+
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -177,38 +179,69 @@ public class OrdersServiceImpl implements OrdersService {
 
     //상태(관리자)
     private static final Map<OrdersStatus, Set<OrdersStatus>> ALLOWED = Map.of(
-            OrdersStatus.PAID,            Set.of(OrdersStatus.SHIPMENT_READY),
-            OrdersStatus.SHIPMENT_READY,  Set.of(OrdersStatus.SHIPPED),
-            OrdersStatus.SHIPPED,         Set.of(OrdersStatus.DELIVERED)
+            OrdersStatus.PAID,           Set.of(OrdersStatus.SHIPMENT_READY, OrdersStatus.CANCELLED, OrdersStatus.REFUNDED, OrdersStatus.CONFIRMATION),
+            OrdersStatus.SHIPMENT_READY, Set.of(OrdersStatus.PAID, OrdersStatus.SHIPPED, OrdersStatus.CANCELLED),
+            OrdersStatus.SHIPPED,        Set.of(OrdersStatus.DELIVERED, OrdersStatus.REFUNDED, OrdersStatus.CONFIRMATION),
+            OrdersStatus.DELIVERED,      Set.of(OrdersStatus.CONFIRMATION, OrdersStatus.REFUNDED)
     );
 
-    //관리자 상태 변경
+
+
     @Override
     @Transactional
     public ReadOneOrdersRes adminStatus(Long ordersId, OrdersStatus next, String reason) {
 
+        // 주문 로드
         OrdersEntity o = ordersRepository.findById(ordersId).orElseThrow(() ->
                 new ResponseStatusException(HttpStatus.NOT_FOUND, "주문 없음: " + ordersId));
 
-        // 허용 전이 검증
-        if (!ALLOWED.getOrDefault(o.getStatus(), Set.of()).contains(next)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "허용되지 않은 전이: " + o.getStatus() + " -> " + next);
+        // 허용 전이 검증(기존 ALLOWED 맵 사용)
+        OrdersStatus prev = o.getStatus();
+        if (!ALLOWED.getOrDefault(prev, Set.of()).contains(next)) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "허용되지 않은 전이: " + prev + " -> " + next
+            );
         }
 
-        switch (next) {
-            case SHIPMENT_READY ->
-                o.setStatus(OrdersStatus.SHIPMENT_READY);
-                // 필요시 포장 준비 로직만 추가
-            case SHIPPED        -> o.setStatus(OrdersStatus.SHIPPED);
-            case DELIVERED ->
-                o.setStatus(OrdersStatus.DELIVERED);
-            default -> throw new ResponseStatusException(HttpStatus.CONFLICT, "이 메서드로는 처리 불가");
-        }
-
+        // 상태 변경
         o.setStatus(next);
-        return toReadOne(o);
+
+        // 구매확정으로 '처음' 전이될 때만 재고 차감
+        if (prev != OrdersStatus.CONFIRMATION && next == OrdersStatus.CONFIRMATION) {
+            if (o.getOrderItems() != null) {
+                for (OrderEntity oi : o.getOrderItems()) {
+                    ItemEntity item = oi.getItem();
+                    if (item == null) continue;
+
+                    final int qty = Math.max(0, oi.getQuantity());
+                    if (qty == 0) continue;
+
+                    final int cur = Math.max(0, item.getItemStock());
+                    final int nextStock = cur - qty;
+
+                    // 음수 재고 방지: 모자라면 실패 처리
+                    if (nextStock < 0) {
+                        throw new ResponseStatusException(
+                                HttpStatus.CONFLICT,
+                                "재고 부족: itemId=" + item.getItemId() + " (현재 " + cur + ", 차감 " + qty + ")"
+                        );
+                    }
+
+                    item.setItemStock(nextStock);
+                    // 0 이하면 SOLD_OUT, 그 외 SELL
+                    item.setItemSellStatus(nextStock <= 0 ? ItemSellStatus.SOLD_OUT : ItemSellStatus.SELL);
+                }
+            }
+        }
+
+        // 최종 응답(파일 내 존재하는 변환 메서드 사용)
+        return toReadOneOrdersRes(o);
     }
+
+
+
+
 
     private ReadOneOrdersRes toReadOne(OrdersEntity o) { /* 매핑 */ return null; }
 

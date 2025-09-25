@@ -139,6 +139,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/cart/**").hasRole("USER")
 
                         // --- Order ---
+                        .requestMatchers("/order/admin/**").hasRole("ADMIN")   // 관리자 전용
                         .requestMatchers("/order/**").permitAll()
                         .requestMatchers("/admin/**").hasRole("ADMIN")
 
