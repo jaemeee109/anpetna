@@ -9,4 +9,6 @@ import java.util.List;
 public interface VenueRepository extends JpaRepository<VenueEntity, Long> {
     /** 노출 active=true 인 지점들만 조회 (목록용) */
     List<VenueEntity> findByActiveTrue();
+
+
 }
