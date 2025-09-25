@@ -321,10 +321,10 @@ export default function Header() {
               <span className="sep">|</span>
               <Link href="/member/list" className="btn-link">USERS</Link>
               <span className="sep">|</span>
-              <Link href="order/admin/erp" className="btn-link">SALES & INVENTORY</Link>
+              <Link href="order/admin/erp" className="btn-link">SALES</Link>
               <span className="sep">|</span>
-              {/*<Link href="#" className="btn-link">INVENTORY</Link>
-              <span className="sep">|</span>*/}
+              <Link href="order/admin/inv" className="btn-link">INVENTORY</Link>
+              <span className="sep">|</span>
               <button type="button" className="btn-link" onClick={handleLogout}>
                 LOGOUT
               </button>

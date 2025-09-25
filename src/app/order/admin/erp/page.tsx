@@ -14,7 +14,6 @@ import {
   readOne,
 } from '@/features/order/data/order.admin.api';
 import { Pagination } from '@/components/layout/Pagination';
-import InventoryTable from '@/features/order/ui/InventoryTable';
 import { createPortal } from 'react-dom';
 
 const WRAP = 'mx-auto w-full max-w-[900px] px-4';
@@ -462,10 +461,7 @@ export default function AdminErpPage() {
           )
         : null}
 
-  <div className="admin-sep" />
 
-      {/* 재고 테이블 */}
-      <InventoryTable from={from} to={to} />
 
       {/* 페이지 전용 스타일 (아이콘 크기 포함) */}
     <style jsx>{`

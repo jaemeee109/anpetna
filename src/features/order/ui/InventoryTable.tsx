@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import http from '@/shared/data/http';
 import { Pagination } from '@/components/layout/Pagination'; // ERP와 동일 컴포넌트 사용
 import Paw from '@/components/icons/Paw';
+
 /** 공통: API 베이스 (http 모듈 baseURL 사용) */
 const API = {
   items: (page = 0, size = 30) => `/item?page=${page}&size=${size}`, // 0-base, 30개/페이지
@@ -40,7 +41,7 @@ type ItemRow = {
   itemId: number;
   itemCategory: string;
   itemName: string;
-  itemStock: number; // DB 등록 수량(초기/현재 저장값)
+  itemStock: number; // DB 현재 재고(백엔드에서 즉시 차감/복원 반영)
 };
 
 type OrderLine = {
@@ -60,8 +61,9 @@ export default function InventoryTable({ from, to }: InventoryProps) {
   const [items, setItems] = useState<ItemRow[]>([]);
   const [total, setTotal] = useState(0);
 
-  /** 구매확정 집계 */
-  const [soldByItem, setSoldByItem] = useState<Record<number, number>>({});
+  /** 주문중/매출확정 집계 */
+  const [inprocByItem, setInprocByItem] = useState<Record<number, number>>({});
+  const [confByItem, setConfByItem] = useState<Record<number, number>>({});
 
   /** 추가입고 임시값 */
   const [extraIn, setExtraIn] = useState<Record<number, number>>({});
@@ -91,17 +93,18 @@ export default function InventoryTable({ from, to }: InventoryProps) {
     return { list, totalElements };
   }
 
-  /** 2) 구매확정 주문(ERP) → 모든 라인아이템을 itemId별로 합산 */
-  async function buildSoldQtyByItem(): Promise<Record<number, number>> {
-    let pg0 = 0;          // ★ 0-base 시작 (중요)
+  /** 2) ERP 목록(기간 내 전체) → 주문중/매출확정 오더를 수집 후, 각 주문 상세로 라인합산 */
+  async function buildQtyMaps(): Promise<{ inproc: Record<number, number>; conf: Record<number, number> }> {
+    let pg0 = 0; // ★ 0-base
     const sz = 200;
-    const ordersIds: number[] = [];
 
+    const P = new Set<string>(['PENDING', 'PAID', 'SHIPMENT_READY', 'SHIPPED', 'DELIVERED']);
+    const inprocIds: number[] = [];
+    const confIds: number[] = [];
+
+    // ERP 페이지 루프(기간 필터 적용, status 필터 없이 전체 가져온 뒤 분류)
     for (let i = 0; i < 50; i++) {
-      // ★ from/to는 필수
-      const resp = await http.get(
-        API.erp({ status: 'CONFIRMATION', page: pg0, size: sz, from, to })
-      );
+      const resp = await http.get(API.erp({ page: pg0, size: sz, from, to }));
       const data = (resp as any)?.data ?? resp;
       const pagePayload = data?.result ?? data;
 
@@ -111,7 +114,9 @@ export default function InventoryTable({ from, to }: InventoryProps) {
       for (const r of rows) {
         const oid = Number(r.ordersId ?? r.id ?? r.orders_id);
         const status = String(r.status ?? r.ordersStatus ?? '').toUpperCase();
-        if (oid > 0 && status === 'CONFIRMATION') ordersIds.push(oid);
+        if (!oid) continue;
+        if (P.has(status)) inprocIds.push(oid);
+        else if (status === 'CONFIRMATION') confIds.push(oid);
       }
 
       const totalPages =
@@ -121,31 +126,36 @@ export default function InventoryTable({ from, to }: InventoryProps) {
             pagePayload?.total_pages ??
             1
         ) || 1;
-      if (pg0 >= totalPages - 1) break; // 마지막 페이지 도달
+      if (pg0 >= totalPages - 1) break;
       pg0 += 1;
     }
 
-    // 주문 상세 합산
-    const acc: Record<number, number> = {};
-    for (const oid of ordersIds) {
-      const resp = await http.get(API.orderDetail(oid));
-      const data = (resp as any)?.data ?? resp;
-      const payload = data?.result ?? data;
+    // 각 주문 상세 합산
+    const accIn: Record<number, number> = {};
+    const accCf: Record<number, number> = {};
 
-      const lines: OrderLine[] = toArray<any>(payload?.orderItems ?? payload?.ordersItems).map(
-        (li) => ({
+    async function accumulate(ids: number[], bucket: Record<number, number>) {
+      for (const oid of ids) {
+        const resp = await http.get(API.orderDetail(oid));
+        const data = (resp as any)?.data ?? resp;
+        const payload = data?.result ?? data;
+
+        const lines: OrderLine[] = toArray<any>(payload?.orderItems ?? payload?.ordersItems).map((li) => ({
           itemId: Number(li.itemId ?? li.item?.itemId ?? li.item_id),
           orderQuantity: Number(li.orderQuantity ?? li.quantity ?? li.order_quantity ?? 0),
-        })
-      );
+        }));
 
-      for (const li of lines) {
-        if (!li.itemId || !Number.isFinite(li.orderQuantity)) continue;
-        acc[li.itemId] = (acc[li.itemId] ?? 0) + Math.max(0, li.orderQuantity);
+        for (const li of lines) {
+          if (!li.itemId || !Number.isFinite(li.orderQuantity)) continue;
+          bucket[li.itemId] = (bucket[li.itemId] ?? 0) + Math.max(0, li.orderQuantity);
+        }
       }
     }
 
-    return acc;
+    await accumulate(inprocIds, accIn);
+    await accumulate(confIds, accCf);
+
+    return { inproc: accIn, conf: accCf };
   }
 
   /** 최초 및 의존성 변경 로드 */
@@ -155,14 +165,15 @@ export default function InventoryTable({ from, to }: InventoryProps) {
       try {
         setLoading(true);
         // 목록은 현재 페이지, 집계는 기간(from/to)에 대해 전체
-        const [{ list, totalElements }, sold] = await Promise.all([
+        const [{ list, totalElements }, qtyMaps] = await Promise.all([
           fetchItems(Math.max(0, page - 1)),
-          buildSoldQtyByItem(),
+          buildQtyMaps(),
         ]);
         if (!alive) return;
         setItems(list);
         setTotal(totalElements);
-        setSoldByItem(sold);
+        setInprocByItem(qtyMaps.inproc);
+        setConfByItem(qtyMaps.conf);
       } finally {
         if (alive) setLoading(false);
       }
@@ -172,23 +183,23 @@ export default function InventoryTable({ from, to }: InventoryProps) {
     };
   }, [page, from, to]); // 페이지/기간 바뀌면 재조회
 
-  /** 화면 표시용 rows (등록수량-구매확정수량) + 카테고리 필터 적용 */
+  /** 화면 표시용 rows + 카테고리 필터 적용 */
   const rows = useMemo(() => {
     const baseRows = items.map((it) => {
-      const base = Number(it.itemStock ?? 0);          // 등록/저장된 수량
-      const sold = Number(soldByItem[it.itemId] ?? 0); // 구매확정 누적 판매수량
-      const current = Math.max(0, base - sold);        // 화면상 현재 재고(요구사항)
+      const stock = Number(it.itemStock ?? 0);              // ✅ DB 현재 재고(즉시 차감/복원 반영)
+      const inProcess = Number(inprocByItem[it.itemId] ?? 0); // 주문중(P~D)
+      const confirmed = Number(confByItem[it.itemId] ?? 0);   // 매출확정(CONFIRMATION)
       return {
         itemId: it.itemId,
         category: it.itemCategory,
         name: it.itemName,
-        base,
-        sold,
-        current,
+        stock,
+        inProcess,
+        confirmed,
       };
     });
     return category ? baseRows.filter((r) => r.category === category) : baseRows;
-  }, [items, soldByItem, category]);
+  }, [items, inprocByItem, confByItem, category]);
 
   /** 카테고리 목록 (현재 페이지 아이템 기준, 중복 제거) */
   const categoryOptions = useMemo(() => {
@@ -206,8 +217,8 @@ export default function InventoryTable({ from, to }: InventoryProps) {
     for (const r of rows) {
       const add = Number(extraIn[r.itemId] ?? 0);
       if (!Number.isFinite(add) || add === 0) continue;
-      // DB 저장 값은 itemStock(등록수량) 기준으로 +추가입고
-      const nextStock = Math.max(0, r.base + add);
+      // ✅ DB 현재 재고(stock) 기준으로 +추가입고
+      const nextStock = Math.max(0, r.stock + add);
       tasks.push(http.put(API.putStock(r.itemId), { itemStock: nextStock }));
     }
     if (tasks.length === 0) {
@@ -217,16 +228,16 @@ export default function InventoryTable({ from, to }: InventoryProps) {
     await Promise.all(tasks);
     // 저장 후 목록 재조회 + 입력값 초기화
     setExtraIn({});
-    // 현재 페이지 다시 불러오기
     setLoading(true);
     try {
-      const [{ list, totalElements }, sold] = await Promise.all([
+      const [{ list, totalElements }, qtyMaps] = await Promise.all([
         fetchItems(Math.max(0, page - 1)),
-        buildSoldQtyByItem(),
+        buildQtyMaps(),
       ]);
       setItems(list);
       setTotal(totalElements);
-      setSoldByItem(sold);
+      setInprocByItem(qtyMaps.inproc);
+      setConfByItem(qtyMaps.conf);
       alert('재고가 저장되었습니다.');
     } finally {
       setLoading(false);
@@ -242,7 +253,7 @@ export default function InventoryTable({ from, to }: InventoryProps) {
         <div className="admin-head text-center">
           <h1 className="admin-title">
             <span>INVENTORY</span>
-             <Paw className="apn-title-ico" />
+            <Paw className="apn-title-ico" />
           </h1>
         </div>
 
@@ -284,7 +295,8 @@ export default function InventoryTable({ from, to }: InventoryProps) {
                 <th className="w-32">카테고리</th>
                 <th className="w-[360px]">상품명</th>
                 <th className="w-24">재고수</th>
-                <th className="w-36">출고</th>
+                <th className="w-36">주문중</th>
+                <th className="w-36">매출확정</th>
                 <th className="w-28">추가입고</th>
               </tr>
             </thead>
@@ -294,15 +306,16 @@ export default function InventoryTable({ from, to }: InventoryProps) {
                   <td>{r.itemId}</td>
                   <td>{r.category}</td>
                   <td>{r.name}</td>
-                  <td>{nf(r.current)}</td>
-                  <td>{nf(r.sold)}</td>
+                  <td>{nf(r.stock)}</td>
+                  <td>{nf(r.inProcess)}</td>
+                  <td>{nf(r.confirmed)}</td>
                   <td>
                     <input
                       type="number"
                       className="border rounded px-2 py-1 w-[90px] text-center"
                       placeholder="0"
                       min={0}
-                      value={extraIn[r.itemId] ?? ''}
+                      value={(extraIn[r.itemId] as any) ?? ''}
                       onChange={(e) =>
                         setExtraIn((prev) => ({
                           ...prev,
@@ -316,7 +329,7 @@ export default function InventoryTable({ from, to }: InventoryProps) {
               ))}
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="py-8 text-gray-500">
+                  <td colSpan={7} className="py-8 text-gray-500">
                     데이터가 없습니다.
                   </td>
                 </tr>
@@ -350,6 +363,14 @@ export default function InventoryTable({ from, to }: InventoryProps) {
           font-weight: 600;
           color: #000;
         }
+
+          /* 아이콘이 보이도록 크기/색만 지정 (UI 변경 아님) */
+          .apn-title-ico {
+            width: 1em;
+            height: 1em;
+            color: #000;
+            flex-shrink: 0;
+          }
         .admin-sep {
           border-top: 1px solid #e5e7eb;
           margin: 16px 0;
@@ -406,7 +427,6 @@ export default function InventoryTable({ from, to }: InventoryProps) {
           text-align: center;
           border-color: #e5e7eb;
           border-radius: 5px;
-          
         }
       `}</style>
     </>
