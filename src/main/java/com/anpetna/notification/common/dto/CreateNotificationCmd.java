@@ -2,6 +2,7 @@ package com.anpetna.notification.common.dto;
 
 import com.anpetna.notification.common.constant.NotificationType;
 import com.anpetna.notification.common.constant.TargetType;
+import com.anpetna.notification.common.constant.NotificationVariant;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Builder;
@@ -29,5 +30,7 @@ public class CreateNotificationCmd {
     private String message;
 
     private String linkUrl;                       // 내부 라우팅(/items/123 같은)
+
+    private NotificationVariant variant;
 }
 

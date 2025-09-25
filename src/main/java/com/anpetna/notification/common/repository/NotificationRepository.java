@@ -27,5 +27,16 @@ public interface NotificationRepository extends JpaRepository<NotificationEntity
     """)
     Optional<NotificationEntity> findOneByIdAndOwner(@Param("nId") Long nId,
                                                      @Param("receiverMemberId") String receiverMemberId);
+
+    @Modifying
+    @Query("""
+        update NotificationEntity n
+        set n.isRead = true,
+        n.readAt = current_timestamp
+        where n.receiver.memberId = :memberId
+        and n.isRead = false
+    """)
+    int markAllRead(String memberId);
+
 }
 
