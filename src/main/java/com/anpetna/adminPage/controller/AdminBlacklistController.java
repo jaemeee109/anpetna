@@ -85,4 +85,15 @@ public class AdminBlacklistController {
     public ApiResult<DeleteBlacklistRes> delete(@PathVariable Long id) {
         return new ApiResult<>(adminBlacklistService.deleteBlacklistRes(id));
     }
+
+    // ===========================================================
+// 블랙리스트 전체 해제(활성 레코드 비활성화) + ROLE=USER 복귀
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PostMapping("/blacklist/active/{memberId}/deactivate")
+    public ApiResult<Void> deactivateActiveByMember(@PathVariable String memberId) {
+        adminBlacklistService.deactivateAllActiveForMember(memberId);
+        return new ApiResult<>(null); // isSuccess=true, 200 OK
+    }
+
+
 }

@@ -13,6 +13,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
@@ -66,7 +67,6 @@ public class AdminMemberServiceImpl implements AdminMemberService {
         // 참고: BLACKLIST 인 경우 관리자 해제 대상이 아니므로 변경하지 않습니다.
     }
 
-
     /*======================================================================================================*/
     @Override
     @Transactional(readOnly = true)
@@ -94,10 +94,22 @@ public class AdminMemberServiceImpl implements AdminMemberService {
                 .name(memberEntity.getMemberName())
                 .email(memberEntity.getMemberEmail())
                 .role(memberEntity.getMemberRole())
+                .phone(memberEntity.getMemberPhone())
                 .build();
     }
 
     /*======================================================================================================*/
+
+    // ✅ 여기(클래스 내부)에 위치해야 합니다.
+    private MemberRole parseRoleKeyword(String raw) {
+        if (raw == null) return null;
+        String s = raw.trim().toLowerCase(Locale.ROOT);
+        // 한국어/영어 키워드 모두 대응
+        if (s.equals("관리") || s.equals("관리자") || s.equals("admin")) return MemberRole.ADMIN;
+        if (s.equals("회원") || s.equals("user")) return MemberRole.USER;
+        if (s.equals("블랙") || s.equals("블랙리스트") || s.equals("black") || s.equals("blacklist")) return MemberRole.BLACKLIST;
+        return null;
+    }
 
     /*
      * 검색 스펙 조립
@@ -105,23 +117,37 @@ public class AdminMemberServiceImpl implements AdminMemberService {
      * @param blacklistOnly true 이면 ROLE = BLACKLIST 강제
      */
     private Specification<MemberEntity> buildSearchSpec(String searchKeyword, boolean blacklistOnly) {
-        Specification<MemberEntity> memberEntitySpecification = Specification.where(null);
+        Specification<MemberEntity> spec = Specification.where(null);
 
         if (searchKeyword != null && !searchKeyword.isBlank()) {
-            String keyword = searchKeyword.trim().toLowerCase();
-            memberEntitySpecification = memberEntitySpecification.and((root, query, cb) -> cb.or(
-                    cb.like(cb.lower(root.get("memberId")), "%" + keyword + "%"),
-                    cb.like(cb.lower(root.get("name")), "%" + keyword + "%"),
-                    cb.like(cb.lower(root.get("email")), "%" + keyword + "%")
-            ));
+            final String kw = searchKeyword.trim();
+            final String kwLower = kw.toLowerCase(Locale.ROOT);
+            final MemberRole roleToken = parseRoleKeyword(kw);
+
+            spec = spec.and((root, query, cb) -> {
+                // ✅ 중복 제거 (페이지가 “안 바뀌는 것처럼” 보이는 현상 방지)
+                query.distinct(true);
+
+                // 문자열 컬럼만 lower+like (ENUM/숫자엔 lower() 금지)
+                var byId    = cb.like(cb.lower(root.get("memberId")),    "%" + kwLower + "%");
+                var byName  = cb.like(cb.lower(root.get("memberName")),  "%" + kwLower + "%");
+                var byEmail = cb.like(cb.lower(root.get("memberEmail")), "%" + kwLower + "%");
+                var byPhone = cb.like(cb.lower(root.get("memberPhone")), "%" + kwLower + "%");
+
+                // 기본 OR 묶음
+                var orPred = cb.or(byId, byName, byEmail, byPhone);
+
+                // ✅ 역할 키워드가 인식되면, ENUM은 LIKE 대신 equals 로만 추가 (DB 방언 안전)
+                if (roleToken != null) {
+                    orPred = cb.or(orPred, cb.equal(root.get("memberRole"), roleToken));
+                }
+                return orPred;
+            });
         }
 
         if (blacklistOnly) {
-            memberEntitySpecification = memberEntitySpecification.and((root, query, cb) -> cb.equal(root.get("role"), MemberRole.BLACKLIST));
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("memberRole"), MemberRole.BLACKLIST));
         }
-
-        return memberEntitySpecification;
+        return spec;
     }
-
 }
-

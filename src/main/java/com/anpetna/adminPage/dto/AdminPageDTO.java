@@ -15,6 +15,7 @@ public class AdminPageDTO {
     String name;              // MemberEntity 에 존재(업로드 파일에 name, email 토큰 확인됨)
     String email;
     MemberRole role;          // USER / ADMIN / BLACKLIST
+    String phone;
 }
 
 /*

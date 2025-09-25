@@ -8,12 +8,15 @@ import com.anpetna.image.dto.NewImageDTO;
 import com.anpetna.image.repository.ImageRepository;
 import com.anpetna.image.service.LocalStorage;
 import com.anpetna.item.config.ItemMapper;
+import com.anpetna.item.constant.ItemSellStatus;
 import com.anpetna.item.domain.ItemEntity;
 import com.anpetna.item.dto.ItemSalesDTO;
 import com.anpetna.item.dto.deleteItem.DeleteItemReq;
 import com.anpetna.item.dto.deleteItem.DeleteItemRes;
 import com.anpetna.item.dto.modifyItem.ModifyItemReq;
 import com.anpetna.item.dto.modifyItem.ModifyItemRes;
+import com.anpetna.item.dto.popularItem.PopularItemReq;
+import com.anpetna.item.dto.popularItem.PopularItemRes;
 import com.anpetna.item.dto.registerItem.RegisterItemReq;
 import com.anpetna.item.dto.registerItem.RegisterItemRes;
 import com.anpetna.item.dto.searchAllItem.SearchAllItemsReq;
@@ -22,18 +25,21 @@ import com.anpetna.item.dto.searchOneItem.SearchOneItemReq;
 import com.anpetna.item.dto.searchOneItem.SearchOneItemRes;
 import com.anpetna.item.repository.ItemRepository;
 import jakarta.persistence.EntityNotFoundException;
-import jakarta.transaction.Transactional;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.modelmapper.ModelMapper;
 import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 @Log4j2
+@Transactional
 public class ItemServiceImpl implements ItemService {
 
     private final LocalStorage fileService;
@@ -45,7 +51,7 @@ public class ItemServiceImpl implements ItemService {
 
     @Override
     @Transactional
-    public RegisterItemRes registerItem(RegisterItemReq req, MultipartFile thumb, List<MultipartFile> files){
+    public RegisterItemRes registerItem(RegisterItemReq req, MultipartFile thumb, List<MultipartFile> files) {
         // 있을테니 넣는다
         req.addImage(fileService.uploadFile(thumb, 0));
         // 있으면 넣는다
@@ -59,7 +65,7 @@ public class ItemServiceImpl implements ItemService {
         ItemEntity item = itemMapper.cItemMapReq().map(req);
         ItemEntity savedItem = itemRepository.save(item);
         RegisterItemRes res = modelMapper.map(savedItem, RegisterItemRes.class);
-        return  res.registered();
+        return res.registered();
     }
 
     @Override
@@ -74,7 +80,7 @@ public class ItemServiceImpl implements ItemService {
 
         // 3. 썸네일 수정
         MultipartFile thumb = req.getNewThumb();
-        if(thumb!=null && !thumb.isEmpty()){
+        if (thumb != null && !thumb.isEmpty()) {
             // 삭제
             fileService.deleteFile(req.getExistingThumb());
             item.getImages().remove(0);
@@ -82,7 +88,7 @@ public class ItemServiceImpl implements ItemService {
             // 추가
             ImageDTO newImg = fileService.uploadFile(thumb, 0);
             ImageEntity newImage = modelMapper.map(newImg, ImageEntity.class);
-            item.setImage(newImage,0);
+            item.setImage(newImage, 0);
         }
 
         // 4. 기존 이미지 삭제 (삭제 대상 찾기 -> Entity -> Storage)
@@ -94,7 +100,7 @@ public class ItemServiceImpl implements ItemService {
 
             //ImageEntity에서 썸네일 제외, keep에 포함되어 있으면 제외
             List<ImageEntity> toDelete = item.getImages().stream()
-                    .filter(img -> img.getSortOrder()>= 1) // 입력시 sort 입력하므로 유무 검증은 안 해도 됨.
+                    .filter(img -> img.getSortOrder() >= 1) // 입력시 sort 입력하므로 유무 검증은 안 해도 됨.
                     .filter(img -> !keep.contains(img.getFileName()))
                     .toList();
             item.getImages().removeAll(toDelete);
@@ -103,13 +109,13 @@ public class ItemServiceImpl implements ItemService {
             }
 
             // 5. 기존 이미지 정렬 조건 업데이트
-            for(ExistingImageDTO existing : existings){
+            for (ExistingImageDTO existing : existings) {
                 item.getImages().stream()
                         .filter(img -> img.getFileName().equals(existing.getFileName()))
                         .findFirst()    // Optional이 안전... 바로 map 하는 것보다
                         .ifPresent(img -> img.setSortOrder(existing.getSortOrder()));
             }
-        }else { //null 또는 빈 리스트
+        } else { //null 또는 빈 리스트
             if (item.getImages().size() > 1) {
                 List<ImageEntity> toDelete = item.getImages().subList(1, item.getImages().size());
                 item.getImages().removeAll(toDelete);
@@ -136,12 +142,12 @@ public class ItemServiceImpl implements ItemService {
     @Override
     @Transactional
     public DeleteItemRes deleteItem(DeleteItemReq req) {
-        List<String> images= imageRepository.getFileName(req.getItemId());
+        List<String> images = imageRepository.getFileName(req.getItemId());
 
         itemRepository.deleteById(req.getItemId());
         itemRepository.flush();
 
-        for(String fileName : images){
+        for (String fileName : images) {
             fileService.deleteFile(fileName);
         }
 
@@ -170,14 +176,14 @@ public class ItemServiceImpl implements ItemService {
     }
 
     @Override
-    public PageResponseDTO<SearchAllItemsRes> getAllItems(SearchAllItemsReq req){
+    public PageResponseDTO<SearchAllItemsRes> getAllItems(SearchAllItemsReq req) {
         Pageable pageable = PageRequest.of(req.getPage(), req.getSize());
         Page<ItemEntity> searchAll = null;
-        if (req.getOrderBySales() == null){
+        if (req.getOrderBySales() == null) {
             searchAll = itemRepository.orderBy(pageable, req);
-        }else{
+        } else {
             List<ItemSalesDTO> itemList = itemRepository.rankSalesQuantity();
-            itemList.forEach(itemSalesDTO -> log.info(itemSalesDTO.getQuantity()+itemSalesDTO.getItem().toString()));
+            itemList.forEach(itemSalesDTO -> log.info(itemSalesDTO.getQuantity() + itemSalesDTO.getItem().toString()));
             List<ItemEntity> itemEntityList = itemList.stream().map(ItemSalesDTO::getItem).toList();
             searchAll = new PageImpl<>(itemEntityList, pageable, itemEntityList.size());
         }
@@ -190,6 +196,16 @@ public class ItemServiceImpl implements ItemService {
         }, pageable);
     }
 
+    @Override
+    @Transactional(readOnly=true)
+    public List<PopularItemRes> getPopularItems(PopularItemReq req) {
+        return itemRepository.rankSalesQuantity().stream()
+                .filter(row ->
+                        !req.isSellOnly() || row.getItem().getItemSellStatus() == ItemSellStatus.SELL)
+                .limit(5) // Top-5 고정
+                .map(row -> PopularItemRes.from(row.getItem()))
+                .toList();
+    }
 
 
     // --- 상품 등록 ---
