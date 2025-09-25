@@ -215,11 +215,11 @@ export default function NewBoardPage() {
 
       {/* 고정글/비밀글 — 관리자만 '고정글' 노출, 일반회원은 '비밀글'만 가운데 정렬 */}
       {isAdmin ? (
-        <div className="flex gap-12" style={{ alignItems: 'center' }}>
-          <label className="flex items-center gap-2 text-gray-600">
-            <input type="checkbox" checked={pinned} onChange={(e) => setPinned(e.target.checked)} />
-            고정글
-          </label>
+         <div className="flex gap-12" style={{ alignItems: 'center' }}>
+      <label className="flex items-center gap-2 text-gray-600">
+        <input type="checkbox" checked={pinned} onChange={(e) => setPinned(e.target.checked)} />
+        고정글
+      </label>
           <label className="flex items-center gap-2 text-gray-600">
             <input type="checkbox" checked={secret} onChange={(e) => setSecret(e.target.checked)} />
             비밀글

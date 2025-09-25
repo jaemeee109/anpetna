@@ -319,12 +319,15 @@ export default function Header() {
               {/* 관리자: MYPAGE(단일 링크 → INFO) | USER | SALES | INV | LOGOUT */}
               <Link href="/member/info" className="btn-link">MYPAGE</Link>
               <span className="sep">|</span>
+              <Link href="banner" className="btn-link">BANNER</Link>
+              <span className="sep">|</span>
               <Link href="/member/list" className="btn-link">USERS</Link>
               <span className="sep">|</span>
               <Link href="order/admin/erp" className="btn-link">SALES</Link>
               <span className="sep">|</span>
               <Link href="order/admin/inv" className="btn-link">INVENTORY</Link>
               <span className="sep">|</span>
+               
               <button type="button" className="btn-link" onClick={handleLogout}>
                 LOGOUT
               </button>
@@ -379,7 +382,7 @@ export default function Header() {
       <nav className="container apn-nav">
         <NavLink href="/board/NOTICE">NOTICE</NavLink>
         <NavLink href="/items">STORE</NavLink>
-        <NavLink href="/board/FREE">BOARD</NavLink>
+        <NavLink href="/board/FREE">CMNTY</NavLink>
 
         <div className="dropdown group">
           <button
