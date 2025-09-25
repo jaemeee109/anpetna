@@ -1,0 +1,125 @@
+package com.anpetna.venue.service.hospital;
+
+
+import com.anpetna.member.domain.MemberEntity;
+import com.anpetna.member.repository.MemberRepository;
+import com.anpetna.venue.constant.ReservationStatus;
+import com.anpetna.venue.domain.hospital.HospitalReservationEntity;
+import com.anpetna.venue.domain.VenueDoctorEntity;
+import com.anpetna.venue.domain.VenueEntity;
+import com.anpetna.venue.dto.hospital.CreateHospitalReservationReq;
+import com.anpetna.venue.dto.hospital.CreateHospitalReservationRes;
+import com.anpetna.venue.dto.doctor.DoctorDTO;
+import com.anpetna.venue.dto.doctor.ListDoctorsRes;
+import com.anpetna.venue.repository.hospital.HospitalReservationRepository;
+import com.anpetna.venue.repository.VenueDoctorRepository;
+import com.anpetna.venue.repository.VenueRepository;
+import com.anpetna.venue.repository.hotel.HotelReservationRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.time.LocalDateTime;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+public class HospitalServiceImpl implements HospitalService {
+
+    private static final int NOSHOW_LIMIT = 3; // 노쇼 3회 이상 차단
+
+    private final VenueRepository venueRepository;
+    private final MemberRepository memberRepository;
+    private final VenueDoctorRepository doctorRepository;
+    private final HospitalReservationRepository hospitalReservationRepository;
+    private final HotelReservationRepository hotelReservationRepository;
+
+    // 회원의 노쇼 누적 회수(호텔+병원 합산)
+    private long getNoShowCountAllServices(String memberId) {
+        long c = hospitalReservationRepository.countByMember_MemberIdAndStatus(memberId, ReservationStatus.NOSHOW);
+        long h = hotelReservationRepository.countByMember_MemberIdAndStatus(memberId, ReservationStatus.NOSHOW);
+        return h + c;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ListDoctorsRes listDoctors(Long venueId) {
+        var items = doctorRepository.findByVenue_VenueIdAndActiveTrue(venueId).stream()
+                .map(d -> DoctorDTO.builder().doctorId(d.getDoctorId()).name(d.getName()).build())
+                .collect(Collectors.toList());
+        return ListDoctorsRes.builder().items(items).build();
+    }
+
+    @Override
+    @Transactional
+    public CreateHospitalReservationRes reserve(String memberId, Long venueId, CreateHospitalReservationReq req) {
+        if (memberId == null || memberId.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "로그인이 필요합니다.");
+        }
+        // 예약 차단 : 노쇼 3회 이상이면 호텔·병원 전체 예약 불가
+        if (getNoShowCountAllServices(memberId) >= NOSHOW_LIMIT) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "노쇼 3회 이상으로 예약이 제한되었습니다.");
+        }
+        VenueEntity venue = venueRepository.findById(venueId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "장소(Venue)를 찾을 수 없습니다."));
+        MemberEntity member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
+        VenueDoctorEntity doctor = doctorRepository.findById(req.getDoctorId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "의사를 찾을 수 없습니다."));
+
+        if (!doctor.isActive() || !doctor.getVenue().getVenueId().equals(venueId)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "해당 매장의 의사가 아닙니다.");
+        }
+
+        // 30분 슬롯 검증: 10:00~18:00, 13~14 제외, 분=00/30
+        LocalDateTime at = req.getAppointmentAt();
+        int hour = at.getHour();
+        int minute = at.getMinute();
+        if (!((hour >= 10 && hour < 18) && (hour < 13 || hour >= 14) && (minute == 0 || minute == 30))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "예약 가능 시간은 10~18시(13~14 제외) 30분 단위입니다.");
+        }
+        if (hospitalReservationRepository.existsByDoctor_DoctorIdAndAppointmentAt(doctor.getDoctorId(), at)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "해당 시간은 이미 예약되었습니다.");
+        }
+
+        HospitalReservationEntity saved = hospitalReservationRepository.save(
+                HospitalReservationEntity.builder()
+                        .venue(venue)
+                        .member(member)
+                        .doctor(doctor)
+                        .appointmentAt(at)
+                        .status(ReservationStatus.PENDING)
+                        .reserverName(req.getReserverName())
+                        .primaryPhone(req.getPrimaryPhone())
+                        .secondaryPhone(req.getSecondaryPhone())
+                        .petName(req.getPetName())
+                        .petBirthYear(req.getPetBirthYear())
+                        .petSpecies(req.getPetSpecies())
+                        .petGender(req.getPetGender())
+                        .memo(req.getMemo())
+                        .build()
+        );
+
+        return CreateHospitalReservationRes.builder().reservationId(saved.getReservationId()).build();
+    }
+
+    @Override
+    @Transactional
+    public void confirm(Long reservationId) {
+        HospitalReservationEntity found = hospitalReservationRepository.findById(reservationId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "예약을 찾을 수 없습니다."));
+        found.setStatus(ReservationStatus.CONFIRMED);
+    }
+
+    // 관리자: 노쇼 처리 API
+    @Override
+    @Transactional
+    public void markNoShow(Long reservationId) {
+        HospitalReservationEntity found = hospitalReservationRepository.findById(reservationId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "예약을 찾을 수 없습니다."));
+        found.setStatus(ReservationStatus.NOSHOW);
+    }
+
+}

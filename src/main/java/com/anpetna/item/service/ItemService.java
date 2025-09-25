@@ -33,4 +33,6 @@ public interface ItemService {
 
     SearchOneItemRes getOneItem(SearchOneItemReq req);
 
+    void updateStock(Long itemId, Integer itemStock); // ERP 재고관리
+
 }

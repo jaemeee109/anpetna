@@ -139,6 +139,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/cart/**").hasRole("USER")
 
                         // --- Order ---
+                        .requestMatchers("/order/admin/**").hasRole("ADMIN")   // 관리자 전용
                         .requestMatchers("/order/**").permitAll()
                         .requestMatchers("/admin/**").hasRole("ADMIN")
 
@@ -147,6 +148,11 @@ public class SecurityConfig {
 
                         // --- Venue ---
                         .requestMatchers(HttpMethod.GET, "/venue/**").permitAll()
+                        .requestMatchers(HttpMethod.POST,
+                                "/venue/*/hotel/reservations",
+                                "/venue/*/hospital/reservations").authenticated()
+
+                        .requestMatchers("/admin/venue/**").hasRole("ADMIN")  // 관리자 전용
 
 
                         .anyRequest().authenticated()

@@ -25,4 +25,7 @@ public class SearchAllItemsRes {
 
     private String thumbnailUrl;
 
+    private Integer itemStock;       // 현재 재고
+    private ItemCategory itemCategory; // 카테고리
+
 }
