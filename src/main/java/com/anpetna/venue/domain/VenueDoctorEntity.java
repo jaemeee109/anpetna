@@ -26,5 +26,5 @@ public class VenueDoctorEntity extends BaseEntity {
     private String name;
 
     @Column(name = "active", nullable = false)
-    private boolean active;
+    private boolean active; // 예약가능여부 (true근무중/false예약불가능 또는 퇴사)
 }

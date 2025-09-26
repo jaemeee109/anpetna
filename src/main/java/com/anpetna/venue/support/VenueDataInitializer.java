@@ -1,4 +1,5 @@
 /*
+
 package com.anpetna.venue.support;
 
 import com.anpetna.venue.domain.VenueEntity;
@@ -68,4 +69,5 @@ public class VenueDataInitializer {
 
     }
 }
+
 */

@@ -3,6 +3,7 @@ package com.anpetna.notification.common.domain;
 import com.anpetna.member.domain.MemberEntity;
 import com.anpetna.notification.common.constant.NotificationType;
 import com.anpetna.notification.common.constant.TargetType;
+import com.anpetna.notification.common.constant.NotificationVariant;
 import jakarta.persistence.*;
 import lombok.*;
 import org.springframework.data.annotation.CreatedDate;
@@ -92,11 +93,7 @@ public class NotificationEntity {
         // isRead 기본 false, readAt null
     }
 
-    /** 읽음 처리 도메인 메서드 */
-    public void markRead() {
-        if (!this.isRead) {
-            this.isRead = true;
-            this.readAt = LocalDateTime.now();
-        }
-    }
+    @Enumerated(EnumType.STRING)
+    @Column(name = "variant")
+    private NotificationVariant variant;
 }
