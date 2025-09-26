@@ -146,6 +146,9 @@ public class SecurityConfig {
                         // --- Home ---
                         .requestMatchers("/home/**").permitAll()
 
+                        // --- Maps ---
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/maps/geocode").permitAll()
+
                         // --- Venue ---
                         .requestMatchers(HttpMethod.GET, "/venue/**").permitAll()
                         .requestMatchers(HttpMethod.POST,
@@ -153,6 +156,8 @@ public class SecurityConfig {
                                 "/venue/*/hospital/reservations").authenticated()
 
                         .requestMatchers("/admin/venue/**").hasRole("ADMIN")  // 관리자 전용
+
+
 
 
                         .anyRequest().authenticated()
