@@ -2,6 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Script from 'next/script';
+import { useRouter } from 'next/navigation';
+
+
 
 /** ▷ API 베이스 추론(NEXT_PUBLIC_API_BASE[_URL] 우선) */
 function resolveApiBase(): string {
@@ -277,6 +280,21 @@ export default function CarePage() {
 
   const rows = useMemo(() => venues || [], [venues]);
 
+const router = useRouter();
+
+/** 예약 페이지로 이동 */
+const goReserve = (v: NearbyVenue) => {
+  const id = Number(v?.venueId);
+  if (!id || Number.isNaN(id)) {
+    alert('예약 지점 정보가 없습니다.');
+    return;
+  }
+  const name = v?.venueName ? encodeURIComponent(v.venueName) : '';
+  router.push(`/care/reserve/${id}?name=${name}`);
+};
+
+
+
   return (
     <main className="care-wrap" data-theme="light">
       <h1 className="sr-only">Care</h1>
@@ -354,10 +372,18 @@ export default function CarePage() {
                 {/* 상단 왼쪽: 매장명 */}
                 <div className="care-name">{v.venueName}</div>
 
-                {/* 오른쪽: 중간 높이의 예약 버튼 */}
+              {/* 오른쪽: 중간 높이의 예약 버튼 */}
                 <div className="care-actions">
-                  <button type="button" className="btn btn-reserve">예약</button>
+                  <button
+                    type="button"
+                    className="btn btn-reserve"
+                    onClick={() => goReserve(v)}
+                  >
+                    예약
+                  </button>
                 </div>
+
+
 
                 {/* 하단 왼쪽: 주소 + 거리(오른쪽에 붙여 표기) */}
                 <div className="care-addr">

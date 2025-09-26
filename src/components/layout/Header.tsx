@@ -327,6 +327,8 @@ export default function Header() {
               <span className="sep">|</span>
               <Link href="order/admin/inv" className="btn-link">INVENTORY</Link>
               <span className="sep">|</span>
+              <Link href="care/admin" className="btn-link">RESERVATION</Link>
+              <span className="sep">|</span>
                
               <button type="button" className="btn-link" onClick={handleLogout}>
                 LOGOUT
