@@ -6,6 +6,7 @@ import com.anpetna.item.domain.ItemEntity;
 import com.anpetna.item.repository.ItemRepository;
 import com.anpetna.member.domain.MemberEntity;
 import com.anpetna.member.repository.MemberRepository;
+import com.anpetna.notification.feature.stock.service.StockLowNotificationService;
 import com.anpetna.order.constant.OrdersStatus;
 import com.anpetna.order.domain.AddressEntity;
 import com.anpetna.order.domain.OrderEntity;
@@ -49,6 +50,7 @@ public class OrdersServiceImpl implements OrdersService {
     private final CartRepository cartRepository;
     //    private static final int FREE_SHIPPING_THRESHOLD = 100_000; // 10만원 이상 무료 배송
     private final MemberRepository memberRepository;
+    private final StockLowNotificationService stockLowNotificationService;
 
     // 기존에는 임의로 설정한 배송비와 무료배송비용 사용.
     // 이를 DTO에 추가하여 입력한 값을 배송비, 무료배송비용으로 사용하게끔 변경.
@@ -153,6 +155,8 @@ public class OrdersServiceImpl implements OrdersService {
                 item.setItemSellStatus(next <= 0 ? ItemSellStatus.SOLD_OUT : ItemSellStatus.SELL);
                 itemRepository.save(item);
                 // =======================================================================
+                stockLowNotificationService.notifyStockLow(item, next);
+
             }
         } else {
             throw new IllegalArgumentException("지원하지 않는 mode: " + req.getMode());
