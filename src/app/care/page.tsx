@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Script from 'next/script';
-import Link from 'next/link';
 
 /** ▷ API 베이스 추론(NEXT_PUBLIC_API_BASE[_URL] 우선) */
 function resolveApiBase(): string {
@@ -17,6 +16,7 @@ function resolveApiBase(): string {
   return `${protocol}//${hostname}${guessPort ? `:${guessPort}` : ''}`.replace(/\/+$/, '');
 }
 
+/** ▷ 타입 정의: 백엔드가 내려주는 매장 데이터 */
 type NearbyVenue = {
   venueId: number;
   venueName: string;
@@ -28,10 +28,10 @@ type NearbyVenue = {
 };
 type NearbyRes = { items: NearbyVenue[] };
 
-/** ▷ 네이버 지도 키 (환경변수 필요) */
+/** ▷ 네이버 지도 브라우저 키(.env.local) */
 const NAVER_ID = process.env.NEXT_PUBLIC_NAVER_MAPS_CLIENT_ID;
 
-/** ▷ 초기 중심(서울 시청 근처) */
+/** ▷ 초기 지도 중심(서울 시청 근처) */
 const DEFAULT_CENTER = { lat: 37.5665, lng: 126.9780 };
 
 /** ▷ window.naver 안전 접근 */
@@ -40,44 +40,43 @@ function getNaver(): any | undefined {
   return (window as any).naver;
 }
 
-/** 글로벌 콜백: 스크립트의 callback=__initNaverMap 에서 호출 */
-declare global {
-  interface Window { __initNaverMap?: () => void }
-}
+/** ▷ 네이버 스크립트 콜백 전역 선언 */
+declare global { interface Window { __initNaverMap?: () => void } }
 
 export default function CarePage() {
+  /** 지도 DOM/인스턴스/마커 */
   const mapEl = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<any | null>(null);
   const markersRef = useRef<any[]>([]);
 
-  // 주소 입력/자동완성 상태
+  /** 검색/자동완성 상태 */
   const [query, setQuery] = useState('');
   const [suggestions, setSuggestions] = useState<{ label: string; lat: number; lng: number }[]>([]);
   const [openSug, setOpenSug] = useState(false);
   const [typing, setTyping] = useState(false);
 
+  /** 지도 중심/매장/상태 */
   const [center, setCenter] = useState<{ lat: number; lng: number }>(DEFAULT_CENTER);
   const [venues, setVenues] = useState<NearbyVenue[]>([]);
   const [loading, setLoading] = useState(false);
-  const [err,   setErr] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
 
   /** 지도 초기화 */
   function initMap() {
     const nv = getNaver();
     if (!mapEl.current || !nv?.maps) return;
 
-    console.debug('[Care] initMap called');
     const nmap = new nv.maps.Map(mapEl.current, {
       center: new nv.maps.LatLng(center.lat, center.lng),
       zoom: 13,
     });
     mapRef.current = nmap;
 
-    // 초기 진입: 전체 매장 거리순 조회
+    // 초기 진입: 기준 좌표에서 전체 매장을 거리순으로
     void fetchVenues(center.lat, center.lng, true);
   }
 
-  // 콜백 등록
+  /** 스크립트 callback 연결/해제 */
   useEffect(() => {
     if (typeof window === 'undefined') return;
     (window as any).__initNaverMap = initMap;
@@ -85,7 +84,7 @@ export default function CarePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [center.lat, center.lng]);
 
-  /** 마커 제거 */
+  /** 마커 전체 제거 */
   function clearMarkers() {
     const nv = getNaver();
     if (!nv?.maps) return;
@@ -93,14 +92,13 @@ export default function CarePage() {
     markersRef.current = [];
   }
 
-  /** 지도 갱신 + 마커 */
+  /** 지도 갱신 + 마커 그리기 */
   function refreshMap(lat: number, lng: number, vs: NearbyVenue[]) {
     const nv = getNaver();
     const nmap = mapRef.current;
     if (!nmap || !nv?.maps) return;
 
     const { LatLng, Marker, LatLngBounds } = nv.maps;
-
     nmap.setCenter(new LatLng(lat, lng));
 
     clearMarkers();
@@ -123,7 +121,7 @@ export default function CarePage() {
     if (vs.length > 0) nmap.fitBounds(bounds);
   }
 
-  /** 매장 목록 호출 */
+  /** 매장 목록 조회 */
   async function fetchVenues(lat: number, lng: number, all: boolean) {
     setLoading(true);
     setErr(null);
@@ -140,7 +138,6 @@ export default function CarePage() {
       const j = (await r.json()) as NearbyRes;
       const list = Array.isArray((j as any).items) ? (j.items as NearbyVenue[]) : [];
 
-      // 혹시 모를 서버 정렬 이상 대비
       list.sort((a, b) => (Number(a.distanceKm) || 0) - (Number(b.distanceKm) || 0));
       setVenues(list);
       refreshMap(lat, lng, list);
@@ -153,40 +150,34 @@ export default function CarePage() {
     }
   }
 
+  /** JS SDK 지오코딩(백엔드 실패시 폴백) — coordinate 미사용 */
+  async function geocodeBySDK(q: string) {
+    const nv = getNaver();
+    if (!nv?.maps?.Service?.geocode) return [];
+    const opts: any = { query: q };
 
-/** JS SDK 지오코딩 (폴백용) — coordinate 옵션 제거 */
-async function geocodeBySDK(q: string) {
-  const nv = getNaver();
-  if (!nv?.maps?.Service?.geocode) return [];
-
-  // ❌ coordinate 제거 (버전별 타입 미스매치 회피)
-  const opts: any = { query: q };
-
-  // ✅ 콜백 인자 순서: (status, response)
-  return await new Promise<{ label: string; lat: number; lng: number }[]>((resolve) => {
-    nv.maps.Service.geocode(opts, (status: any, res: any) => {
-      if (status !== nv.maps.Service.Status.OK || !Array.isArray(res?.v2?.addresses)) {
-        resolve([]);
-        return;
-      }
-      const items = res.v2.addresses
-        .map((a: any) => {
-          const label =
-            a.roadAddress || a.jibunAddress || a.englishAddress || a.address || '';
-          const lat = Number(a.y);
-          const lng = Number(a.x);
-          return label && Number.isFinite(lat) && Number.isFinite(lng)
-            ? { label, lat, lng }
-            : null;
-        })
-        .filter(Boolean);
-      resolve(items as any);
+    return await new Promise<{ label: string; lat: number; lng: number }[]>((resolve) => {
+      nv.maps.Service.geocode(opts, (status: any, res: any) => {
+        if (status !== nv.maps.Service.Status.OK || !Array.isArray(res?.v2?.addresses)) {
+          resolve([]);
+          return;
+        }
+        const items = res.v2.addresses
+          .map((a: any) => {
+            const label = a.roadAddress || a.jibunAddress || a.englishAddress || a.address || '';
+            const lat = Number(a.y);
+            const lng = Number(a.x);
+            return label && Number.isFinite(lat) && Number.isFinite(lng)
+              ? { label, lat, lng }
+              : null;
+          })
+          .filter(Boolean);
+        resolve(items as any);
+      });
     });
-  });
-}
+  }
 
-
-  /** 자동완성: 백엔드 프록시 + 실패 시 SDK 폴백 */
+  /** 자동완성: 백엔드 → 폴백 SDK */
   useEffect(() => {
     let timer: any;
     if (!query.trim()) {
@@ -205,16 +196,13 @@ async function geocodeBySDK(q: string) {
           lng: String(center.lng),
         }).toString();
 
-        // 1차: 백엔드 프록시
         const r = await fetch(url.toString(), { credentials: 'include' });
         const ok = r.ok;
         const j = ok ? await r.json() : { items: [] };
         let items: { label: string; lat: number; lng: number }[] = j?.items ?? [];
 
-        // 2차: 실패/빈 결과 → SDK
         if (!ok || items.length === 0) {
-        items = await geocodeBySDK(query.trim());
-
+          items = await geocodeBySDK(query.trim());
         }
 
         setSuggestions(items);
@@ -231,7 +219,7 @@ async function geocodeBySDK(q: string) {
     return () => clearTimeout(timer);
   }, [query, center.lat, center.lng]);
 
-  /** 제안 선택 → 지도 이동 + 전체 매장 거리순 */
+  /** 자동완성 선택 */
   async function handlePickSuggestion(s: { label: string; lat: number; lng: number }) {
     setQuery(s.label);
     setOpenSug(false);
@@ -239,7 +227,7 @@ async function geocodeBySDK(q: string) {
     await fetchVenues(s.lat, s.lng, true);
   }
 
-  /** 주소 검색(엔터/버튼) */
+  /** 주소 검색 */
   async function handleSearchAddress(e?: React.FormEvent) {
     e?.preventDefault();
     if (!query.trim()) return;
@@ -253,16 +241,13 @@ async function geocodeBySDK(q: string) {
         lng: String(center.lng),
       }).toString();
 
-      // 1차: 백엔드
       const r = await fetch(url.toString(), { credentials: 'include' });
       const ok = r.ok;
       const j = ok ? await r.json() : { items: [] };
       let items: { label: string; lat: number; lng: number }[] = j?.items ?? [];
 
-      // 2차: SDK
       if (!ok || items.length === 0) {
-    items = await geocodeBySDK(query.trim());
-
+        items = await geocodeBySDK(query.trim());
       }
 
       const best = items[0];
@@ -293,35 +278,19 @@ async function geocodeBySDK(q: string) {
   const rows = useMemo(() => venues || [], [venues]);
 
   return (
-    <main className="care-wrap">
+    <main className="care-wrap" data-theme="light">
       <h1 className="sr-only">Care</h1>
 
       {/* 지도 */}
       {NAVER_ID ? (
         <>
-          {/* 1차 로더: oapi + ncpClientId */}
           <Script
-            id="naver-maps-1"
+            id="naver-maps"
             src={`https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${encodeURIComponent(
               NAVER_ID!
             )}&submodules=geocoder&callback=__initNaverMap`}
             strategy="afterInteractive"
-            onReady={() => {
-              // 콜백이 누락될 경우 대비해 수동 호출
-              try { (window as any).__initNaverMap?.(); } catch {}
-              // 1.5초 후에도 naver 객체가 없으면 보조 로더 주입
-              setTimeout(() => {
-                if (!(window as any).naver?.maps) {
-                  console.warn('[Care] primary loader failed, injecting fallback loader');
-                  const s = document.createElement('script');
-                  s.src = `https://openapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${encodeURIComponent(
-                    NAVER_ID!
-                  )}&submodules=geocoder&callback=__initNaverMap`;
-                  s.async = true;
-                  document.head.appendChild(s);
-                }
-              }, 1500);
-            }}
+            onReady={() => { try { (window as any).__initNaverMap?.(); } catch {} }}
           />
           <div ref={mapEl} className="care-map" aria-label="케어 매장 지도" />
         </>
@@ -331,7 +300,7 @@ async function geocodeBySDK(q: string) {
         </div>
       )}
 
-      {/* 검색바 */}
+      {/* 지도 '하단 중앙' 검색바 */}
       <form className="care-searchbar" onSubmit={handleSearchAddress}>
         <div className="auto-wrap">
           <input
@@ -362,14 +331,14 @@ async function geocodeBySDK(q: string) {
             </ul>
           )}
         </div>
-        <button type="submit" className="btn">위치 탐색</button>
-        <button type="button" onClick={handleLocateMe} className="btn">내위치 탐색</button>
+        <button type="submit" className="btn btn-primary">검색</button>
+        <button type="button" onClick={handleLocateMe} className="btn btn-ghost">내위치찾기</button>
       </form>
 
       {/* 구분선 */}
-      <div className="care-sep" />
+      <div className="care-sep" role="separator" />
 
-      {/* 리스트 */}
+      {/* 매장 리스트 */}
       <section aria-label="매장 리스트" className="care-list">
         {loading && <div className="care-msg">불러오는 중…</div>}
         {err && <div className="care-err">오류: {err}</div>}
@@ -382,43 +351,254 @@ async function geocodeBySDK(q: string) {
             const id = v.venueId ?? i;
             return (
               <li key={id} className="care-li">
+                {/* 상단 왼쪽: 매장명 */}
                 <div className="care-name">{v.venueName}</div>
-                <div className="care-addr">{v.address}</div>
+
+                {/* 오른쪽: 중간 높이의 예약 버튼 */}
                 <div className="care-actions">
-                  <Link href="#" prefetch={false} className="btn">예약</Link>
+                  <button type="button" className="btn btn-reserve">예약</button>
+                </div>
+
+                {/* 하단 왼쪽: 주소 + 거리(오른쪽에 붙여 표기) */}
+                <div className="care-addr">
+                  {v.address}
                   {typeof v.distanceKm === 'number' && (
-                    <span className="care-dist">{v.distanceKm.toFixed(2)} km</span>
+                    <span className="care-dist-inline"> · {v.distanceKm.toFixed(2)} km</span>
                   )}
                 </div>
               </li>
             );
           })}
         </ul>
+         <p className="mb-[60px]"></p>
       </section>
 
-      {/* 페이지 한정 스타일 */}
+      {/* ======================== 스타일 ======================== */}
       <style jsx>{`
-        .care-wrap { max-width: 800px; margin: 0 auto; padding: 16px; }
-        .care-map { width: 100%; height: 420px; border: 1px solid #e5e7eb; border-radius: 8px; }
-        .care-map-empty { display:flex; align-items:center; justify-content:center; color:#6b7280; background:#f9fafb; }
-        .care-searchbar { margin-top: 12px; display:flex; gap:8px; align-items:flex-start; }
-        .auto-wrap { position: relative; flex:1; }
-        .care-input { width:100%; height:40px; padding:0 12px; border:1px solid #e5e7eb; border-radius:10px; outline:none; text-align:center; }
-        .care-input::placeholder { text-align:center; }
-        .care-input:not(:placeholder-shown) { text-align:left; }
-        .auto-list { position:absolute; top:44px; left:0; right:0; background:#fff; border:1px solid #e5e7eb; border-radius:8px;
-          box-shadow:0 4px 14px rgba(0,0,0,0.06); max-height:260px; overflow:auto; z-index:20; padding:6px 0; margin:0; list-style:none; }
-        .auto-item { padding:8px 12px; cursor:pointer; text-align:left; }
-        .auto-item:hover { background:#f9fafb; }
-        .auto-item.muted { color:#6b7280; cursor:default; }
-        .care-sep { border-top:1px solid #e5e7eb; margin:16px 0; }
-        .care-list { margin-top:8px; }
-        .care-ul { list-style:none; padding:0; margin:0; }
-        .care-li { padding:10px 4px; border-bottom:1px solid #f3f4f6; text-align:left; }
-        .care-name { font-weight:700; }
-        .care-addr { color:#6b7280; margin-top:2px; }
-        .care-actions { margin-top:6px; display:flex; gap:8px; align-items:center; }
-        .care-dist { color:#6b7280; font-size:12px; }
+        :root,
+        .care-wrap[data-theme="light"] {
+          --color-bg: #ffffff;
+          --color-surface: #f9fafb;
+          --color-border: #e5e7eb;
+          --color-muted: #6b7280;
+          --color-text: #111827;
+          --color-primary: #ffffffff;
+          --color-primary-contrast: #000000ff;
+          --color-link: #2563eb;
+
+          --radius-sm: 8px;
+          --radius-md: 10px;
+          --radius-lg: 16px;
+          --shadow-sm: 0 1px 2px rgba(0,0,0,0.06);
+          --shadow-md: 0 4px 14px rgba(0,0,0,0.06);
+
+          --font-size-sm: 12px;
+          --font-size-md: 14px;
+          --font-size-lg: 16px;
+          --font-size-xl: 18px;
+          --line-height: 1.5;
+
+          --space-1: 4px;
+          --space-2: 8px;
+          --space-3: 12px;
+          --space-4: 16px;
+          --space-5: 20px;
+          --space-6: 24px;
+
+          --height-input: 40px;
+          --height-button: 40px;
+          --map-height: 420px;
+          --container-max: 880px;
+        }
+
+        .care-wrap[data-theme="dark"] {
+          --color-bg: #0b1020;
+          --color-surface: #0f172a;
+          --color-border: #1f2937;
+          --color-muted: #9aa3b2;
+          --color-text: #e5e7eb;
+          --color-primary: #faf760ff;
+          --color-primary-contrast: #0b1020;
+          --color-link: #93c5fd;
+          --shadow-sm: 0 1px 2px rgba(0,0,0,0.5);
+          --shadow-md: 0 6px 24px rgba(0,0,0,0.5);
+        }
+
+        /* LAYOUT */
+        .care-wrap {
+          max-width: 750px;
+          margin: 0 auto;
+          padding: var(--space-4);
+          background: var(--color-bg);
+          color: var(--color-text);
+          font-size: var(--font-size-lg);
+          line-height: var(--line-height);
+        }
+
+        /* MAP */
+        .care-map {
+          width: 100%;
+          height: var(--map-height);
+          border: 1px solid var(--color-border);
+          border-radius: 15px;
+          background: var(--color-surface);
+          box-shadow: 0 3px 3px rgba(199,196,196,0.5);
+        }
+        .care-map.care-map-empty {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: var(--color-muted);
+        }
+
+        /* 지도 하단 중앙 검색바 — (3) 겹침 방지 */
+        .care-searchbar {
+          margin: 20px auto 0;
+          width: 500px;
+          display: flex;
+          gap: 35px;                
+          justify-content: center;
+          align-items: center;
+          flex-wrap: nowrap;                   /* 버튼 줄바꿈 방지 */
+        }
+        .care-searchbar .auto-wrap { flex: 1 1 auto; width: 300px; } 
+        .care-searchbar .btn { flex: 0 0 auto; white-space: nowrap; width: 100px }   
+        .auto-wrap { position: relative; }
+        .care-input {
+          width: 100%;
+          height: var(--height-input);
+          padding: 0 var(--space-3);
+          border: 1px solid var(--color-border);
+          border-radius: var(--radius-md);
+          background: var(--color-bg);
+          color: var(--color-text);
+          outline: none;
+          text-align: center;
+          transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .care-input::placeholder { text-align: center; color: var(--color-muted); }
+        .care-input:not(:placeholder-shown) { text-align: left; }
+        .care-input:focus {
+          border-color: var(--color-primary);
+          box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-primary), transparent 80%);
+        }
+
+        /* 자동완성 */
+        .auto-list {
+          position: absolute;
+          top: calc(var(--height-input) + 4px);
+          left: 0; right: 0;
+          background: var(--color-bg);
+          border: 1px solid var(--color-border);
+          border-radius: var(--radius-sm);
+          box-shadow: var(--shadow-md);
+          max-height: 260px;
+          overflow: auto;
+          z-index: 20;
+          padding: var(--space-2) 0;
+          margin: 0;
+          list-style: none;
+        }
+        .auto-item { padding: var(--space-2) var(--space-3); cursor: pointer; text-align: left; transition: background 0.15s ease; }
+        .auto-item:hover { background: var(--color-surface); }
+        .auto-item.muted { color: var(--color-muted); cursor: default; }
+
+        /* BUTTONS */
+        .btn {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          min-width: 96px;
+          height: var(--height-button);
+          padding: 0 var(--space-3);
+          border-radius: var(--radius-md);
+          border: 1px solid var(--color-border);
+          background: var(--color-surface);
+          color: var(--color-text);
+          font-size: var(--font-size-md);
+          cursor: pointer;
+          transition: transform 0.02s ease, background 0.15s ease, border 0.15s ease, color 0.15s ease;
+          user-select: none;
+          text-decoration: none;
+        }
+        .btn:active { transform: translateY(1px); }
+
+        .btn-primary { background: var(--color-primary); color: var(--color-primary-contrast); border-color: color-mix(in oklab, var(--color-primary), #000 6%); }
+        .btn-primary:hover { filter: brightness(0.96); }
+        .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        .btn-ghost { 
+        background: transparent; 
+        color: var(--color-text);
+        margin-left:-25px; }
+        .btn-ghost:hover { background: var(--color-surface); }
+
+        /* 예약 버튼: 흰색 + 회색 테두리 + 3D */
+        .btn-reserve {
+          background: #ffffff;
+          color: var(--color-text);
+          border: 1px solid #cfd4dc;
+          box-shadow:
+            inset 0 1px 0 rgba(255,255,255,0.8),
+            0 2px 0 rgba(0,0,0,0.06),
+            0 6px 14px rgba(0,0,0,0.06);
+        }
+        .btn-reserve:hover { filter: brightness(0.98); }
+        .btn-reserve:active {
+          transform: translateY(1px);
+          box-shadow:
+            inset 0 1px 0 rgba(255,255,255,0.6),
+            0 1px 0 rgba(0,0,0,0.06),
+            0 4px 10px rgba(0,0,0,0.06);
+        }
+
+        /* DIVIDER */
+        .care-sep { border-top: 1px solid var(--color-border); margin: var(--space-4) 0; }
+
+        /* LIST (본문보다 더 좁게 중앙 정렬) */
+        .care-list {
+          margin-top: var(--space-4);
+          max-width: 640px;
+          margin-left: auto;
+          margin-right: auto;
+        }
+        .care-msg { color: var(--color-muted); padding: var(--space-2) 0; }
+        .care-err {
+          color: #b91c1c;
+          background: color-mix(in oklab, #fecaca, transparent 70%);
+          border: 1px solid color-mix(in oklab, #fecaca, #000 10%);
+          padding: var(--space-2) var(--space-3);
+          border-radius: var(--radius-sm);
+        }
+
+        .care-ul { list-style: none; padding: 0; margin: 0; }
+
+        /* (2) 예약 버튼을 가운데 라인에 오른쪽 정렬 */
+        .care-li {
+          padding: var(--space-3) var(--space-1);
+          border-bottom: 1px solid var(--color-border);
+          text-align: left;
+          display: grid;
+          grid-template-columns: 1fr auto; /* 왼쪽 내용 / 오른쪽 버튼 */
+          grid-template-rows: auto auto;   /* 1행: 이름 / 2행: 주소 */
+          align-items: center;             /* 각 행 세로 가운데 */
+          gap: var(--space-2);
+        }
+        .care-name { grid-column: 1; grid-row: 1; font-weight: 700; }
+        .care-addr { grid-column: 1; grid-row: 2; color: var(--color-muted); margin-top: 2px; font-size: var(--font-size-md); }
+        .care-actions { grid-column: 2; grid-row: 1 / span 2; justify-self: end; align-self: center; } /* 가운데 높이 + 오른쪽 */
+        .care-dist-inline { margin-left: 8px; color: var(--color-muted); font-size: var(--font-size-sm); }
+
+        /* RESPONSIVE */
+        @media (max-width: 768px) {
+          :root, .care-wrap[data-theme="light"], .care-wrap[data-theme="dark"] {
+            --container-max: 100%;
+            --map-height: 340px;
+            --font-size-lg: 15px;
+          }
+          .care-searchbar { flex-direction: column; width: min(560px, 94%); }
+          .care-searchbar .btn { width: 100%; }
+        }
       `}</style>
     </main>
   );
