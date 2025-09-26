@@ -383,6 +383,7 @@ export default function Header() {
         <NavLink href="/board/NOTICE">NOTICE</NavLink>
         <NavLink href="/items">STORE</NavLink>
         <NavLink href="/board/FREE">CMNTY</NavLink>
+        <NavLink href="/care">CARE</NavLink>
 
         <div className="dropdown group">
           <button

@@ -68,7 +68,7 @@ p  { font-weight: 400; }
 
 /* 네비(알약 버튼) */
 .apn-nav{
-  display:flex; justify-content:center; gap:34px;
+  display:flex; justify-content:center; gap:10px;
   padding: 6px 0 10px;
 }
 .pill{
@@ -83,7 +83,7 @@ p  { font-weight: 400; }
   display:inline-flex;
   align-items:center;
   justify-content:center;
-  width:92px;
+  width:102px;
   height:32px;       /* 세로 높이 고정 */
   padding:0 14px;    /* 상하 0으로 맞춤 */
   box-sizing:border-box;
@@ -107,6 +107,10 @@ p  { font-weight: 400; }
 
 .apn-nav > a:nth-child(4).pill,
 .apn-nav > :nth-child(4) .pill,
+.pill--help   { background:#dcffed; } /* CARE */
+
+.apn-nav > a:nth-child(5).pill,
+.apn-nav > :nth-child(5) .pill,
 .pill--help   { background:#fffce0; } /* HELP */
 
 /* (1) 얇은 하단 구분선 */
