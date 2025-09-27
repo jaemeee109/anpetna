@@ -8,8 +8,9 @@ import type {
   CreateReservationRes,
   AdminReservationLine,
   AdminReservationPage,
+   VenueSummary, 
 } from './venue.types';
-
+import type { AdminBulkUpdateReservationStatusBody } from './venue.types';
 /**
  * ✅ 백엔드 경로 모음
  * (Back-Tree 기준: AdminVenueController, HospitalController, HotelController, VenueController 확인됨)
@@ -23,11 +24,21 @@ const VENUE_PATHS = {
 
 function pickArray<T = any>(data: any): T[] {
   if (Array.isArray(data)) return data as T[];
-  if (Array.isArray(data?.items)) return data.items as T[]; // ← items 형태도 허용
+  if (Array.isArray(data?.items)) return data.items as T[]; 
   if (Array.isArray(data?.content)) return data.content as T[];
   if (Array.isArray(data?.list)) return data.list as T[];
   if (Array.isArray(data?.dtoList)) return data.dtoList as T[];
   return [];
+}
+
+// 매장 목록 — GET /venue/list
+export async function listVenues(): Promise<VenueSummary[]> {
+  const { data } = await http.get(`${VENUE_PATHS.VENUE_ROOT}/list`);
+  const items = pickArray<any>(data);
+  return items.map((v: any) => ({
+    venueId: Number(v.venueId),
+    venueName: String(v.venueName ?? ''),
+  }));
 }
 
 /** (병원 예약용) 의사 목록 — GET /venue/{venueId}/doctors
@@ -56,19 +67,24 @@ export async function listUnavailableTimes(params: {
   return Array.isArray(data?.times) ? (data.times as string[]) : [];
 }
 
-/** 병원 예약 생성 — POST /hospital/reservations */
+// 병원 예약 생성 — POST /venue/{venueId}/hospital/reservations
 export async function createHospitalReservation(
+  venueId: number,
   body: CreateHospitalReservationReq
 ): Promise<CreateReservationRes> {
-  const { data } = await http.post(`${VENUE_PATHS.HOSPITAL_ROOT}/reservations`, body);
+  // 백엔드 스펙에 맞춰 venueId를 경로에 포함
+  const url = `${VENUE_PATHS.VENUE_ROOT}/${venueId}/hospital/reservations`; // :contentReference[oaicite:9]{index=9}
+  const { data } = await http.post(url, body);
   return data as CreateReservationRes;
 }
 
-/** 호텔 예약 생성 — POST /hotel/reservations */
+
+// 호텔 예약 생성 — POST /venue/{venueId}/hotel/reservations
 export async function createHotelReservation(
+  venueId: number,
   body: CreateHotelReservationReq
 ): Promise<CreateReservationRes> {
-  const { data } = await http.post(`${VENUE_PATHS.HOTEL_ROOT}/reservations`, body);
+  const { data } = await http.post(`${VENUE_PATHS.VENUE_ROOT}/${venueId}/hotel/reservations`, body);
   return data as CreateReservationRes;
 }
 
@@ -78,6 +94,8 @@ export async function adminListReservations(params: {
   status?: string;
   type?: 'HOSPITAL' | 'HOTEL';
   memberId?: string;
+  doctorId?: number | string;   // ← 추가
+  date?: string;                // ← 추가 (YYYY-MM-DD)
   page?: number;
   size?: number;
 }): Promise<AdminReservationPage> {
@@ -100,6 +118,14 @@ export async function adminBulkUpdateReservationStatus(body: {
   const { data } = await http.post(`${VENUE_PATHS.ADMIN_ROOT}/reservations/status`, body);
   return data ?? {};
 }
+export async function adminSetClosedTimes(body: {
+  doctorId: number;
+  date: string;       // YYYY-MM-DD
+  close: string[];    // ['09:00','09:30',...]
+}): Promise<{ ok: boolean }> {
+  const { data } = await http.post(`${VENUE_PATHS.ADMIN_ROOT}/hospital/closed-times`, body);
+  return (data && typeof data.ok === 'boolean') ? data : { ok: true };
+}
 
 const venueApi = {
   listDoctors,
@@ -108,6 +134,9 @@ const venueApi = {
   createHotelReservation,
   adminListReservations,
   adminBulkUpdateReservationStatus,
+  listVenues,                
+   adminSetClosedTimes,
 };
+
 
 export default venueApi;

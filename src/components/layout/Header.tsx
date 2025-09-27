@@ -4,6 +4,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
+import venueApi from '@/features/venue/data/venue.api';
 
 /* -------------------- 쿠키/스토리지 유틸 -------------------- */
 function getCookie(name: string) {
@@ -108,7 +109,7 @@ export default function Header() {
 
   // 드롭다운
   const [myOpen, setMyOpen] = useState(false);
-  const [sysOpen, setSysOpen] = useState(false);     // ※ SYSTEM UI는 제거하지만 원본 흐름 보존을 위해 상태 자체는 유지
+  const [sysOpen, setSysOpen] = useState(false);     // ※ SYSTEM UI는 제거하지만 원본 흐름 보존
   const myRef = useRef<HTMLDivElement | null>(null);
   const sysRef = useRef<HTMLDivElement | null>(null); // ※ 동일
 
@@ -116,7 +117,7 @@ export default function Header() {
     const onDocClick = (e: MouseEvent) => {
       const t = e.target as Node;
       if (myRef.current && !myRef.current.contains(t)) setMyOpen(false);
-      if (sysRef.current && !sysRef.current.contains(t)) setSysOpen(false); // 사용처 유지(문제 없음)
+      if (sysRef.current && !sysRef.current.contains(t)) setSysOpen(false);
     };
     document.addEventListener('click', onDocClick);
     return () => document.removeEventListener('click', onDocClick);
@@ -149,9 +150,8 @@ export default function Header() {
     setAdmin(!!(isAdminByJwt || isAdminStored));
   }
 
-  // 2차: 서버에서 역할 확정 (ADMIN/BLACKLIST/USER 중 하나를 memberRole로 고정 저장)
+  // 2차: 서버에서 역할 확정 (ADMIN/BLACKLIST/USER 중 하나)
   async function verifyRoleFromServerIfNeeded() {
-    // 아예 로컬 인증 흔적이 없으면 종료
     if (!hasAnyLocalAuth()) return;
 
     const token = getTokenFromStorage();
@@ -167,7 +167,6 @@ export default function Header() {
       return;
     }
 
-    // 토큰이 없으면 서버조회 스킵
     if (!token) {
       if (stored) {
         setAuthed(true);
@@ -179,7 +178,6 @@ export default function Header() {
       return;
     }
 
-    // 토큰이 있을 때만 서버로 최종 확인
     const id =
       (typeof window !== 'undefined' && (localStorage.getItem('memberId') || localStorage.getItem('loginId'))) || '';
     if (!id) return;
@@ -302,6 +300,25 @@ export default function Header() {
     pathname?.startsWith('/board/FAQ/') ||
     pathname?.startsWith('/board/QNA/');
 
+  /* -------------------- RESERVATION 드롭다운 상태/로더 -------------------- */
+  const [rvOpen, setRvOpen] = useState(false);
+  const [rvLoading, setRvLoading] = useState(false);
+  const [rvErr, setRvErr] = useState<string | null>(null);
+  const [venues, setVenues] = useState<{ venueId: number; venueName: string }[]>([]);
+
+  async function ensureVenues() {
+    if (venues.length > 0 || rvLoading) return;
+    setRvLoading(true); setRvErr(null);
+    try {
+      const list = await venueApi.listVenues();
+      setVenues(list);
+    } catch (e: any) {
+      setRvErr(e?.message || '매장 목록을 불러오지 못했습니다.');
+    } finally {
+      setRvLoading(false);
+    }
+  }
+
   return (
     <header className="apn-header">
       {/* 상단 우측 */}
@@ -316,7 +333,7 @@ export default function Header() {
             </>
           ) : admin ? (
             <>
-              {/* 관리자: MYPAGE(단일 링크 → INFO) | USER | SALES | INV | LOGOUT */}
+              {/* 관리자: MYPAGE(단일 링크 → INFO) | USER | SALES | INV | RESERVATION(드롭다운) | LOGOUT */}
               <Link href="/member/info" className="btn-link">MYPAGE</Link>
               <span className="sep">|</span>
               <Link href="banner" className="btn-link">BANNER</Link>
@@ -327,9 +344,45 @@ export default function Header() {
               <span className="sep">|</span>
               <Link href="order/admin/inv" className="btn-link">INVENTORY</Link>
               <span className="sep">|</span>
-              <Link href="care/admin" className="btn-link">RESERVATION</Link>
+
+              {/* ▼ 여기: 기존 <Link href="care/admin">RESERVATION</Link> 를 드롭다운으로 교체 */}
+              <div className="relative inline-block">
+                <button
+                  type="button"
+                  className="btn-link"
+                  onClick={() => { setRvOpen((v) => !v); if (!rvOpen) void ensureVenues(); }}
+                  aria-haspopup="menu"
+                  aria-expanded={rvOpen ? 'true' : 'false'}
+                >
+                  RESERVATION ▾
+                </button>
+
+                {rvOpen && (
+                  <div
+                    role="menu"
+                    className="absolute z-50 mt-2 min-w-[220px] rounded-lg border border-gray-200 bg-white p-2 shadow"
+                  >
+                    {rvLoading && <div className="px-2 py-1 text-sm text-gray-500">불러오는 중…</div>}
+                    {rvErr && <div className="px-2 py-1 text-sm text-red-500">{rvErr}</div>}
+                    {!rvLoading && !rvErr && venues.map((v) => (
+                      <Link
+                        key={v.venueId}
+                        href={`/care/admin?venueId=${v.venueId}`}
+                        className="block rounded px-3 py-2 hover:bg-gray-50"
+                        role="menuitem"
+                        onClick={() => setRvOpen(false)}
+                      >
+                        {v.venueName}
+                      </Link>
+                    ))}
+                    {!rvLoading && !rvErr && venues.length === 0 && (
+                      <div className="px-2 py-1 text-sm text-gray-500">지점이 없습니다</div>
+                    )}
+                  </div>
+                )}
+              </div>
+
               <span className="sep">|</span>
-               
               <button type="button" className="btn-link" onClick={handleLogout}>
                 LOGOUT
               </button>

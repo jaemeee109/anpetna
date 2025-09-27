@@ -50,7 +50,22 @@ export type AdminReservationLine = {
   type: 'HOSPITAL' | 'HOTEL';
   venueName: string;
   memberId?: string;
+
+  // 병원 전용
+  doctorId?: number;
+  doctorName?: string;
+  appointmentAt?: string;
+
+  // 호텔 전용
+  checkIn?: string;   // YYYY-MM-DD
+  checkOut?: string;  // YYYY-MM-DD
+
+  // 공통 보조
+  reserverName?: string;
+  primaryPhone?: string;
+  petName?: string;
 };
+
 
 export type AdminReservationPage = {
   content: AdminReservationLine[];
@@ -58,4 +73,24 @@ export type AdminReservationPage = {
   totalElements: number;
   pageNumber?: number;
   pageSize?: number;
+   appointment_at?: string;
 };
+// 매장 요약 타입 — Header 드롭다운/관리페이지 제목용
+export type VenueSummary = { venueId: number; venueName: string };
+
+export type ReservationType = 'HOSPITAL' | 'HOTEL';
+export type AdminStatus =
+  | 'PENDING'
+  | 'CONFIRMED'
+  | 'REJECTED'
+  | 'CANCELED'
+  | 'NOSHOW';
+
+export interface AdminBulkUpdateReservationStatusBody {
+  ids: number[];
+  status: AdminStatus;
+  /** 탭 정보 */
+  type?: ReservationType;   // 서버가 필수면 ? 제거
+  /** 지점 정보 */
+  venueId?: number;         // 서버가 필수면 ? 제거
+}

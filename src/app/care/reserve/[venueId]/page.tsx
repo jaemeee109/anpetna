@@ -263,8 +263,12 @@ export default function ReservePage() {
         return;
       }
       try {
-        const times = await venueApi.listUnavailableTimes({ doctorId: did, date: ymd });
-        setUnavailableTimes(times || []);
+      const arr = await venueApi.listUnavailableTimes({ doctorId: did, date: ymd });
+// 백엔드가 ["HH:mm"] 문자열 배열을 반환하므로 그대로 사용
+setUnavailableTimes(Array.from(new Set(arr.filter((t: any): t is string => typeof t === 'string'))));
+
+
+
       } catch {
         setUnavailableTimes([]);
       }
@@ -301,6 +305,7 @@ export default function ReservePage() {
 async function submitHospital() {
   if (!canSubmitHospital) return;
   const appointmentAt = `${date}T${time}:00`;
+
   const body: CreateHospitalReservationReq = {
     doctorId: Number(doctorId),
     appointmentAt,
@@ -313,8 +318,21 @@ async function submitHospital() {
     petGender: petGender as PetGender,
     memo: memo || undefined,
   };
+
   // ✅ venueId를 함께 전달
- await venueApi.createHospitalReservation(body);
+// submitHospital 내부 호출부만 교체
+await venueApi.createHospitalReservation(venueId, {
+  doctorId: Number(doctorId),
+  appointmentAt: `${date}T${time}:00`,
+  reserverName,
+  primaryPhone,
+  secondaryPhone,
+  petName,
+  petBirthYear: Number(petBirthYear),
+  petSpecies,
+  petGender: petGender as any, // 기존 타입 그대로
+  memo,
+});
   alert('예약 신청이 완료되었습니다.');
   router.push('/');
 }
@@ -331,7 +349,18 @@ async function submitHospital() {
       petBirthYear: Number(petBirthYear),
       memo: memo || undefined,
     };
-    await venueApi.createHotelReservation(body);
+    // submitHotel 내부 호출부만 교체
+await venueApi.createHotelReservation(venueId, {
+  checkIn: `${checkIn}T00:00:00`,
+  checkOut: `${checkOut}T00:00:00`,
+  reserverName,
+  primaryPhone,
+  secondaryPhone,
+  petName,
+  petBirthYear: Number(petBirthYear),
+  memo,
+});
+
     alert('예약 신청이 완료되었습니다.');
     router.push('/');
   }
