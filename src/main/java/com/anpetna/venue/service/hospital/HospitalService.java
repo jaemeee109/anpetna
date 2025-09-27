@@ -3,10 +3,14 @@ package com.anpetna.venue.service.hospital;
 import com.anpetna.venue.dto.hospital.CreateHospitalReservationReq;
 import com.anpetna.venue.dto.hospital.CreateHospitalReservationRes;
 import com.anpetna.venue.dto.doctor.ListDoctorsRes;
+import java.util.List;
 
 public interface HospitalService {
     ListDoctorsRes listDoctors(Long venueId);
     CreateHospitalReservationRes reserve(String memberId, Long venueId, CreateHospitalReservationReq req);
     void confirm(Long reservationId); // 관리자 확정
     void markNoShow(Long reservationId);
+
+    List<AdminHospitalReservationRow> adminList(Long venueId, String status, String memberId);
+    boolean tryUpdateStatus(Long reservationId, String nextStatus);
 }

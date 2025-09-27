@@ -136,4 +136,13 @@ public class VenueServiceImpl implements VenueService {
     private static double round2(double v) {
         return Math.round(v * 100.0) / 100.0;
     }
+
+
+    /** 매장 리스트 조회 */
+    @Override
+    @Transactional(readOnly = true)
+    public List<VenueEntity> listAll() {
+        return venueRepository.findAll();
+    }
+
 }

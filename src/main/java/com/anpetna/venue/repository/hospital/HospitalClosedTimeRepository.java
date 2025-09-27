@@ -12,4 +12,7 @@ public interface HospitalClosedTimeRepository extends JpaRepository<HospitalClos
     List<HospitalClosedTimeEntity> findByDateAndDoctorIdIsNull(LocalDate date);
 
     List<HospitalClosedTimeEntity> findByDateAndDoctorId(LocalDate date, Long doctorId);
+
+    //특정 의사/날짜 기존 마감 레코드 일괄 삭제
+    void deleteByDateAndDoctorId(LocalDate date, Long doctorId);
 }

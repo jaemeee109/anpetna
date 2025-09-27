@@ -10,4 +10,7 @@ public interface HospitalScheduleService {
      * - (선택) 관리자 차단 슬롯
      */
     List<String> listUnavailableTimes(Long doctorId, LocalDate date);
+
+    /** 의사/날짜별 마감 시간(HH:mm) 저장: 기존 마감은 모두 지우고, 전달받은 목록으로 대체 */
+    void setClosedTimes(Long doctorId, LocalDate date, List<String> times);
 }
