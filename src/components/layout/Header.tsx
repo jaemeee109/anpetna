@@ -410,6 +410,9 @@ export default function Header() {
                     <Link href="/order/history" className="dropdown-item" role="menuitem" onClick={() => setMyOpen(false)}>
                       ORDER
                     </Link>
+                    <Link href="/care/history" className="dropdown-item" role="menuitem" onClick={() => setMyOpen(false)}>
+                      RESERVE
+                    </Link>
                     <Link href="/member/delete" className="dropdown-item" role="menuitem" onClick={() => setMyOpen(false)}>
                       DEL
                     </Link>
