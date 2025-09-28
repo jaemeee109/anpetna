@@ -94,25 +94,3 @@ export interface AdminBulkUpdateReservationStatusBody {
   /** 지점 정보 */
   venueId?: number;         // 서버가 필수면 ? 제거
 }
-
-// 회원 예약내역 라인
-export type MyReservationLine = {
-  status: 'PENDING' | 'CONFIRMED' | 'REJECTED' | 'CANCELED' | 'NOSHOW';
-  venueName: string;                 // anpetna_venue.venue_name
-  type: 'HOSPITAL' | 'HOTEL';        // 서비스 타입
-  appointmentAt?: string | null;     // 병원: YYYY-MM-DDTHH:mm:ss 형태
-  checkIn?: string | null;           // 호텔: YYYY-MM-DD
-  checkOut?: string | null;          // 호텔: YYYY-MM-DD
-};
-
-// 공용 페이지 응답 호환
-export type PageRes<T> = {
-  page?: number;
-  size?: number;
-  total?: number;
-  totalElements?: number;
-  dtoList?: T[];
-  content?: T[];
-  list?: T[];
-};
-

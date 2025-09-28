@@ -11,8 +11,6 @@ import type {
    VenueSummary, 
 } from './venue.types';
 import type { AdminBulkUpdateReservationStatusBody } from './venue.types';
-import type { PageRes } from './venue.types';
-import type { MyReservationLine } from './venue.types';
 /**
  * ✅ 백엔드 경로 모음
  * (Back-Tree 기준: AdminVenueController, HospitalController, HotelController, VenueController 확인됨)
@@ -129,19 +127,6 @@ export async function adminSetClosedTimes(body: {
   return (data && typeof data.ok === 'boolean') ? data : { ok: true };
 }
 
-
-
-export async function listMyReservations(args: { page?: number; size?: number } = {}) {
-  const page = Number(args.page ?? 1);
-  const size = Number(args.size ?? 10);
-  // 백엔드에서 ApiResult<T>로 감싸므로 data.result 언랩 필요: http.ts에서 공통 처리됩니다.
-  const r = await http.get(withPrefix('/member/reservations'), { params: { page, size } });
-  const data = (r as any)?.data ?? r;
-  const payload = data?.result ?? data ?? {};
-  return payload as PageRes<MyReservationLine>;
-}
-
-// ↓ venueApi 객체에 listMyReservations 추가
 const venueApi = {
   listDoctors,
   listUnavailableTimes,
@@ -149,9 +134,9 @@ const venueApi = {
   createHotelReservation,
   adminListReservations,
   adminBulkUpdateReservationStatus,
-  listVenues,
-  adminSetClosedTimes,
-  listMyReservations, // ← 추가
+  listVenues,                
+   adminSetClosedTimes,
 };
+
 
 export default venueApi;
