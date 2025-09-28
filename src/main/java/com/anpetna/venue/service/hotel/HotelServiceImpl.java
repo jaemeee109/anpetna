@@ -111,6 +111,65 @@ public class HotelServiceImpl implements HotelService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "예약을 찾을 수 없습니다."));
         found.setStatus(ReservationStatus.NOSHOW);
     }
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    @Override
+    public java.util.List<AdminHotelReservationRow> adminList(Long venueId, String status, String memberId) {
+        com.anpetna.venue.constant.ReservationStatus statusEnum = null;
+        if (status != null && !status.isBlank()) {
+            try { statusEnum = com.anpetna.venue.constant.ReservationStatus.valueOf(status.trim().toUpperCase()); }
+            catch (IllegalArgumentException ignored) {}
+        }
+
+        java.util.List<com.anpetna.venue.domain.hotel.HotelReservationEntity> all =
+                hotelReservationRepository.findAll();
+        java.util.List<AdminHotelReservationRow> rows = new java.util.ArrayList<>();
+
+        for (com.anpetna.venue.domain.hotel.HotelReservationEntity r : all) {
+            if (venueId != null) {
+                if (r.getVenue() == null || r.getVenue().getVenueId() == null || !r.getVenue().getVenueId().equals(venueId)) {
+                    continue;
+                }
+            }
+            if (statusEnum != null && r.getStatus() != statusEnum) continue;
+            if (memberId != null) {
+                if (r.getMember() == null || r.getMember().getMemberId() == null || !r.getMember().getMemberId().equals(memberId)) {
+                    continue;
+                }
+            }
+
+            rows.add(AdminHotelReservationRow.builder()
+                    .reservationId(r.getReservationId())
+                    .status(r.getStatus())
+                    .venueName(r.getVenue() != null ? r.getVenue().getVenueName() : null)
+                    .memberId(r.getMember() != null ? r.getMember().getMemberId() : null)
+                    .reserverName(r.getReserverName())
+                    .petName(r.getPetName())
+                    .primaryPhone(r.getPrimaryPhone())
+                    .checkIn(r.getCheckIn())
+                    .checkOut(r.getCheckOut())
+                    .createdAt(r.getCreateDate())
+                    .build());
+        }
+        return rows;
+    }
+
+    @org.springframework.transaction.annotation.Transactional
+    @Override
+    public boolean tryUpdateStatus(Long reservationId, String nextStatus) {
+        if (reservationId == null || nextStatus == null) return false;
+        final com.anpetna.venue.constant.ReservationStatus next;
+        try {
+            next = com.anpetna.venue.constant.ReservationStatus.valueOf(nextStatus.trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
+
+        var opt = hotelReservationRepository.findById(reservationId);
+        if (opt.isEmpty()) return false;
+        var r = opt.get();
+        r.setStatus(next); // JPA dirty checking
+        return true;
+    }
 
 
 }
