@@ -1,5 +1,6 @@
 package com.anpetna.auth.dto;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
 import lombok.*;
 
 @Getter
@@ -11,4 +12,7 @@ import lombok.*;
 public class TokenRequest {
     private String refreshToken;
     private String accessToken;
+
+    @JsonPOJOBuilder(withPrefix = "")
+    public static class TokenRequestBuilder {}
 }
