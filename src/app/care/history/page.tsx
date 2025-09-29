@@ -7,6 +7,7 @@ import { Pagination } from '@/components/layout/Pagination';
 import venueApi from '@/features/venue/data/venue.api';
 import type { MyReservationLine } from '@/features/venue/data/venue.types';
 import PawIcon from '@/components/icons/Paw';
+import { useRouter } from 'next/navigation';
 const PAGE_SIZE = 10;
 
 /* ===================== 날짜/시간 포맷 유틸 ===================== */
@@ -121,7 +122,7 @@ export default function MyReserveHistoryPage() {
   }, [page]);
 
   const lines = useMemo(() => rows ?? [], [rows]);
-
+  const router = useRouter();
   return (
     <RequireLogin>
       <main className="reserve-history">
@@ -154,13 +155,20 @@ export default function MyReserveHistoryPage() {
                   : `${ymd(r.checkIn)}~${ymd(r.checkOut)}`;
                 const timeText = isHospital ? hm(r.appointmentAt) : '';
                 return (
-                  <tr key={i}>
+                  <tr
+                    key={i}
+                    onClick={() =>
+                      router.push(`/care/history/${r.type.toLowerCase()}/${r.reservationId}`)
+                    }
+                    style={{ cursor: 'pointer' }} // 마우스 올렸을 때 손가락 모양 나오게
+                  >
                     <td className="rh-td"><StatusChip s={r.status} /></td>
                     <td className="rh-td">{r.venueName}</td>
                     <td className="rh-td">{SERVICE_LABEL[r.type] ?? r.type}</td>
                     <td className="rh-td">{dateText}</td>
                     <td className="rh-td">{timeText || '-'}</td>
                   </tr>
+
                 );
               })
             )}

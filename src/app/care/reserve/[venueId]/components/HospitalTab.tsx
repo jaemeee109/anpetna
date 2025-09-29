@@ -102,33 +102,53 @@ export default function HospitalTab({ venueId }: Props) {
     petSpecies.trim() &&
     petGender !== '';
 
-  async function submit() {
-    if (!canSubmit) return;
-      // 동의 안 했으면 제출 차단 + 얼럿
+async function submit() {
+  if (!canSubmit) return;
+
+  // 1) 동의 체크
   if (!agree) {
     alert("유의사항에 체크해주세요.");
     return;
   }
 
-
-    const appointmentAt = `${date}T${time}:00`;
-    const body: CreateHospitalReservationReq = {
-      doctorId: Number(doctorId),
-      appointmentAt,
-      reserverName,
-      primaryPhone,
-      secondaryPhone: secondaryPhone || undefined,
-      petName,
-      petBirthYear: Number(petBirthYear),
-      petSpecies,
-      petGender: petGender as PetGender,
-      memo: memo || undefined,
-    };
-
-    await venueApi.createHospitalReservation(venueId, body);
-    alert('예약 신청이 완료되었습니다.');
-    router.push('/');
+  // 2) 과거 시각 클라이언트 차단 (date: YYYY-MM-DD, time: HH:mm)
+  if (!date || !time) return;
+  const selected = new Date(`${date}T${time}:00`);
+  const now = new Date();
+  if (isNaN(selected.getTime()) || selected.getTime() < now.getTime()) {
+    alert("지나간 날짜는 예약할 수 없습니다.");
+    return;
   }
+
+  const appointmentAt = `${date}T${time}:00`;
+  const body: CreateHospitalReservationReq = {
+    doctorId: Number(doctorId),
+    appointmentAt,
+    reserverName,
+    primaryPhone,
+    secondaryPhone: secondaryPhone || undefined,
+    petName,
+    petBirthYear: Number(petBirthYear),
+    petSpecies,
+    petGender: petGender as PetGender,
+    memo: memo || undefined,
+  };
+
+  // 3) API 호출 + 서버측 400 메시지 노출
+  try {
+    await venueApi.createHospitalReservation(venueId, body);
+    alert("예약 신청이 완료되었습니다.");
+    router.push("/");
+  } catch (err: any) {
+    const msg =
+      err?.response?.status === 400
+        ? (err?.response?.data?.message || "지나간 날짜는 예약할 수 없습니다.")
+        : "예약 중 오류가 발생했습니다.";
+    alert(msg);
+  }
+}
+
+
 
   return (
     <div className="space-y-8">

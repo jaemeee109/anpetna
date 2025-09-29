@@ -103,6 +103,7 @@ export type MyReservationLine = {
   appointmentAt?: string | null;     // 병원: YYYY-MM-DDTHH:mm:ss 형태
   checkIn?: string | null;           // 호텔: YYYY-MM-DD
   checkOut?: string | null;          // 호텔: YYYY-MM-DD
+  reservationId: number;
 };
 
 // 공용 페이지 응답 호환
@@ -114,5 +115,47 @@ export type PageRes<T> = {
   dtoList?: T[];
   content?: T[];
   list?: T[];
+};
+
+// 병원 예약
+export type MyHospitalReservationDetail = {
+  reservationId: number;
+  venueName: string;
+  service: 'HOSPITAL';
+  status: ReservationStatus;
+
+  appointmentAt: string;     
+  doctorName?: string;
+
+  reserverName: string;
+  primaryPhone: string;
+  secondaryPhone?: string;
+
+  petName: string;
+  petBirthYear: number;
+  petSpecies: string;
+  petGender: PetGender;
+
+  memo?: string;
+};
+
+// 호텔 예약
+export type MyHotelReservationDetail = {
+  reservationId: number;
+  venueName: string;
+  service: 'HOTEL';
+  status: ReservationStatus;
+
+  checkIn: string;   // YYYY-MM-DD
+  checkOut: string;  // YYYY-MM-DD
+
+  reserverName: string;
+  primaryPhone: string;
+  secondaryPhone?: string;
+
+  petName: string;
+  petBirthYear: number;
+
+  memo?: string;
 };
 

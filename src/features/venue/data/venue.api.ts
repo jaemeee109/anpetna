@@ -8,14 +8,16 @@ import type {
   CreateReservationRes,
   AdminReservationLine,
   AdminReservationPage,
-   VenueSummary, 
+  VenueSummary, 
+  MyHospitalReservationDetail,
+  MyHotelReservationDetail,
 } from './venue.types';
 import type { AdminBulkUpdateReservationStatusBody } from './venue.types';
 import type { PageRes } from './venue.types';
 import type { MyReservationLine } from './venue.types';
 /**
- * ✅ 백엔드 경로 모음
- * (Back-Tree 기준: AdminVenueController, HospitalController, HotelController, VenueController 확인됨)
+ * 백엔드
+ *  AdminVenueController, HospitalController, HotelController, VenueController 
  */
 const VENUE_PATHS = {
   VENUE_ROOT: withPrefix('/venue'),
@@ -141,6 +143,24 @@ export async function listMyReservations(args: { page?: number; size?: number } 
   return payload as PageRes<MyReservationLine>;
 }
 
+
+export async function readMyHospitalReservation(id: number) {
+  const { data } = await http.get(withPrefix(`/member/reservations/hospital/${id}`));
+  return (data?.result ?? data) as MyHospitalReservationDetail;
+}
+export async function readMyHotelReservation(id: number) {
+  const { data } = await http.get(withPrefix(`/member/reservations/hotel/${id}`));
+  return (data?.result ?? data) as MyHotelReservationDetail;
+}
+export async function cancelMyHospitalReservation(id: number) {
+  const { data } = await http.post(withPrefix(`/member/reservations/hospital/${id}/cancel`), {});
+  return data ?? { ok: true };
+}
+export async function cancelMyHotelReservation(id: number) {
+  const { data } = await http.post(withPrefix(`/member/reservations/hotel/${id}/cancel`), {});
+  return data ?? { ok: true };
+}
+
 // ↓ venueApi 객체에 listMyReservations 추가
 const venueApi = {
   listDoctors,
@@ -151,7 +171,13 @@ const venueApi = {
   adminBulkUpdateReservationStatus,
   listVenues,
   adminSetClosedTimes,
-  listMyReservations, // ← 추가
+  listMyReservations, 
+  readMyHospitalReservation,  
+  readMyHotelReservation,     
+  cancelMyHospitalReservation, 
+  cancelMyHotelReservation,    
 };
+
+
 
 export default venueApi;

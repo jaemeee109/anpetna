@@ -47,34 +47,60 @@ export default function HotelTab({ venueId }: Props) {
     petName.trim() &&
     petBirthYear !== '';
 
-  async function submit() {
-    if (!canSubmit) return;
-      if (!agree) {
+ async function submit() {
+  if (!canSubmit) return;
+
+  // 1) 동의 체크
+  if (!agree) {
     alert("유의사항에 체크해주세요.");
     return;
   }
 
+  // 2) 과거 날짜/순서 클라이언트 차단
+  if (!checkIn || !checkOut) return;
+  const today = new Date();
+  const todayZero = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0);
+  const inDate = new Date(`${checkIn}T00:00:00`);
+  const outDate = new Date(`${checkOut}T00:00:00`);
 
-    const body: CreateHotelReservationReq = {
-      checkIn,
-      checkOut,
-      reserverName,
-      primaryPhone,
-      secondaryPhone: secondaryPhone || undefined,
-      petName,
-      petBirthYear: Number(petBirthYear),
-      memo: memo || undefined,
-    };
+  if (isNaN(inDate.getTime()) || inDate.getTime() < todayZero.getTime()) {
+    alert("지나간 날짜는 예약할 수 없습니다.");
+    return;
+  }
+  if (!(outDate.getTime() > inDate.getTime())) {
+    alert("퇴실일은 입실일 다음날 이후여야 합니다.");
+    return;
+  }
 
-    // API 요구사항: ISO-8601 형태로 보정
+  const body: CreateHotelReservationReq = {
+    checkIn,
+    checkOut,
+    reserverName,
+    primaryPhone,
+    secondaryPhone: secondaryPhone || undefined,
+    petName,
+    petBirthYear: Number(petBirthYear),
+    memo: memo || undefined,
+  };
+
+  try {
     await venueApi.createHotelReservation(venueId, {
       ...body,
       checkIn: `${checkIn}T00:00:00`,
       checkOut: `${checkOut}T00:00:00`,
     });
-    alert('예약 신청이 완료되었습니다.');
-    router.push('/');
+    alert("예약 신청이 완료되었습니다.");
+    router.push("/");
+  } catch (err: any) {
+    const msg =
+      err?.response?.status === 400
+        ? (err?.response?.data?.message || "지나간 날짜는 예약할 수 없습니다.")
+        : "예약 중 오류가 발생했습니다.";
+    alert(msg);
   }
+}
+
+
 
   const selectedRange = checkIn && checkOut ? `${checkIn} ~ ${checkOut}` : '';
 
