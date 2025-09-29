@@ -12,6 +12,7 @@ import com.anpetna.venue.repository.hotel.HotelReservationRepository;
 import com.anpetna.venue.repository.hospital.HospitalReservationRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -19,6 +20,7 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Transactional
 public class MemberReservationServiceImpl implements MemberReservationService {
 
     private final HospitalReservationRepository hospitalRepo;

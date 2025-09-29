@@ -51,24 +51,41 @@ public class HotelServiceImpl implements HotelService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "노쇼 3회 이상으로 예약이 제한되었습니다.");
         }
 
-
         VenueEntity venue = venueRepository.findById(venueId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "장소(Venue)를 찾을 수 없습니다."));
 
         MemberEntity member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
 
-        LocalDate in  = req.getCheckIn();
-        LocalDate out = req.getCheckOut();
-        if (out.isBefore(in)) {
+        LocalDate today   = LocalDate.now();
+        LocalDate checkIn = req.getCheckIn();
+        LocalDate checkOut = req.getCheckOut();
+
+        //  검증: null/과거/퇴실일 관계
+        if (checkIn == null || checkOut == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "입실일/퇴실일이 없습니다.");
+        }
+        if (checkIn.isBefore(today)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "과거 날짜에는 예약할 수 없습니다.");
+        }
+        if (!checkOut.isAfter(checkIn)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "퇴실일은 입실일 다음날 이후여야 합니다.");
+        }
+        // (보강) 동일 의미의 중복 방어 — 논리상 위 조건이 true면 여기 오지 않지만, 가독성 유지
+        if (checkOut.isBefore(checkIn)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "checkOut은 checkIn 이후여야 합니다.");
         }
 
-        // 정원 체크(대기+확정)
+        // ★ 정원 체크(대기+확정) — LocalDate 인자 전달
         long overlap = hotelReservationRepository.countOverlapping(
-                venueId, in, out, ReservationStatus.PENDING, ReservationStatus.CONFIRMED);
+                venueId,
+                checkIn,
+                checkOut,
+                ReservationStatus.PENDING,
+                ReservationStatus.CONFIRMED
+        ); //  startDate/endDate는 LocalDate. :contentReference[oaicite:1]{index=1}
+
         if (overlap >= CAPACITY) {
-            // 자동 마감(정원 초과 시 신청 불가)
             throw new ResponseStatusException(HttpStatus.CONFLICT, "정원 15마리 초과로 예약이 마감되었습니다.");
         }
 
@@ -76,8 +93,8 @@ public class HotelServiceImpl implements HotelService {
                 HotelReservationEntity.builder()
                         .venue(venue)
                         .member(member)
-                        .checkIn(in)
-                        .checkOut(out)
+                        .checkIn(checkIn)   //
+                        .checkOut(checkOut) //
                         .status(ReservationStatus.PENDING) // 관리자 확정
                         .reserverName(req.getReserverName())
                         .primaryPhone(req.getPrimaryPhone())
@@ -88,11 +105,11 @@ public class HotelServiceImpl implements HotelService {
                         .build()
         );
 
-
         return CreateHotelReservationRes.builder()
                 .reservationId(saved.getReservationId())
                 .build();
     }
+
 
     @Override
     @Transactional
@@ -152,6 +169,7 @@ public class HotelServiceImpl implements HotelService {
         }
         return rows;
     }
+
 
     @org.springframework.transaction.annotation.Transactional
     @Override
