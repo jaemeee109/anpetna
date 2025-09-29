@@ -157,6 +157,9 @@ public class SecurityConfig {
 
                         .requestMatchers("/admin/venue/**").hasRole("ADMIN")  // 관리자 전용
 
+                        // --- Reservation ---
+                        .requestMatchers("/care/admin/**").hasRole("ADMIN")  // 관리자 전용
+
 
 
 

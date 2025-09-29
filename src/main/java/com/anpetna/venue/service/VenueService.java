@@ -1,8 +1,11 @@
 package com.anpetna.venue.service;
 
+import com.anpetna.venue.domain.VenueEntity;
 import com.anpetna.venue.dto.ListNearbyVenuesRes;
 import com.anpetna.venue.dto.create.CreateVenueReservationReq;
 import com.anpetna.venue.dto.create.CreateVenueReservationRes;
+
+import java.util.List;
 
 /** Venue 관련 비즈니스 로직 인터페이스 */
 public interface VenueService {
@@ -14,4 +17,6 @@ public interface VenueService {
 
     /** 예약 생성(로그인 필요): memberId와 venueId, 예약정보를 받아 예약 레코드 생성 */
     CreateVenueReservationRes reserve(String memberId, Long venueId, CreateVenueReservationReq req);
+
+    List<VenueEntity> listAll();
 }

@@ -22,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
@@ -120,6 +121,67 @@ public class HospitalServiceImpl implements HospitalService {
         HospitalReservationEntity found = hospitalReservationRepository.findById(reservationId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "예약을 찾을 수 없습니다."));
         found.setStatus(ReservationStatus.NOSHOW);
+    }
+    @Transactional(readOnly = true)
+    @Override
+    public List<AdminHospitalReservationRow> adminList(Long venueId, String status, String memberId) {
+        com.anpetna.venue.constant.ReservationStatus statusEnum = null;
+        if (status != null && !status.isBlank()) {
+            try { statusEnum = com.anpetna.venue.constant.ReservationStatus.valueOf(status.trim().toUpperCase()); }
+            catch (IllegalArgumentException ignored) {}
+        }
+
+        java.util.List<com.anpetna.venue.domain.hospital.HospitalReservationEntity> all =
+                hospitalReservationRepository.findAll();
+        java.util.List<AdminHospitalReservationRow> rows = new java.util.ArrayList<>();
+
+        for (com.anpetna.venue.domain.hospital.HospitalReservationEntity r : all) {
+            if (venueId != null) {
+                if (r.getVenue() == null || r.getVenue().getVenueId() == null || !r.getVenue().getVenueId().equals(venueId)) {
+                    continue;
+                }
+            }
+            if (statusEnum != null && r.getStatus() != statusEnum) continue;
+            if (memberId != null) {
+                if (r.getMember() == null || r.getMember().getMemberId() == null || !r.getMember().getMemberId().equals(memberId)) {
+                    continue;
+                }
+            }
+
+            rows.add(AdminHospitalReservationRow.builder()
+                    .reservationId(r.getReservationId())
+                    .status(r.getStatus())
+                    .venueName(r.getVenue() != null ? r.getVenue().getVenueName() : null)
+                    .memberId(r.getMember() != null ? r.getMember().getMemberId() : null)
+                    .reserverName(r.getReserverName())
+                    .petName(r.getPetName())
+                    .primaryPhone(r.getPrimaryPhone())
+                    .doctorId(r.getDoctor() != null ? r.getDoctor().getDoctorId() : null)
+                    .doctorName(r.getDoctor() != null ? r.getDoctor().getName() : null)
+                    .appointmentAt(r.getAppointmentAt())
+                    .createdAt(r.getCreateDate())
+                    .build());
+        }
+        return rows;
+    }
+
+
+    @Transactional
+    @Override
+    public boolean tryUpdateStatus(Long reservationId, String nextStatus) {
+        if (reservationId == null || nextStatus == null) return false;
+        final com.anpetna.venue.constant.ReservationStatus next;
+        try {
+            next = com.anpetna.venue.constant.ReservationStatus.valueOf(nextStatus.trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
+
+        var opt = hospitalReservationRepository.findById(reservationId);
+        if (opt.isEmpty()) return false;
+        var r = opt.get();
+        r.setStatus(next); // JPA dirty checking
+        return true;
     }
 
 }

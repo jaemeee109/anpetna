@@ -17,6 +17,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RequestBody;
 
+import java.util.*;
+
+
 @RestController                              // REST 컨트롤러 (JSON 반환)
 @RequestMapping("/venue")                    // 이 클래스의 모든 엔드포인트 앞에 /venue 붙음
 @RequiredArgsConstructor                     // final 필드 자동 생성자 주입 (venueService)
@@ -72,4 +75,19 @@ public class VenueController {
                 venueService.reserve(memberId, venueId, req) // 서비스 호출
         );
     }
+    // === NEW: 모든 지점 단순 목록 (드롭다운용) ===
+    @GetMapping("/list")
+    @Transactional(readOnly = true)
+    public ResponseEntity<List<Map<String, Object>>> listAllForDropdown() {
+        var venues = venueService.listAll(); // Service에서 전부 조회 (이름/ID만)
+        List<Map<String, Object>> items = new ArrayList<>();
+        for (var v : venues) {
+            var m = new java.util.LinkedHashMap<String, Object>();
+            m.put("venueId", v.getVenueId());
+            m.put("venueName", v.getVenueName());
+            items.add(m);
+        }
+        return ResponseEntity.ok(items);
+    }
+
 }
