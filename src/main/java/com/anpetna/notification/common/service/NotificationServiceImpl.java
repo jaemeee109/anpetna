@@ -4,6 +4,8 @@ import com.anpetna.core.coreDto.PageRequestDTO;
 import com.anpetna.core.coreDto.PageResponseDTO;
 import com.anpetna.member.domain.MemberEntity;
 import com.anpetna.member.repository.MemberRepository;
+import com.anpetna.notification.common.constant.NotificationType;
+import com.anpetna.notification.common.constant.TargetType;
 import com.anpetna.notification.common.domain.NotificationEntity;
 import com.anpetna.notification.common.dto.*;
 import com.anpetna.notification.common.repository.NotificationRepository;
@@ -198,4 +200,33 @@ public class NotificationServiceImpl implements NotificationService {
 
         return dto;
     }
+
+    @Override
+    @Transactional
+    public void notify(String receiverMemberId, NotificationType type, TargetType targetType, String targetId) {
+
+        MemberEntity receiver = memberRepository.findByMemberId(receiverMemberId)
+                .orElseThrow(() -> new EntityNotFoundException("receiver not found: " + receiverMemberId));
+
+        NotificationEntity entity = NotificationEntity.builder()
+                .receiver(receiver)
+                .notificationType(type)
+                .targetType(targetType)
+                .targetId(targetId)
+                .isRead(false)
+                .build();
+
+        NotificationEntity saved = repo.save(entity);
+        NotificationDTO dto = NotificationDTO.from(saved);
+        repo.flush();
+
+        afterCommit(() -> sse.broadcast(
+                receiverMemberId,
+                SseEmitter.event()
+                        .name("notification")
+                        .id(saved.getEventId())
+                        .data(dto)
+        ));
+    }
+
 }

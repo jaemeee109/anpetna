@@ -1,8 +1,7 @@
 package com.anpetna.venue.controller;
 
 import com.anpetna.venue.dto.ListNearbyVenuesRes;
-import com.anpetna.venue.dto.create.CreateVenueReservationReq;
-import com.anpetna.venue.dto.create.CreateVenueReservationRes;
+
 import com.anpetna.venue.service.VenueService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -60,21 +59,8 @@ public class VenueController {
         );
     }
 
-    /** 지점 예약 생성 (로그인 필요)
-     *  - Spring Security에서 인증 성공 시 AuthenticationPrincipal로 memberId 주입
-     *  - Body: reservedAt(예약일시), memo(선택)
-     *  - 반환: 새로 생성된 예약의 reservationId
-     */
-    @PostMapping("/{venueId}/reservations")
-    public ResponseEntity<CreateVenueReservationRes> reserve(
-            @AuthenticationPrincipal(expression = "username") String memberId,
-            @PathVariable Long venueId,
-            @Valid @RequestBody CreateVenueReservationReq req
-    ) {
-        return ResponseEntity.ok(
-                venueService.reserve(memberId, venueId, req) // 서비스 호출
-        );
-    }
+
+
     // === NEW: 모든 지점 단순 목록 (드롭다운용) ===
     @GetMapping("/list")
     @Transactional(readOnly = true)
