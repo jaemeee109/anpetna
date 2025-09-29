@@ -161,6 +161,18 @@ export async function cancelMyHotelReservation(id: number) {
   return data ?? { ok: true };
 }
 
+// src/features/venue/data/venue.api.ts 내 추가
+export async function adminReadHospitalReservation(id: number) {
+  const { data } = await http.get(withPrefix(`/admin/venue/reservations/hospital/${id}`));
+  return (data?.result ?? data) as MyHospitalReservationDetail;
+}
+export async function adminReadHotelReservation(id: number) {
+  const { data } = await http.get(withPrefix(`/admin/venue/reservations/hotel/${id}`));
+  return (data?.result ?? data) as MyHotelReservationDetail;
+}
+
+
+
 // ↓ venueApi 객체에 listMyReservations 추가
 const venueApi = {
   listDoctors,
@@ -176,6 +188,8 @@ const venueApi = {
   readMyHotelReservation,     
   cancelMyHospitalReservation, 
   cancelMyHotelReservation,    
+   adminReadHospitalReservation,
+  adminReadHotelReservation,
 };
 
 

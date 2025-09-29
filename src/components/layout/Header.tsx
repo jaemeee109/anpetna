@@ -345,42 +345,43 @@ export default function Header() {
               <Link href="order/admin/inv" className="btn-link">INVENTORY</Link>
               <span className="sep">|</span>
 
-              {/* ▼ 여기: 기존 <Link href="care/admin">RESERVATION</Link> 를 드롭다운으로 교체 */}
-              <div className="relative inline-block">
-                <button
-                  type="button"
-                  className="btn-link"
-                  onClick={() => { setRvOpen((v) => !v); if (!rvOpen) void ensureVenues(); }}
-                  aria-haspopup="menu"
-                  aria-expanded={rvOpen ? 'true' : 'false'}
-                >
-                  RESERVATION ▾
-                </button>
+             {/* RESERVATION 드롭다운 */}
+            <div className="dropdown">
+              <span
+                className="btn-link dropdown-toggle"
+                onClick={() => { setRvOpen(v => !v); if (!rvOpen) void ensureVenues(); }}
+                aria-haspopup="menu"
+                aria-expanded={rvOpen ? 'true' : 'false'}
+              >
+                RESERVATION
+              </span>
 
-                {rvOpen && (
-                  <div
-                    role="menu"
-                    className="absolute z-50 mt-2 min-w-[220px] rounded-lg border border-gray-200 bg-white p-2 shadow"
-                  >
-                    {rvLoading && <div className="px-2 py-1 text-sm text-gray-500">불러오는 중…</div>}
-                    {rvErr && <div className="px-2 py-1 text-sm text-red-500">{rvErr}</div>}
-                    {!rvLoading && !rvErr && venues.map((v) => (
-                      <Link
-                        key={v.venueId}
-                        href={`/care/admin?venueId=${v.venueId}`}
-                        className="block rounded px-3 py-2 hover:bg-gray-50"
-                        role="menuitem"
-                        onClick={() => setRvOpen(false)}
-                      >
-                        {v.venueName}
-                      </Link>
-                    ))}
-                    {!rvLoading && !rvErr && venues.length === 0 && (
-                      <div className="px-2 py-1 text-sm text-gray-500">지점이 없습니다</div>
-                    )}
-                  </div>
-                )}
-              </div>
+              {rvOpen && (
+                <div role="menu" className="dropdown-menu">
+                  {rvLoading && (
+                    <div className="dropdown-item" aria-disabled="true">불러오는 중…</div>
+                  )}
+                  {rvErr && (
+                    <div className="dropdown-item" aria-disabled="true">{rvErr}</div>
+                  )}
+                  {!rvLoading && !rvErr && venues.map((v) => (
+                    <Link
+                      key={v.venueId}
+                      href={`/care/admin?venueId=${v.venueId}`}
+                      className="dropdown-item"
+                      role="menuitem"
+                      onClick={() => setRvOpen(false)}
+                    >
+                      {v.venueName}
+                    </Link>
+                  ))}
+                  {!rvLoading && !rvErr && venues.length === 0 && (
+                    <div className="dropdown-item" aria-disabled="true">매장이 없습니다</div>
+                  )}
+                </div>
+              )}
+            </div>
+
 
               <span className="sep">|</span>
               <button type="button" className="btn-link" onClick={handleLogout}>

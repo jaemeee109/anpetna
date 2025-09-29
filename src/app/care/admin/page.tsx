@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import PawIcon from '@/components/icons/Paw';
+import Pin from '@/components/icons/Pin';
 import venueApi from '@/features/venue/data/venue.api';
 import type { AdminReservationLine, VenueSummary } from '@/features/venue/data/venue.types';
 import { Pagination } from '@/components/layout/Pagination';
@@ -13,6 +14,14 @@ import { Pagination } from '@/components/layout/Pagination';
 type Tab = 'HOSPITAL' | 'HOTEL';
 const ALL_STATUSES = ['PENDING','CONFIRMED','REJECTED','CANCELED','NOSHOW'] as const;
 
+/* =====================예약상태 한글화===================== */
+const STATUS_LABELS: Record<(typeof ALL_STATUSES)[number], string> = {
+  PENDING:   '예약신청',
+  CONFIRMED: '예약확정',
+  REJECTED:  '예약취소',
+  CANCELED:  '접수취소',
+  NOSHOW:    '노쇼',
+};
 /* ===================== 유틸 ===================== */
 function pad2(n: number) { return String(n).padStart(2, '0'); }
 
@@ -164,7 +173,7 @@ function Calendar(props: CalendarProps) {
 /* ====== 시간 슬롯 ====== */
 function buildTimeSlots(): string[] {
   const out: string[] = [];
-  for (let h = 9; h <= 18; h++) {
+  for (let h = 10; h <= 18; h++) {
     for (const m of [0, 30]) out.push(`${pad2(h)}:${pad2(m)}`);
   }
   return out;
@@ -384,13 +393,16 @@ export default function AdminReservePage() {
     } finally { setLoadingBot(false); }
   }
 
-  function StatusSelect({ value, onChange }: { value?: string; onChange: (v: string) => void }) {
-    return (
-      <select className="dropdown" value={value ?? ''} onChange={(e) => onChange(e.target.value)}>
-        {ALL_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-      </select>
-    );
-  }
+function StatusSelect({ value, onChange }: { value?: string; onChange: (v: string) => void }) {
+  return (
+    <select className="dropdown" value={value ?? ''} onChange={(e) => onChange(e.target.value)}>
+      {ALL_STATUSES.map(s => (
+        <option key={s} value={s}>{STATUS_LABELS[s]}</option>
+      ))}
+    </select>
+  );
+}
+
 
   function openBulk(which: 'TOP'|'BOT') {
     setBulkTarget(which);
@@ -566,7 +578,7 @@ async function applyBulk(which: 'TOP' | 'BOT' | null = null, mode: 'ROW' | 'BULK
 
   /* ========================= JSX ========================= */
   return (
-    <main className="apn-main mx-auto px-4 max-w-[1000px]" style={{ paddingBottom: 40 }}>
+    <main className="apn-main mx-auto px-4 max-w-[900px]" style={{ paddingBottom: 40 }}>
       {/* 타이틀 */}
       <div className="admin-head text-center">
         <h1 className="admin-title">
@@ -576,7 +588,7 @@ async function applyBulk(which: 'TOP' | 'BOT' | null = null, mode: 'ROW' | 'BULK
       </div>
 
       {/* 탭 */}
-      <div className="admin-actions flex items-center justify-center gap-2 mt-[16px] mb-[8px]">
+      <div className="admin-actions flex items-center justify-center gap-[10px] mt-[16px] mb-[8px]">
         <button type="button" className={`tab ${tab==='HOSPITAL'?'active':''}`} onClick={() => setTab('HOSPITAL')}>병원</button>
         <button type="button" className={`tab ${tab==='HOTEL'?'active':''}`} onClick={() => setTab('HOTEL')}>호텔</button>
       </div>
@@ -585,7 +597,7 @@ async function applyBulk(which: 'TOP' | 'BOT' | null = null, mode: 'ROW' | 'BULK
       <div className="admin-sep" />
       <section>
         <div className="flex items-center justify-between mb-2">
-          <div className="text-gray-700 font-semibold">예약상태가 <strong>(예약신청 = PENDING)</strong> 인 예약 리스트</div>
+          <div className="text-gray-700 font-semibold"><strong> <Pin className="apn-title-ico" /> 새로운 예약신청</strong></div>
           <div className="flex gap-2">
             <button className="btn-3d btn-white" onClick={() => openBulk('TOP')}>일괄변경</button>
             <button className="btn-3d btn-primary" onClick={() => applyBulk('TOP','ROW')}>저장</button>
@@ -602,7 +614,7 @@ async function applyBulk(which: 'TOP' | 'BOT' | null = null, mode: 'ROW' | 'BULK
               : 'grid-cols-[28px_140px_120px_160px_160px_1fr_160px]' /* HOTEL: 체크인/체크아웃 두 칼럼 */
           } gap-2 px-2 text-sm font-semibold`}
         >
-          <div className="text-center">
+          <div className="text-center" >
             <input type="checkbox" onChange={(e)=>toggleAllTop(e.target.checked)} aria-label="전체 선택" />
           </div>
           <div>예약상태</div>
@@ -617,26 +629,26 @@ async function applyBulk(which: 'TOP' | 'BOT' | null = null, mode: 'ROW' | 'BULK
             <div>예약날짜</div>
           )}
 
-          {tab === 'HOSPITAL' ? <div>담당선생님</div> : null}
-          <div>예약자이름</div>
+          {tab === 'HOSPITAL' ? <div>담당의</div> : null}
+          <div>예약자명</div>
           <div>연락처</div>
         </div>
 
         <div className="admin-sep" />
 
         {/* 목록 */}
-        <div className="px-2">
+        <div className="px-2 ">
           {loadingTop ? (
             <div className="text-center py-8">불러오는 중…</div>
           ) : errTop ? (
             <div className="text-center text-red-600 py-8">{errTop}</div>
           ) : topList.length === 0 ? (
-            <div className="text-center py-8">데이터가 없습니다.</div>
+            <div className="text-center py-8 mt-[15px]">데이터가 없습니다.</div>
           ) : (
             topList.map(row => (
               <div
                 key={row.reservationId}
-                className="grid items-center border-b border-gray-100 py-2 hover:bg-[#f9fafb]"
+                className="grid items-center py-2 hover:bg-[#f9fafb]"
                 style={{
                   gridTemplateColumns: tab==='HOSPITAL'
                     ? '28px 140px 120px 180px 1fr 1fr 160px'
@@ -658,9 +670,9 @@ async function applyBulk(which: 'TOP' | 'BOT' | null = null, mode: 'ROW' | 'BULK
                   />
                 </div>
                 <div>
-                  <Link href={`/care/admin/${row.reservationId}`} className="text-blue-600 underline">
-                    {row.reservationId}
-                  </Link>
+                 <Link href={`/care/admin/${row.reservationId}?venueId=${venueId}`} className="text-blue-600 underline">
+  {row.reservationId}
+</Link>
                 </div>
 
                 {/* 날짜/체류기간 표시 */}
@@ -682,7 +694,7 @@ async function applyBulk(which: 'TOP' | 'BOT' | null = null, mode: 'ROW' | 'BULK
         </div>
 
         {/* 페이징 */}
-        <div className="mt-3 flex justify-center">
+        <div className="mt-3 flex justify-center mt-[35px] mb-[30px]">
           <Pagination current={page1} size={size} total={topTotal} onPage={(p)=>setPage1(p)} />
         </div>
       </section>
@@ -693,14 +705,14 @@ async function applyBulk(which: 'TOP' | 'BOT' | null = null, mode: 'ROW' | 'BULK
         {/* 병원 */}
         {tab === 'HOSPITAL' ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
-            <div className="card">
-              <div className="card-title">달력</div>
+            
+            
               <Calendar mode="single" value={dateH} onChange={(v) => { setDateH(v); setPage2(1); }} />
-            </div>
-            <div className="card">
-              <div className="card-title">선생님</div>
+            
+            <div className="card mt-[20px]">
+              <div className="card-title mt-[10px]">선생님</div>
               <select
-                className="inp mb-4"
+                className="inp-1 mb-4"
                 value={String(doctorId)}
                 onChange={(e)=>{ const v=e.target.value; setDoctorId(v?Number(v):''); setPage2(1); }}
                 onFocus={() => { if (doctors.length === 0 && venueId) { venueApi.listDoctors(venueId).then(setDoctors).catch(()=>setDoctors([])); } }}
@@ -709,7 +721,7 @@ async function applyBulk(which: 'TOP' | 'BOT' | null = null, mode: 'ROW' | 'BULK
                 {doctors.map(d => <option key={d.doctorId} value={d.doctorId}>{d.doctorName}</option>)}
               </select>
 
-              <div className="card-title">진료 시간</div>
+              <div className="card-title mt-[15px]">진료 시간</div>
               <div className="slot-grid">
                 {timeSlots.map((t) => {
                   const isReserved = reservedH.has(t);            // 확정/노쇼
@@ -752,40 +764,37 @@ async function applyBulk(which: 'TOP' | 'BOT' | null = null, mode: 'ROW' | 'BULK
                   );
                 })}
               </div>
-              <div className="mt-2 flex gap-2">
-                <button className="btn" onClick={() => setPendingClose(new Set())} disabled={pendingClose.size === 0}>선택해제</button>
-                <button className="btn" onClick={saveTimeClosures} disabled={pendingClose.size === 0 || !doctorId || !dateH}>마감 저장</button>
+              <div className="mt-2 flex gap-[10px] mt-[20px]">
+                <button className="btn" onClick={() => setPendingClose(new Set())} disabled={pendingClose.size === 0}>선택해제 </button>
+                <button className="btn" onClick={saveTimeClosures} disabled={pendingClose.size === 0 || !doctorId || !dateH}>변경저장</button>
               </div>
             </div>
           </div>
         ) : (
           // 호텔
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
-            <div className="card">
-              <div className="card-title">달력</div>
+            
+        
               <Calendar mode="single" value={dateT} onChange={(v) => { setDateT(v); setPage2(1); }} />
-            </div>
-            <div className="card">
-              <div className="card-title">안내</div>
-              <div className="note">달력에서 날짜를 고르면 해당 날짜의 예약 리스트가 아래에 표시됩니다. (CONFIRMED/REJECTED/CANCELED/NOSHOW)</div>
-            </div>
+            
+        
           </div>
         )}
 
         {/* 하단 리스트 헤더 */}
-        <div className={`grid ${tab==='HOSPITAL'
-            ? 'grid-cols-[28px_140px_1fr_1fr_160px]'
-            : 'grid-cols-[28px_140px_120px_1fr_1fr_160px]'
-          } gap-2 px-2 text-sm font-semibold`}>
-          <div className="text-center">
-            <input type="checkbox" onChange={(e)=>toggleAllBot(e.target.checked)} aria-label="전체 선택" />
-          </div>
-          <div>예약상태</div>
-          {tab === 'HOSPITAL' ? null : <div>예약번호</div>}
-          <div>예약자이름</div>
-          <div>반려동물이름</div>
-          <div>연락처</div>
-        </div>
+       <div className={`grid ${tab==='HOSPITAL'
+    ? 'grid-cols-[28px_140px_120px_1fr_1fr_160px]'
+    : 'grid-cols-[28px_140px_120px_1fr_1fr_160px]'
+  } gap-2 px-2 text-sm font-semibold mt-[40px]`}>
+  <div className="text-center">
+    <input type="checkbox" onChange={(e)=>toggleAllBot(e.target.checked)} aria-label="전체 선택" />
+  </div>
+  <div>예약상태</div>
+  <div>예약번호</div>
+  <div>예약자이름</div>
+  <div>반려동물이름</div>
+  <div>연락처</div>
+</div>
 
         <div className="admin-sep" />
 
@@ -796,14 +805,14 @@ async function applyBulk(which: 'TOP' | 'BOT' | null = null, mode: 'ROW' | 'BULK
           ) : errBot ? (
             <div className="text-center text-red-600 py-8">{errBot}</div>
           ) : (filteredBotList ?? []).length === 0 ? (
-            <div className="text-center py-8">데이터가 없습니다.</div>
+            <div className="text-center py-8 mt-[15px]">데이터가 없습니다.</div>
           ) : (
             filteredBotList.map((row: any) => (
-              <div key={row.reservationId}
-                   className="grid items-center border-b border-gray-100 py-2 hover:bg-[#f9fafb]"
-                   style={{ gridTemplateColumns: tab==='HOSPITAL'
-                     ? '28px 140px 1fr 1fr 160px'
-                     : '28px 140px 120px 1fr 1fr 160px' }}>
+             <div key={row.reservationId}
+     className="grid items-center  py-2 hover:bg-[#f9fafb]"
+     style={{ gridTemplateColumns: tab==='HOSPITAL'
+       ? '28px 140px 120px 1fr 1fr 160px'   // ← 병원에도 예약번호 칼럼 추가
+       : '28px 140px 120px 1fr 1fr 160px' }}>
                 <div className="text-center">
                   <input
                     type="checkbox"
@@ -818,13 +827,13 @@ async function applyBulk(which: 'TOP' | 'BOT' | null = null, mode: 'ROW' | 'BULK
                     onChange={(v)=> setStatusBot(prev => ({ ...prev, [row.reservationId]: v }))}
                   />
                 </div>
-                {tab === 'HOSPITAL' ? null : (
+             
                   <div>
-                    <Link href={`/care/admin/${row.reservationId}`} className="text-blue-600 underline">
-                      {row.reservationId}
-                    </Link>
+                    <Link href={`/care/admin/${row.reservationId}?venueId=${venueId}`} className="text-blue-600 underline">
+                    {row.reservationId}
+                  </Link>
                   </div>
-                )}
+                
                 <div>{row.reserverName ?? '-'}</div>
                 <div>{row.petName ?? '-'}</div>
                 <div>{row.primaryPhone ?? '-'}</div>
@@ -834,8 +843,8 @@ async function applyBulk(which: 'TOP' | 'BOT' | null = null, mode: 'ROW' | 'BULK
         </div>
 
         {/* 페이징 + 버튼 */}
-        <div className="admin-sep mb-[12px]" />
-        <div className="grid grid-cols-[1fr_auto_1fr] items-center">
+        <div className="admin-sep " />
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center mt-[30px] mb-[50px]">
           <div />
           <div className="flex justify-center">
             <Pagination current={page2} size={size} total={botTotal} onPage={(p)=>setPage2(p)} />
@@ -883,7 +892,8 @@ async function applyBulk(which: 'TOP' | 'BOT' | null = null, mode: 'ROW' | 'BULK
               value={bulkStatus}
               onChange={(e)=>setBulkStatus(e.target.value)}
             >
-              {ALL_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+             {ALL_STATUSES.map(s => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
+
             </select>
             <div style={{ display: 'flex', justifyContent: 'end', gap: 8 }}>
               <button className="btn-3d btn-white" onClick={()=>setBulkOpen(false)}>취소</button>
@@ -896,34 +906,143 @@ async function applyBulk(which: 'TOP' | 'BOT' | null = null, mode: 'ROW' | 'BULK
 
       {/* ===== 스타일 ===== */}
       <style jsx>{`
-        .admin-title { display:inline-flex; align-items:center; gap:8px; font-size:28px; font-weight:600; color:#000; }
-        :global(.apn-title-ico){ width:1em; height:1em; display:inline-block; color:#000 !important; }
-        :global(.apn-title-ico *){ fill:currentColor; stroke:currentColor; }
-        .admin-sep { border-top:1px solid #e5e7eb; margin:12px 0; }
+        /* =========================
+        * Admin Title & Separator
+        * ========================= */
+        .admin-title {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 28px;
+          font-weight: 600;
+          color: #000;
+        }
+        :global(.apn-title-ico) {
+          width: 1em;
+          height: 1em;
+          display: inline-block;
+          color: #000 !important;
+        }
+        :global(.apn-title-ico *) {
+          fill: currentColor;
+          stroke: currentColor;
+        }
+        .admin-sep {
+          border-top: 1px solid #e5e7eb;
+          margin: 12px 0;
+        }
 
-        .tab { border:1px solid #e5e7eb; border-radius:10px; padding:6px 16px; background:#fff; box-shadow:0 2px 0 rgba(0,0,0,0.06); }
-        .tab.active { background:#eee; }
+        /* ==========
+        * Tabs
+        * ========== */
+        .tab {
+          border: 1px solid #e5e7eb;
+          border-radius: 10px;
+          padding: 6px 16px;
+          background: #fff;
+          box-shadow: 0 2px 0 rgba(0, 0, 0, 0.06);
+        }
+        .tab.active {
+          background: #eee;
+        }
 
-        .btn { border:1px solid #e5e7eb; border-radius:10px; padding:8px 14px; background:#fff; }
-        .btn-3d { border:1px solid #e5e7eb; border-radius:10px; padding:8px 14px; background:#fff; box-shadow:0 2px 0 rgba(0,0,0,0.06); }
-        .btn-white { }
-        .btn-primary { }
+        /* ==========
+        * Buttons
+        * ========== */
+        .btn {
+          border: 1px solid #e5e7eb;
+          border-radius: 10px;
+          padding: 8px 14px;
+          background: #fff;
+        }
+        .btn-3d {
+          border: 1px solid #e5e7eb;
+          border-radius: 10px;
+          padding: 8px 14px;
+          background: #fff;
+          box-shadow: 0 2px 0 rgba(0, 0, 0, 0.06);
+        }
+        .btn-white { /* white 변형(추후 확장용) — 의도적으로 비워둠 */ }
+        .btn-primary { /* primary 변형(추후 확장용) — 의도적으로 비워둠 */ }
 
-        .card { border:1px solid #e5e7eb; border-radius:16px; padding:16px; background:#fff; }
-        .card-title { font-weight:600; margin-bottom:10px; }
-        .note { color:#6b7280; }
+        /* ==========
+        * Cards
+        * ========== */
+        .card {
+          border: 1px solid #e5e7eb;
+          border-radius: 16px;
+          padding: 16px;
+          background: #fff;
+        }
+        .card-title {
+          font-weight: 600;
+          margin-bottom: 10px;
+        }
+        .note {
+          color: #6b7280;
+        }
 
-        .dropdown { border:1px solid #e5e7eb; border-radius:10px; padding:6px 10px; background:#fff; }
+        /* =======================
+        * Inputs & Dropdowns
+        * ======================= */
+        .dropdown {
+          border: 1px solid #e5e7eb;
+          border-radius: 10px;
+          padding: 6px 10px;
+          background: #fff;
+        }
+        .inp {
+          border: 1px solid #e5e7eb;
+          border-radius: 8px;
+          padding: 8px 10px;
+          width: 100%;
+          background: #fff;
+        }
 
-        .inp { border:1px solid #e5e7eb; border-radius:8px; padding:8px 10px; width:100%; background:#fff; }
+        .inp-1{
+          border: 1px solid #e5e7eb;
+          border-radius: 8px;
+          padding: 8px 10px;
+          width: 200px;
+          background: #fff;
+        }
 
-        .slot-grid { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:8px; }
-        @media (max-width:768px){ .slot-grid { grid-template-columns:repeat(4,minmax(0,1fr)); } }
-        .slot { border:1px solid #e5e7eb; border-radius:8px; padding:8px 0; background:#fff; transition:background 0.15s ease; }
-        .slot.active { background:#eee; box-shadow:inset 0 1px 3px rgba(0,0,0,0.12); }
-        .slot.disabled { background:#f3f4f6; color:#9ca3af; cursor:not-allowed; opacity:0.65; }
-        .slot.dim { background:#fafafa; }
+        /* ===============
+        * Slots Grid
+        * =============== */
+        .slot-grid {
+          display: grid;
+          grid-template-columns: repeat(6, minmax(0, 1fr));
+          gap: 8px;
+          
+        }
+        @media (max-width: 768px) {
+          .slot-grid {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+          }
+        }
+        .slot {
+          border: 1px solid #e5e7eb;
+          border-radius: 8px;
+          padding: 8px 0;
+          background: #fff;
+          transition: background 0.15s ease;
+        }
+        .slot.active {
+          background: #eee;
+          box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.12);
+        }
+        .slot.disabled {
+          background: #f3f4f6;
+          color: #9ca3af;
+          cursor: not-allowed;
+          opacity: 0.65;
+        }
+        .slot.dim {
+          background: #fafafa;
+        }
       `}</style>
+
     </main>
   );
 }

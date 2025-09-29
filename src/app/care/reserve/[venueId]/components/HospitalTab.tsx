@@ -10,7 +10,7 @@ import type { DoctorDTO, CreateHospitalReservationReq, PetGender } from '@/featu
 /* ── 유틸(원본 유지) ───────────────────────────────────────── */
 function buildTimeSlots(): string[] {
   const out: string[] = [];
-  for (let h = 9; h <= 18; h++) {
+  for (let h = 10; h <= 18; h++) {
     for (const m of [0, 30]) {
       const hh = String(h).padStart(2, '0');
       const mm = String(m).padStart(2, '0');
