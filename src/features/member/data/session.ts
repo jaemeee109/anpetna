@@ -34,13 +34,23 @@ export function purgeAuthArtifacts() {
   } catch {}
 }
 
-/** 서버 로그아웃(있으면) + 로컬 정리 */
+
+
 export async function serverLogout() {
   try {
-    await http.post(withPrefix("/jwt/logout"), null, { withCredentials: true });
+    // 저장 위치는 localStorage 우선, 없으면 빈 문자열
+    const refresh = (typeof window !== 'undefined' && localStorage.getItem('refreshToken')) || '';
+
+    await http.post(
+      withPrefix("/jwt/logout"),
+      { refreshToken: refresh },                  
+      { withCredentials: true }
+    );
   } catch {
     // 없어도 무시
   } finally {
     purgeAuthArtifacts();
   }
 }
+
+
