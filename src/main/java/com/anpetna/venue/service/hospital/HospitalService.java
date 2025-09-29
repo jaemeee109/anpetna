@@ -4,6 +4,7 @@ import com.anpetna.venue.dto.hospital.CreateHospitalReservationReq;
 import com.anpetna.venue.dto.hospital.CreateHospitalReservationRes;
 import com.anpetna.venue.dto.doctor.ListDoctorsRes;
 import java.util.List;
+import com.anpetna.venue.dto.member.MyHospitalReservationDetail;
 
 public interface HospitalService {
     ListDoctorsRes listDoctors(Long venueId);
@@ -13,4 +14,7 @@ public interface HospitalService {
 
     List<AdminHospitalReservationRow> adminList(Long venueId, String status, String memberId);
     boolean tryUpdateStatus(Long reservationId, String nextStatus);
+
+    MyHospitalReservationDetail adminReadDetail(Long reservationId);
+
 }
