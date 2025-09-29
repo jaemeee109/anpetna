@@ -161,8 +161,6 @@ public class SecurityConfig {
                         .requestMatchers("/care/admin/**").hasRole("ADMIN")  // 관리자 전용
 
 
-
-
                         .anyRequest().authenticated()
                 )
 
