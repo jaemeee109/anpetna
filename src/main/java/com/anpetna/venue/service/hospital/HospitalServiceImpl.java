@@ -63,6 +63,7 @@ public class HospitalServiceImpl implements HospitalService {
         if (getNoShowCountAllServices(memberId) >= NOSHOW_LIMIT) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "노쇼 3회 이상으로 예약이 제한되었습니다.");
         }
+
         VenueEntity venue = venueRepository.findById(venueId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "장소(Venue)를 찾을 수 없습니다."));
         MemberEntity member = memberRepository.findById(memberId)
@@ -74,13 +75,22 @@ public class HospitalServiceImpl implements HospitalService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "해당 매장의 의사가 아닙니다.");
         }
 
-        // 30분 슬롯 검증: 10:00~18:00, 13~14 제외, 분=00/30
+        // ====== 날짜/시간 검증 추가 (Null, 과거 금지) ======
+        LocalDateTime now = LocalDateTime.now();
         LocalDateTime at = req.getAppointmentAt();
+        if (at == null || at.isBefore(now)) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "과거 시각에는 예약할 수 없습니다."
+            );
+        }
+        // ====== 30분 슬롯/영업시간 검증 ======
         int hour = at.getHour();
         int minute = at.getMinute();
         if (!((hour >= 10 && hour < 18) && (hour < 13 || hour >= 14) && (minute == 0 || minute == 30))) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "예약 가능 시간은 10~18시(13~14 제외) 30분 단위입니다.");
         }
+
         if (hospitalReservationRepository.existsByDoctor_DoctorIdAndAppointmentAt(doctor.getDoctorId(), at)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "해당 시간은 이미 예약되었습니다.");
         }
@@ -105,6 +115,7 @@ public class HospitalServiceImpl implements HospitalService {
 
         return CreateHospitalReservationRes.builder().reservationId(saved.getReservationId()).build();
     }
+
 
     @Override
     @Transactional
