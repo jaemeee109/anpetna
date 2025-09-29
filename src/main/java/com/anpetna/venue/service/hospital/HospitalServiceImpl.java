@@ -20,7 +20,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
-
+import com.anpetna.venue.dto.member.MyHospitalReservationDetail;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -194,5 +196,30 @@ public class HospitalServiceImpl implements HospitalService {
         r.setStatus(next); // JPA dirty checking
         return true;
     }
+
+    @Transactional(readOnly = true)
+    @Override
+    public MyHospitalReservationDetail adminReadDetail(Long reservationId) {
+        var e = hospitalReservationRepository.findById(reservationId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "예약을 찾을 수 없습니다."));
+        return MyHospitalReservationDetail.builder()
+                .reservationId(e.getReservationId())
+                .venueName(e.getVenue() != null ? e.getVenue().getVenueName() : "")
+                .service("HOSPITAL")
+                .status(e.getStatus())
+                .appointmentAt(e.getAppointmentAt())
+                .doctorName(e.getDoctor() != null ? e.getDoctor().getName() : null)
+                .reserverName(e.getReserverName())
+                .primaryPhone(e.getPrimaryPhone())
+                .secondaryPhone(e.getSecondaryPhone())
+                .petName(e.getPetName())
+                .petBirthYear(e.getPetBirthYear())
+                .petSpecies(e.getPetSpecies())
+                .petGender(e.getPetGender())
+                .memo(e.getMemo())
+                .build();
+    }
+
+
 
 }

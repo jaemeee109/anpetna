@@ -20,6 +20,9 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import com.anpetna.venue.dto.member.MyHotelReservationDetail;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 @RequiredArgsConstructor
@@ -188,6 +191,28 @@ public class HotelServiceImpl implements HotelService {
         r.setStatus(next); // JPA dirty checking
         return true;
     }
+
+    @Transactional(readOnly = true)
+    @Override
+    public MyHotelReservationDetail adminReadDetail(Long reservationId) {
+        var e = hotelReservationRepository.findById(reservationId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "예약을 찾을 수 없습니다."));
+        return MyHotelReservationDetail.builder()
+                .reservationId(e.getReservationId())
+                .venueName(e.getVenue() != null ? e.getVenue().getVenueName() : "")
+                .service("HOTEL")
+                .status(e.getStatus())
+                .checkIn(e.getCheckIn())
+                .checkOut(e.getCheckOut())
+                .reserverName(e.getReserverName())
+                .primaryPhone(e.getPrimaryPhone())
+                .secondaryPhone(e.getSecondaryPhone())
+                .petName(e.getPetName())
+                .petBirthYear(e.getPetBirthYear())
+                .memo(e.getMemo())
+                .build();
+    }
+
 
 
 }
