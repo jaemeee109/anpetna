@@ -338,11 +338,11 @@ export default function Header() {
               <span className="sep">|</span>
               <Link href="banner" className="btn-link">BANNER</Link>
               <span className="sep">|</span>
-              <Link href="/member/list" className="btn-link">USERS</Link>
+              <Link prefetch={false} href="/member/list">USERS</Link>
               <span className="sep">|</span>
-              <Link href="order/admin/erp" className="btn-link">SALES</Link>
+              <Link prefetch={false} href="/order/admin/erp">SALES</Link>
               <span className="sep">|</span>
-              <Link href="order/admin/inv" className="btn-link">INVENTORY</Link>
+              <Link prefetch={false} href="/order/admin/inv">INVENTORY</Link>
               <span className="sep">|</span>
 
              {/* RESERVATION 드롭다운 */}

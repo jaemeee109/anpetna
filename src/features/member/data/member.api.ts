@@ -1,4 +1,5 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+//src/features/member/data/member.api.ts
+
 import http from '@/shared/data/http';
 import { purgeAuthArtifacts } from '@/features/member/data/session';
 
@@ -61,13 +62,59 @@ function bases(): string[] {
   return Array.from(new Set(list));
 }
 
-async function jsonFetch<T=any>(url: string, init?: RequestInit): Promise<T> {
-  const r = await fetch(url, init);
+async function jsonFetch<T = any>(url: string, init?: RequestInit): Promise<T> {
+  const r = await fetch(url, {
+    ...init,
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json; charset=utf-8',
+      ...(init?.headers || {}),
+    },
+    credentials: 'include',
+  });
+
+  const ct = r.headers.get('content-type') || '';
+  const isJson = /application\/json/i.test(ct);
+  const isHtml = /text\/html/i.test(ct);
+
+  // 본문은 먼저 텍스트로
   const text = await r.text();
-  const data = text ? JSON.parse(text) : null;
-  if (!r.ok) throw new Error((data && (data.message||data.error)) || `HTTP ${r.status}`);
-  return data as T;
+
+  // JSON 파싱(가능할 때만)
+  let data: any = null;
+  if (isJson && text) {
+    try { data = JSON.parse(text); } catch { data = null; }
+  }
+
+  const isLoginApi = /\/jwt\/login(?:\b|$)/.test(url);
+
+  if (!r.ok) {
+    // ✅ 로그인 실패는 상태코드가 무엇이든(400/401/404/500 등) 동일하게 처리
+    if (isLoginApi) {
+      alert('아이디/비밀번호를 잘못 입력하셨습니다. 다시 입력해주세요');
+      // 화면에는 아무 HTML/에러본문도 노출하지 않도록 고정된 코드만 throw
+      throw new Error('INVALID_CREDENTIALS');
+    }
+
+    // ✅ 일반 오류: HTML 본문을 화면에 흘리지 않도록 안전 메시지로만 throw
+    const msg =
+      (isJson && data && (data.message || data.error)) ||
+      `HTTP ${r.status}`;
+    throw new Error(String(msg));
+  }
+
+  // ✅ 정상인데 HTML이 오면(예: 프록시/라우팅 오류) 화면 노출 방지
+  if (isHtml) {
+    // 필요 시 콘솔로만 일부 확인
+    console.warn('[jsonFetch] Unexpected HTML response for', url);
+    throw new Error('UNEXPECTED_HTML');
+  }
+
+  // 정상 JSON이면 data, 그 외에는 undefined 반환(기존 로직 유지)
+  return (isJson ? (data as T) : (undefined as unknown as T));
 }
+
+
 
 /* ---------------- JWT 디코드 보조 ---------------- */
 function parseJwt(token: string): any | null {
@@ -156,7 +203,7 @@ export async function readMemberMe(): Promise<any> {
   if (!hasAuth) throw new Error('인증 정보 없음');
 
   const pathCandidates = [
-    `/member/my_page/${encodeURIComponent(id)}`,   // ✅ USER 접근 가능 엔드포인트
+    `/member/my_page/${encodeURIComponent(id)}`,   //  USER 접근 가능 엔드포인트
     `/member/readOne/${encodeURIComponent(id)}`,  // (백엔드 허용 시 보조)
   ];
 
@@ -235,7 +282,7 @@ export async function signup(body: JoinMemberReq): Promise<JoinMemberRes> {
   throw new Error('회원가입 실패');
 }
 
-/** ⭐ 로그인 */
+/** 로그인 */
 export async function login(body: LoginReq): Promise<LoginRes> {
   const paths = ['/jwt/login'];
   let last: any;
@@ -270,5 +317,13 @@ export async function login(body: LoginReq): Promise<LoginRes> {
       } catch (e) { last = e; }
     }
   }
-  throw last instanceof Error ? last : new Error('로그인 실패');
+    if (last instanceof Error) {
+    // 로그인 실패 케이스는 alert로 이미 안내했으므로 화면에는 문구를 남기지 않음
+    if (last.message === 'INVALID_CREDENTIALS') {
+      throw new Error(''); // 화면에 표시될 메시지 비움
+    }
+    throw last;
+  }
+  throw new Error('로그인 실패');
 }
+

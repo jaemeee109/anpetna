@@ -1,7 +1,6 @@
 // src/lib/api.ts
 /**
  * API 경로 유틸 + 상수
- * - 백엔드가 루트(/) 또는 /anpetna 아래여도 withPrefix()가 알아서 붙임
  */
 
 export const API_PREFIX = ((process.env.NEXT_PUBLIC_API_PREFIX as string | undefined) ?? "")

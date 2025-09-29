@@ -1,6 +1,6 @@
 // src/shared/data/http.ts
 import axios, { AxiosInstance, InternalAxiosRequestConfig } from "axios";
-
+import { purgeAuthArtifacts } from '@/features/member/data/session';
 /** env helper (빈 문자열 방지) */
 const env = (k: string, fallback = "") => {
   const v = process.env[k];
@@ -166,6 +166,28 @@ const instance: AxiosInstance = axios.create({
   baseURL: `${BASE}${PREFIX}`,
   withCredentials: true,
 });
+
+function redirectToLoginWithNext() {
+  if (typeof window === 'undefined') return;
+  const next = encodeURIComponent(window.location.pathname + window.location.search);
+  // 앱 베이스패스가 없다면 절대경로로 충분합니다.
+  window.alert('로그인 기간이 만료되었습니다. 다시 로그인 해주세요');
+  window.location.href = `/member/login?next=${next}`;
+}
+
+// axios 인스턴스 이름이 http 또는 instance 등일 수 있습니다.
+// 아래에서 사용하는 이름으로 맞춰 주세요. (이 파일에 이미 있는 인스턴스 변수에 맞춰 교체)
+instance.interceptors.response.use(
+  (res) => res,
+  (error) => {
+    const status = error?.response?.status ?? 0;
+    if (status === 401 || status === 403) {
+      try { purgeAuthArtifacts(); } catch {}
+      redirectToLoginWithNext();
+    }
+    return Promise.reject(error);
+  }
+);
 
 /** 요청 인터셉터 */
 instance.interceptors.request.use((config: InternalAxiosRequestConfig) => {
