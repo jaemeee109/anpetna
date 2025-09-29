@@ -14,6 +14,8 @@ public class MyReservationRow {
     private String type;                       // "HOSPITAL" | "HOTEL"
     private ReservationStatus status;
 
+    private Long reservationId;
+
     // 병원 전용
     private LocalDateTime appointmentAt;
 
