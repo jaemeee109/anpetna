@@ -3,6 +3,9 @@ package com.anpetna.venue.service.hospital;
 
 import com.anpetna.member.domain.MemberEntity;
 import com.anpetna.member.repository.MemberRepository;
+import com.anpetna.notification.feature.reservation.hospital.HospitalNoShowNotification;
+import com.anpetna.notification.feature.reservation.hospital.HospitalReservationConfirmNotificationService;
+import com.anpetna.notification.feature.reservation.hospital.HospitalReservationService;
 import com.anpetna.venue.constant.ReservationStatus;
 import com.anpetna.venue.domain.hospital.HospitalReservationEntity;
 import com.anpetna.venue.domain.VenueDoctorEntity;
@@ -21,8 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import com.anpetna.venue.dto.member.MyHospitalReservationDetail;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
+
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -38,6 +40,9 @@ public class HospitalServiceImpl implements HospitalService {
     private final VenueDoctorRepository doctorRepository;
     private final HospitalReservationRepository hospitalReservationRepository;
     private final HotelReservationRepository hotelReservationRepository;
+    private final HospitalReservationConfirmNotificationService hospitalReservationNotificationService;
+    private final HospitalNoShowNotification hospitalNoShowNotification;
+    private final HospitalReservationService hospitalReservationService;
 
     // 회원의 노쇼 누적 회수(호텔+병원 합산)
     private long getNoShowCountAllServices(String memberId) {
@@ -115,6 +120,8 @@ public class HospitalServiceImpl implements HospitalService {
                         .build()
         );
 
+        hospitalReservationService.notifyHospitalReservation(member, memberId, venue, at);
+
         return CreateHospitalReservationRes.builder().reservationId(saved.getReservationId()).build();
     }
 
@@ -125,6 +132,13 @@ public class HospitalServiceImpl implements HospitalService {
         HospitalReservationEntity found = hospitalReservationRepository.findById(reservationId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "예약을 찾을 수 없습니다."));
         found.setStatus(ReservationStatus.CONFIRMED);
+
+        hospitalReservationNotificationService.notifyHospitalReservationConfirm(
+                found.getMember(),
+                found.getMember().getMemberId(),
+                found.getVenue(),
+                found.getAppointmentAt()
+        );
     }
 
     // 관리자: 노쇼 처리 API
@@ -134,6 +148,13 @@ public class HospitalServiceImpl implements HospitalService {
         HospitalReservationEntity found = hospitalReservationRepository.findById(reservationId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "예약을 찾을 수 없습니다."));
         found.setStatus(ReservationStatus.NOSHOW);
+
+        hospitalNoShowNotification.notifyHospitalNoShow(
+                found.getMember(),
+                found.getMember().getMemberId(),
+                found.getVenue(),
+                found.getAppointmentAt()
+        );
     }
     @Transactional(readOnly = true)
     @Override
