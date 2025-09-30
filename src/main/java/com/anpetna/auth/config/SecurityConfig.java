@@ -76,6 +76,9 @@ public class SecurityConfig {
                 // ===== 인가 규칙 =====
                 .securityMatcher("/**")
                 .authorizeHttpRequests(auth -> auth
+                        //(보안 사용 시) 헬스엔드포인트 허용
+                        .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
+
                         //브라우저에서 실제 요청 전에 보내는 프리플라이트 요청 -> 인증 없이 허용해주어야 브라우저에서 정상적으로 POST/PUT/DELETE 요청이 가능
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
