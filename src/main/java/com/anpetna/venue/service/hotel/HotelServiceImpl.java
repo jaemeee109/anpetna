@@ -4,6 +4,9 @@ package com.anpetna.venue.service.hotel;
 import com.anpetna.member.domain.MemberEntity;
 import com.anpetna.member.repository.MemberRepository;
 
+import com.anpetna.notification.feature.reservation.hotel.HotelNoShowNotification;
+import com.anpetna.notification.feature.reservation.hotel.HotelReservationConfirmNotificationService;
+import com.anpetna.notification.feature.reservation.hotel.HotelReservationService;
 import com.anpetna.venue.constant.ReservationStatus;
 import com.anpetna.venue.domain.hotel.HotelReservationEntity;
 import com.anpetna.venue.domain.VenueEntity;
@@ -19,10 +22,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
+
 import com.anpetna.venue.dto.member.MyHotelReservationDetail;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 @RequiredArgsConstructor
@@ -35,6 +36,9 @@ public class HotelServiceImpl implements HotelService {
     private final MemberRepository memberRepository;
     private final HotelReservationRepository hotelReservationRepository;
     private final HospitalReservationRepository hospitalReservationRepository;
+    private final HotelReservationConfirmNotificationService hotelReservationNotificationService;
+    private final HotelNoShowNotification hotelNoShowNotification;
+    private final HotelReservationService hotelReservationService;
 
     // 회원의 노쇼 누적 회수(호텔+병원 합산)
     private long getNoShowCountAllServices(String memberId) {
@@ -108,6 +112,8 @@ public class HotelServiceImpl implements HotelService {
                         .build()
         );
 
+        hotelReservationService.notifyHotelReservation(member, memberId, venue, checkIn, checkOut);
+
         return CreateHotelReservationRes.builder()
                 .reservationId(saved.getReservationId())
                 .build();
@@ -121,6 +127,14 @@ public class HotelServiceImpl implements HotelService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "예약을 찾을 수 없습니다."));
         found.setStatus(ReservationStatus.CONFIRMED);
         // JPA dirty checking
+
+        hotelReservationNotificationService.notifyHotelReservationConfirm(
+                found.getMember(),
+                found.getMember().getMemberId(),
+                found.getVenue(),
+                found.getCheckIn(),
+                found.getCheckOut()
+        );
     }
 
     //  관리자: 노쇼 처리 API
@@ -130,6 +144,14 @@ public class HotelServiceImpl implements HotelService {
         HotelReservationEntity found = hotelReservationRepository.findById(reservationId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "예약을 찾을 수 없습니다."));
         found.setStatus(ReservationStatus.NOSHOW);
+
+        hotelNoShowNotification.notifyHotelNoShow(
+                found.getMember(),
+                found.getMember().getMemberId(),
+                found.getVenue(),
+                found.getCheckIn(),
+                found.getCheckOut()
+        );
     }
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
     @Override
