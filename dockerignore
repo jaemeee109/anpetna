@@ -1,8 +1,6 @@
 .git
+.gitignore
 .gradle
-**/build/
-**/out/
-**/.idea
-**/.vscode
-Dockerfile
-README.md
+**/node_modules
+build/
+!build/libs/*.jar   # JAR만 포함되도록 재포함
