@@ -606,7 +606,7 @@ async function applyBulk(which: 'TOP' | 'BOT' | null = null, mode: 'ROW' | 'BULK
 
         <div className="admin-sep" />
 
-        {/* 헤더 라인 */}
+        {/* 새로운 예약신청 테이블 */}
         <div
           className={`grid ${
             tab==='HOSPITAL'
@@ -671,8 +671,8 @@ async function applyBulk(which: 'TOP' | 'BOT' | null = null, mode: 'ROW' | 'BULK
                 </div>
                 <div>
                  <Link href={`/care/admin/${row.reservationId}?venueId=${venueId}`} className="text-blue-600 underline">
-  {row.reservationId}
-</Link>
+                  {row.reservationId}
+                </Link>
                 </div>
 
                 {/* 날짜/체류기간 표시 */}
@@ -699,10 +699,10 @@ async function applyBulk(which: 'TOP' | 'BOT' | null = null, mode: 'ROW' | 'BULK
         </div>
       </section>
 
-      {/* ===== 아랫섹션 ===== */}
+      {/* ========================== 아랫섹션 ========================== */}
       <div className="admin-sep" />
       <section>
-        {/* 병원 */}
+        {/* **********************병원********************** */}
         {tab === 'HOSPITAL' ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
             
@@ -781,20 +781,22 @@ async function applyBulk(which: 'TOP' | 'BOT' | null = null, mode: 'ROW' | 'BULK
           </div>
         )}
 
-        {/* 하단 리스트 헤더 */}
+        {/* =================하단 예약리스트 헤더 (병원&호텔 공용)================= */}
        <div className={`grid ${tab==='HOSPITAL'
-    ? 'grid-cols-[28px_140px_120px_1fr_1fr_160px]'
-    : 'grid-cols-[28px_140px_120px_1fr_1fr_160px]'
-  } gap-2 px-2 text-sm font-semibold mt-[40px]`}>
-  <div className="text-center">
-    <input type="checkbox" onChange={(e)=>toggleAllBot(e.target.checked)} aria-label="전체 선택" />
-  </div>
-  <div>예약상태</div>
-  <div>예약번호</div>
-  <div>예약자이름</div>
-  <div>반려동물이름</div>
-  <div>연락처</div>
-</div>
+          ? 'grid-cols-[28px_140px_120px_140px_1fr_1fr_160px]'
+          : 'grid-cols-[28px_140px_120px_140px_1fr_1fr_160px]'
+        } gap-2 px-2 text-sm font-semibold mt-[40px]`}>
+        <div className="text-center">
+          <input type="checkbox" onChange={(e)=>toggleAllBot(e.target.checked)} aria-label="전체 선택" />
+        </div>
+        <div>예약상태</div>
+        <div>예약번호</div>
+        <div>회원아이디</div> {/* ← 추가 */}
+        <div>예약자이름</div>
+        <div>반려동물이름</div>
+        <div>연락처</div>
+      </div>
+
 
         <div className="admin-sep" />
 
@@ -808,38 +810,65 @@ async function applyBulk(which: 'TOP' | 'BOT' | null = null, mode: 'ROW' | 'BULK
             <div className="text-center py-8 mt-[15px]">데이터가 없습니다.</div>
           ) : (
             filteredBotList.map((row: any) => (
-             <div key={row.reservationId}
-     className="grid items-center  py-2 hover:bg-[#f9fafb]"
-     style={{ gridTemplateColumns: tab==='HOSPITAL'
-       ? '28px 140px 120px 1fr 1fr 160px'   // ← 병원에도 예약번호 칼럼 추가
-       : '28px 140px 120px 1fr 1fr 160px' }}>
-                <div className="text-center">
-                  <input
-                    type="checkbox"
-                    checked={!!checkedBot[row.reservationId]}
-                    onChange={(e)=>setCheckedBot((m)=>({...m, [row.reservationId]: e.target.checked}))}
-                    aria-label={`${row.reservationId} 선택`}
-                  />
-                </div>
-                <div>
-                  <StatusSelect
-                    value={statusBot[row.reservationId] ?? row.status}
-                    onChange={(v)=> setStatusBot(prev => ({ ...prev, [row.reservationId]: v }))}
-                  />
-                </div>
-             
-                  <div>
-                    <Link href={`/care/admin/${row.reservationId}?venueId=${venueId}`} className="text-blue-600 underline">
-                    {row.reservationId}
-                  </Link>
-                  </div>
-                
-                <div>{row.reserverName ?? '-'}</div>
-                <div>{row.petName ?? '-'}</div>
-                <div>{row.primaryPhone ?? '-'}</div>
-              </div>
-            ))
-          )}
+    <div
+      key={row.reservationId}
+      className="grid items-center py-2 hover:bg-[#f9fafb] cursor-pointer"
+      style={{ gridTemplateColumns: tab==='HOSPITAL'
+        ? '28px 140px 120px 140px 1fr 1fr 160px'
+        : '28px 140px 120px 140px 1fr 1fr 160px' }}
+      onClick={(e) => {
+        const el = e.target as HTMLElement;
+        if (el.closest('a,button,input,select,label')) return; // 내부 컨트롤 클릭은 제외
+        router.push(`/care/admin/${row.reservationId}?venueId=${venueId}`);
+      }}
+    >
+      <div className="text-center">
+        <input
+          type="checkbox"
+          checked={!!checkedBot[row.reservationId]}
+          onChange={(e)=>setCheckedBot((m)=>({...m, [row.reservationId]: e.target.checked}))}
+          aria-label={`${row.reservationId} 선택`}
+          onClick={(e)=>e.stopPropagation()}
+        />
+      </div>
+
+      <div>
+        <StatusSelect
+          value={statusBot[row.reservationId] ?? row.status}
+          onChange={(v)=> setStatusBot(prev => ({ ...prev, [row.reservationId]: v }))}
+        />
+      </div>
+
+      <div>
+        <Link
+          href={`/care/admin/${row.reservationId}?venueId=${venueId}`}
+          className="text-blue-600 underline"
+          onClick={(e)=>e.stopPropagation()}
+        >
+          {row.reservationId}
+        </Link>
+      </div>
+
+      <div className="truncate">
+        {row.memberId ? (
+          <Link
+            href={`/care/history?memberId=${encodeURIComponent(row.memberId)}&from=admin&venueId=${venueId}`}
+            className="underline"
+            onClick={(e)=>e.stopPropagation()}
+          >
+            {row.memberId}
+          </Link>
+
+
+        ) : ('-')}
+      </div>
+
+      <div className="truncate">{row.reserverName ?? '-'}</div>
+      <div className="truncate">{row.petName ?? '-'}</div>
+      <div>{row.primaryPhone ?? '-'}</div>
+    </div>
+  ))
+)}
         </div>
 
         {/* 페이징 + 버튼 */}

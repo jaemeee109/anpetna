@@ -7,7 +7,8 @@ import { Pagination } from '@/components/layout/Pagination';
 import venueApi from '@/features/venue/data/venue.api';
 import type { MyReservationLine } from '@/features/venue/data/venue.types';
 import PawIcon from '@/components/icons/Paw';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+
 const PAGE_SIZE = 10;
 
 /* ===================== 날짜/시간 포맷 유틸 ===================== */
@@ -108,21 +109,44 @@ export default function MyReserveHistoryPage() {
   const [total, setTotal] = useState(0);
   const size = PAGE_SIZE;
 
+  // 관리자 조회용 쿼리 파라미터 — useEffect 보다 위로 이동
+  const sp = useSearchParams();
+  const from = sp.get('from');
+  const memberId = sp.get('memberId') || '';
+  const venueId = Number(sp.get('venueId') || '0');
+  const isAdmin = from === 'admin' && venueId > 0;
+
   useEffect(() => {
     let alive = true;
     (async () => {
+      if (from === 'admin' && memberId && venueId) {
+        const { content, totalElements } = await venueApi.adminListReservations({
+          venueId,
+          memberId,
+          page: page - 1,
+          size,
+        });
+        if (!alive) return;
+        const list = (content ?? []) as MyReservationLine[];
+        setRows(Array.isArray(list) ? list : []);
+        setTotal(Number(totalElements ?? 0));
+        return;
+      }
+
       const res = await venueApi.listMyReservations({ page, size });
       const list = (res?.dtoList ?? res?.content ?? res?.list ?? []) as MyReservationLine[];
-      if (alive) {
-        setRows(Array.isArray(list) ? list : []);
-        setTotal(Number(res?.total ?? res?.totalElements ?? 0));
-      }
+      if (!alive) return;
+      setRows(Array.isArray(list) ? list : []);
+      setTotal(Number(res?.total ?? res?.totalElements ?? 0));
     })();
     return () => { alive = false; };
-  }, [page]);
+  }, [from, memberId, venueId, page, size]);
 
   const lines = useMemo(() => rows ?? [], [rows]);
   const router = useRouter();
+
+  
+
   return (
     <RequireLogin>
       <main className="reserve-history">
@@ -157,10 +181,16 @@ export default function MyReserveHistoryPage() {
                 return (
                   <tr
                     key={i}
-                    onClick={() =>
-                      router.push(`/care/history/${r.type.toLowerCase()}/${r.reservationId}`)
-                    }
-                    style={{ cursor: 'pointer' }} // 마우스 올렸을 때 손가락 모양 나오게
+                    onClick={() => {
+                      if (isAdmin) {
+                        // ✅ 관리자용 상세로 이동 (type과 venueId 함께 전달)
+                        router.push(`/care/admin/${r.reservationId}?type=${r.type}&venueId=${venueId}`);
+                      } else {
+                        // 기존: 회원 본인 상세
+                        router.push(`/care/history/${r.type.toLowerCase()}/${r.reservationId}`);
+                      }
+                    }}
+                    style={{ cursor: 'pointer' }}
                   >
                     <td className="rh-td"><StatusChip s={r.status} /></td>
                     <td className="rh-td">{r.venueName}</td>
@@ -185,6 +215,22 @@ export default function MyReserveHistoryPage() {
           onPage={(p) => setPage(p)}
         />
         <p className=" mb-[50px]"></p>
+
+              {/* 관리자용 */}
+            {from === 'admin' && venueId ? (
+            <div className="text-center mt-4">
+              <button
+                type="button"
+                className="btn-list"
+                onClick={() => router.push(`/care/admin?venueId=${venueId}`)}
+              >
+                목록으로
+              </button>
+            </div>
+          ) : null}
+
+
+
       </main>
 
  
@@ -272,6 +318,17 @@ export default function MyReserveHistoryPage() {
   user-select: none;
 }
 
+
+  .btn-list{
+  border-radius: 9px !important;
+  border: 1px solid #cacacaff;
+  background: #fafafa;
+  width: 80px;
+  height: 35px;
+  font-size: 14px;
+  font-weight: 400;
+  text-align: center;
+  }
   
 `}</style>
 

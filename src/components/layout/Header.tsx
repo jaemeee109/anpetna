@@ -156,7 +156,7 @@ export default function Header() {
 
     const token = getTokenFromStorage();
 
-    // ✅ 이미 ADMIN이면 서버 확인 생략
+    //  이미 ADMIN이면 서버 확인 생략
     const isAdminByJwt = token ? payloadHasAdmin(decodeJwt(token)) : false;
     const stored = (typeof window !== 'undefined' && localStorage.getItem('memberRole')) || '';
     const up = stored.toUpperCase();
@@ -291,8 +291,8 @@ async function handleLogout() {
   method: 'POST',
   credentials: 'include',
   headers: {
-    ...auth,                               // ✅ Authorization 헤더 정상 부착
-    'Content-Type': 'application/json',    // ✅ JSON 바디 명시
+    ...auth,                               //  Authorization 헤더 정상 부착
+    'Content-Type': 'application/json',    //  JSON 바디 명시
   },
   body: JSON.stringify({ refreshToken: refresh }),
 });

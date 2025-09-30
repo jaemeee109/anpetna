@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
-import { useParams, useSearchParams } from 'next/navigation';
+import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import RequireLogin from '@/components/auth/RequireLogin';
 import PawIcon from '@/components/icons/Paw';
 import venueApi from '@/features/venue/data/venue.api';
@@ -67,7 +67,8 @@ function StatusChip({
 export default function AdminReserveDetailPage() {
   const params = useParams<{ reservationId: string }>();
   const search = useSearchParams();
-const backVenueId = search?.get('venueId');
+  const router = useRouter();                   
+  const backVenueId = search?.get('venueId');
   const idStr = params?.reservationId;
   const id = useMemo(() => (idStr ? Number(idStr) : NaN), [idStr]);
   const qType = (search?.get('type') || '').toUpperCase() as 'HOSPITAL' | 'HOTEL' | '';
@@ -268,16 +269,27 @@ const backVenueId = search?.get('venueId');
 
         {/* 하단 버튼: 관리자는 "목록으로"만 */}
         {!loading && !err && (
-          <div className="rd-actions mt-[50px] mb-[50px]">
-          <Link
-            href={`/care/admin${backVenueId ? `?venueId=${backVenueId}` : ''}`}
-            className="rd-btn"
-            style={{ textDecoration: 'none', color: '#111111' }}
-          >
-            목록으로
-          </Link>
-        </div>
-        )}
+            <div className="rd-actions mt-[50px] mb-[50px]">
+              {/* 이전 페이지로 이동 */}
+              <button
+                type="button"
+                className="rd-btn"
+                onClick={() => router.back()}
+              >
+                뒤로가기
+              </button>
+
+              {/* 목록으로*/}
+              <Link
+                href={`/care/admin${backVenueId ? `?venueId=${backVenueId}` : ''}`}
+                className="rd-btn"
+                style={{ textDecoration: 'none', color: '#111111' }}
+              >
+                목록으로
+              </Link>
+            </div>
+          )}
+
 
         <p className="mb-[50px]"></p>
       </main>
