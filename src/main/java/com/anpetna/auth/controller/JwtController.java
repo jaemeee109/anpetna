@@ -8,6 +8,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+
+
 @RestController
 @RequestMapping("/jwt")
 @RequiredArgsConstructor
@@ -28,7 +30,8 @@ public class JwtController {
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(
             @RequestHeader(value="Authorization", required=false) String authorization,
-            @RequestBody TokenRequest tokenRequest) {
+            @RequestBody TokenRequest tokenRequest){
+
 
         String access = clean(authorization);
         String refresh = clean(tokenRequest.getRefreshToken());
@@ -40,6 +43,8 @@ public class JwtController {
 
         jwtService.logout(req);
         return ResponseEntity.noContent().build();
+
+
     }
 
     private String clean(String token) {
@@ -50,4 +55,6 @@ public class JwtController {
         }
         return token;
     }
+
+
 }
