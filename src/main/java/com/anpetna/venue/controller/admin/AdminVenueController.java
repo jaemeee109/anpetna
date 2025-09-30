@@ -8,6 +8,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import com.anpetna.venue.dto.member.MyHospitalReservationDetail;
@@ -67,16 +68,16 @@ public class AdminVenueController {
             @RequestParam(required = false) String type,       // "HOSPITAL" | "HOTEL"
             @RequestParam(required = false) String status,     // PENDING, CONFIRMED, ...
             @RequestParam(required = false) String memberId,
-            @RequestParam(required = false) Long doctorId,     // ★ 병원: 의사 필터
-            @RequestParam(required = false) String date,       // ★ YYYY-MM-DD (병원/호텔 공통)
+            @RequestParam(required = false) Long doctorId,     //  병원: 의사 필터
+            @RequestParam(required = false) String date,       //  YYYY-MM-DD (병원/호텔 공통)
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
-        final java.time.LocalDate filterDate = (date != null && !date.isBlank())
-                ? java.time.LocalDate.parse(date, java.time.format.DateTimeFormatter.ISO_DATE)
+        final LocalDate filterDate = (date != null && !date.isBlank())
+                ? LocalDate.parse(date, DateTimeFormatter.ISO_DATE)
                 : null;
 
-        java.util.List<java.util.Map<String, Object>> list = new java.util.ArrayList<>();
+        List<Map<String, Object>> list = new ArrayList<>();
 
         // ===== 병원 =====
         if (type == null || "HOSPITAL".equalsIgnoreCase(type)) {
@@ -84,8 +85,8 @@ public class AdminVenueController {
 
             // (옵션) 날짜/의사 필터
             if (filterDate != null || doctorId != null) {
-                java.time.LocalDateTime start = (filterDate != null) ? filterDate.atStartOfDay() : null;
-                java.time.LocalDateTime end   = (filterDate != null) ? filterDate.plusDays(1).atStartOfDay().minusNanos(1) : null;
+                LocalDateTime start = (filterDate != null) ? filterDate.atStartOfDay() : null;
+                LocalDateTime end   = (filterDate != null) ? filterDate.plusDays(1).atStartOfDay().minusNanos(1) : null;
 
                 rows = rows.stream().filter(r -> {
                     if (doctorId != null && (r.getDoctorId() == null || !doctorId.equals(r.getDoctorId()))) {
