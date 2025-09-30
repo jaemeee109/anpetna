@@ -44,7 +44,7 @@ export default function RequireLogin({ children }: { children: React.ReactNode }
       <div className="auth-wall">
         <p>로그인한 사람만 볼 수 있습니다.</p>
         <p>
-          <Link href={`/login?next=${next}`} className="btn-3d btn-white">
+          <Link href={`/member/login`} className="btn-3d btn-white">
             로그인하기
           </Link>
         </p>
