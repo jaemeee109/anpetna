@@ -1,28 +1,37 @@
 package com.anpetna.board.service;
 
 import com.anpetna.board.constant.BoardType;
+import com.anpetna.board.constant.LikeTargetType;
 import com.anpetna.board.domain.BoardEntity;
+import com.anpetna.board.domain.LikeEntity;
 import com.anpetna.board.dto.BoardDTO;
 import com.anpetna.board.dto.ImageOrderReq;
 import com.anpetna.board.dto.createBoard.CreateBoardReq;
 import com.anpetna.board.dto.createBoard.CreateBoardRes;
 import com.anpetna.board.dto.deleteBoard.DeleteBoardReq;
 import com.anpetna.board.dto.deleteBoard.DeleteBoardRes;
+import com.anpetna.board.dto.likeCountTop5.LikeCountTop5Res;
+import com.anpetna.board.dto.noticeTop5.NoticeTop5Res;
 import com.anpetna.board.dto.readOneBoard.ReadOneBoardReq;
 import com.anpetna.board.dto.readOneBoard.ReadOneBoardRes;
 import com.anpetna.board.dto.updateBoard.UpdateBoardReq;
 import com.anpetna.board.dto.updateBoard.UpdateBoardRes;
+import com.anpetna.board.event.BoardCreatedEvent;
 import com.anpetna.board.repository.BoardJpaRepository;
+import com.anpetna.board.repository.LikeJpaRepository;
 import com.anpetna.core.coreDto.PageRequestDTO;
 import com.anpetna.core.coreDto.PageResponseDTO;
 import com.anpetna.image.domain.ImageEntity;
 import com.anpetna.image.dto.ImageDTO;
 import com.anpetna.image.service.LocalStorage;
+import com.anpetna.notification.feature.like.service.LikeNotificationService;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -49,6 +58,9 @@ public class BoardServiceImpl implements BoardService {
     private final BoardJpaRepository boardJpaRepository;
     private final LocalStorage localStorage;
     private final ModelMapper modelMapper;
+    private final ApplicationEventPublisher publisher;
+    private final LikeNotificationService likeNotificationService;
+    private final LikeJpaRepository likeJpaRepository; // 공용 좋아요 테이블 레포지토리 주입 (중복 좋아요 방지/토글 판정용)
 
     /* ==================== 관리자 판별용 메서드 추가 ==================== */
     // ★★★ 공통 유틸: 관리자 여부 판별
@@ -123,6 +135,19 @@ public class BoardServiceImpl implements BoardService {
 
         // 4) 저장 & 응답 매핑 (ModelMapper)
         BoardEntity saved = boardJpaRepository.save(boardEntity);
+
+        // ★ NEW: 게시글 저장 성공 → 도메인 이벤트 발행 (커밋 후 리스너에서 처리)
+        publisher.publishEvent(
+                BoardCreatedEvent.builder()
+                        .bno(saved.getBno())
+                        .boardType(saved.getBoardType())
+                        .bWriter(saved.getBWriter())
+                        .bTitle(saved.getBTitle())
+                        .bContent(saved.getBContent())
+                        .build()
+        );
+
+
         return modelMapper.map(saved, CreateBoardRes.class);
     }
 
@@ -137,7 +162,7 @@ public class BoardServiceImpl implements BoardService {
     @Override
     @Transactional(readOnly = true)
     public PageResponseDTO<BoardDTO> readAllBoard(PageRequestDTO pr) {
-        String boardType = pr.getBoardType();
+        String boardTypeStr = pr.getBoardType();
         String keyword = pr.getKeyword();
         String[] types = pr.getTypes();
 
@@ -147,10 +172,22 @@ public class BoardServiceImpl implements BoardService {
         Pageable pageable = PageRequest.of(Math.max(pr.getPage() - 1, 0), Math.max(pr.getSize(), 1));
 
         Page<BoardEntity> page;
+
         if (hasSearch) {
-            page = boardJpaRepository.search(pageable, types, keyword);
+            // String -> BoardType(enum) 변환 (대소문자 보정)
+            BoardType bt = null;
+            if (boardTypeStr != null && !boardTypeStr.isBlank()) {
+                try {
+                    bt = BoardType.valueOf(boardTypeStr.toUpperCase());
+                } catch (IllegalArgumentException ignore) {
+                    bt = null; // 잘못된 값이면 필터 제외
+                }
+            }
+
+            page = boardJpaRepository.searchByBoardType(pageable, bt, types, keyword);
         } else {
-            page = boardJpaRepository.findByBoardTypeSafe(boardType, pageable);
+            // 검색이 없을 때는 기존 safe 쿼리 그대로 사용 (String boardType 사용)
+            page = boardJpaRepository.findByBoardTypeSafe(boardTypeStr, pageable);
         }
 
         List<BoardDTO> list = page.map(BoardDTO::new).getContent();
@@ -162,15 +199,30 @@ public class BoardServiceImpl implements BoardService {
                 .build();
     }
 
+
     @Override
     @Transactional(readOnly = true)
     public PageResponseDTO<BoardDTO> readAll(BoardType type, String category, PageRequestDTO pr) {
-        Pageable pageable = PageRequest.of(Math.max(pr.getPage() - 1, 0), Math.max(pr.getSize(), 1));
+        // 검색 파라미터
+        String keyword = pr.getKeyword();
+        String[] types = pr.getTypes();
+        boolean hasSearch = (keyword != null && !keyword.isBlank())
+                || (types != null && types.length > 0);
+
+        Pageable pageable = PageRequest.of(
+                Math.max(pr.getPage() - 1, 0),
+                Math.max(pr.getSize(), 1)
+        );
 
         Page<BoardEntity> page;
-        if (type == BoardType.FAQ && category != null && !category.isBlank()) {
+
+        if (hasSearch) {
+            // ★ 검색이 있는 경우: boardType까지 where에 포함
+            page = boardJpaRepository.searchByBoardType(pageable, type, types, keyword);
+        } else if (type == BoardType.FAQ && category != null && !category.isBlank()) {
             page = boardJpaRepository.findByBoardTypeAndCategory(type, category, pageable);
         } else {
+            // 검색이 없으면 안전 조회
             page = boardJpaRepository.findByBoardTypeSafe(type == null ? null : type.name(), pageable);
         }
 
@@ -182,6 +234,7 @@ public class BoardServiceImpl implements BoardService {
                 .total((int) page.getTotalElements())
                 .build();
     }
+
 
     /* ============================ 상세 ============================ */
     @Override
@@ -202,10 +255,12 @@ public class BoardServiceImpl implements BoardService {
 
         return ReadOneBoardRes.builder()
                 .bno(e.getBno())
-                .bTitle(e.getBTitle())
                 .bWriter(e.getBWriter())
+                .bTitle(e.getBTitle())
                 .bContent(e.getBContent())
                 .bLikeCount(e.getBLikeCount())
+                .noticeFlag(Boolean.TRUE.equals(e.getNoticeFlag()))
+                .isSecret(Boolean.TRUE.equals(e.getIsSecret()))
                 .images(images)
                 .createDate(e.getCreateDate())
                 .latestDate(e.getLatestDate())
@@ -349,20 +404,85 @@ public class BoardServiceImpl implements BoardService {
     @Override
     @Transactional
     public UpdateBoardRes likeBoard(Long bno, String memberId) {
+        // 0) 인증 가드
         if (memberId == null || memberId.isBlank()) {
             throw new AccessDeniedException("로그인이 필요합니다.");
         }
 
+        // 1) 대상 게시글 존재 확인 (무결성 보장)
         BoardEntity e = boardJpaRepository.findById(bno)
                 .orElseThrow(() -> new RuntimeException("존재하지 않는 게시글입니다."));
 
-        int currentLike = (e.getBLikeCount() == null ? 0 : e.getBLikeCount());
-        e.setBLikeCount(currentLike + 1);
+        // 2) 현재 사용자가 이 게시글을 이미 좋아요 눌렀는지 조회 (공용 like 테이블)
+        boolean exists = likeJpaRepository.existsByTargetTypeAndTargetIdAndMemberId(
+                LikeTargetType.BOARD, bno, memberId
+        );
 
-        return UpdateBoardRes.builder()
-                .bno(e.getBno())
-                .bLikeCount(e.getBLikeCount())
-                .build();
+        if (exists) {
+            // 3-A) 이미 눌린 상태 → "취소" (좋아요 기록 삭제 + 카운트 -1)
+            likeJpaRepository.findByTargetTypeAndTargetIdAndMemberId(
+                    LikeTargetType.BOARD, bno, memberId).ifPresent(likeJpaRepository::delete);
+
+            // 동시성 안전한 원자적 감소(하한 0)
+            boardJpaRepository.decBoardLike(bno);
+
+            // 최신 카운트는 공용 like 테이블에서 집계 (원본 컬럼은 화면 정렬용 캐시)
+            long latest = likeJpaRepository.countByTargetTypeAndTargetId(LikeTargetType.BOARD, bno);
+
+            return UpdateBoardRes.builder()
+                    .bno(e.getBno())
+                    .bLikeCount((int) latest)
+                    .build();
+        } else {
+            // 3-B) 아직 안 눌림 → "좋아요" (기록 저장 + 카운트 +1)
+            try {
+                likeJpaRepository.save(LikeEntity.builder()
+                        .targetType(LikeTargetType.BOARD)
+                        .targetId(bno)
+                        .memberId(memberId)
+                        .build()
+                );
+                // 동시성 안전한 원자적 증가
+                boardJpaRepository.incBoardLike(bno);
+            } catch (DataIntegrityViolationException dup) {
+                // (경쟁 상황) 같은 시점에 다른 트랜잭션이 먼저 insert한 경우
+                // → 최종 상태는 "좋아요됨"이므로 그대로 진행
+            }
+
+            // 알림(성공/중복 상관없이 최종 좋아요 상태가 ON이면 발송)
+            try {
+                likeNotificationService.notifyBoardLike(e, memberId);
+            } catch (Exception ex) {
+                log.warn("notifyBoardLike failed: bno={}, actor={}", bno, memberId, ex);
+            }
+
+            long latest = likeJpaRepository.countByTargetTypeAndTargetId(LikeTargetType.BOARD, bno);
+
+            return UpdateBoardRes.builder()
+                    .bno(e.getBno())
+                    .bLikeCount((int) latest)
+                    .build();
+        }
+    }
+
+    /* ============================ 공지글 최신순 5개 ============================ */
+    @Override
+    public List<NoticeTop5Res> getNoticeTop5() {
+        Pageable top5 = PageRequest.of(0, 5);
+        return boardJpaRepository.noticeCreateDateTop5(BoardType.NOTICE, top5)
+                .stream()
+                .map(NoticeTop5Res::from)
+                .toList();
+    }
+
+    /* ============================ 게시물 좋아요 순 5개 ============================ */
+    @Override
+    public List<LikeCountTop5Res> getLikeCountTop5() {
+        Pageable top5 = PageRequest.of(0, 5);
+        return boardJpaRepository.freeLikeCountTop5(BoardType.FREE, top5)
+                .stream()
+                .map(LikeCountTop5Res::from)
+                .toList();
     }
 }
 

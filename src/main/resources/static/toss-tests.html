@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>주문 조회 → 결제(토스 위젯 v2) → 자동 승인</title>
+
+  <!-- ✅ 토스 결제위젯 v2 -->
+  <script src="https://js.tosspayments.com/v2/standard"></script>
+
+  <style>
+    :root { --bg:#0b0f14; --card:#121826; --muted:#9aa4b2; --text:#e5e7eb; --accent:#60a5fa; --good:#22c55e; --bad:#ef4444; --warn:#f59e0b; --border:#1f2937; }
+    *{box-sizing:border-box}
+    body{margin:0;padding:24px;background:var(--bg);color:var(--text);font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial;line-height:1.45}
+    h1{font-size:22px;margin:0 0 12px} h2{font-size:16px;margin:22px 0 12px;color:var(--muted)}
+    .wrap{max-width:1000px;margin:0 auto;display:grid;gap:16px}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px;box-shadow:0 8px 30px rgba(0,0,0,0.25)}
+    .grid{display:grid;gap:12px}
+    .row{display:grid;grid-template-columns:220px 1fr;gap:10px;align-items:center}
+    label{color:var(--muted);font-size:14px}
+    input,button{font-size:14px;border-radius:10px;border:1px solid var(--border);background:#0b1220;color:var(--text);padding:10px 12px}
+    input:read-only{opacity:.8}
+    button{cursor:pointer} button.primary{background:#1e3a8a;color:white}
+    .btns{display:flex;gap:8px;flex-wrap:wrap}
+    pre{margin:0;padding:12px;background:#0b1220;border:1px dashed #1f2937;border-radius:10px;white-space:pre-wrap;word-break:break-word;max-height:360px;overflow:auto}
+    .result{display:grid;grid-template-columns:220px 1fr;gap:8px;margin-top:8px;padding:10px;border:1px dashed var(--border);border-radius:10px;background:#0c1220}
+    .result div span{color:var(--muted)}
+    .pill{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border-radius:999px;border:1px solid var(--border);background:#0b1220}
+    .ok{color:var(--good);font-weight:600}
+    .bad{color:var(--bad);font-weight:600}
+    .muted{color:var(--muted)}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <h1>주문서(DB) → 결제(토스 위젯 v2) 단일 페이지</h1>
+    <div class="muted">주문번호로 주문서를 불러오고, 그 주문으로 <b>prepare</b> → (성공 시) <b>confirm</b>까지 처리합니다.
+      결제위젯 금액은 <b>주문서 총액</b> 및 <b>prepare 응답</b> 기준으로 자동 반영됩니다.</div>
+  </div>
+
+  <!-- 0) 주문서 조회 -->
+  <div class="card grid">
+    <h2>0) 주문서 조회 (GET /api/order/{orderNo})</h2>
+    <div class="row">
+      <label>주문번호(orderNo)</label>
+      <input id="orderNo" placeholder="예) 1001" />
+    </div>
+    <div class="btns">
+      <button id="btn-fetch-order" class="primary">주문서 불러오기</button>
+      <button id="btn-clear-order">초기화</button>
+      <span class="pill">상태: <span id="order-state" class="muted" style="margin-left:6px">대기</span></span>
+    </div>
+    <pre id="order-log">주문번호를 입력하고 '주문서 불러오기'를 누르세요…</pre>
+    <div id="order-result" class="result" style="display:none">
+      <div><span>주문번호</span></div><div id="oi-orderNo">-</div>
+      <div><span>회원ID</span></div><div id="oi-memberId">-</div>
+      <div><span>총액(orderTotalPrice)</span></div><div id="oi-totalPrice">-</div>
+      <div><span>상태(orderStatus)</span></div><div id="oi-status">-</div>
+    </div>
+  </div>
+
+  <!-- 1) 결제 준비(prepare) -->
+  <div class="card grid">
+    <h2>1) 결제 준비 (POST /api/pay/toss/prepare)</h2>
+    <div class="muted">기본적으로 <b>주문서의 값</b>을 사용합니다. 필요하면 표시용 주문명을 수정할 수 있습니다.</div>
+    <div class="row"><label>표시용 주문명(orderName, 선택)</label><input id="orderName" placeholder="예) 주문 #1001" /></div>
+    <div class="row"><label>고객명(customerName, 선택)</label><input id="customerName" placeholder="예) 홍길동" /></div>
+    <div class="btns">
+      <button id="btn-prepare" class="primary">prepare 호출</button>
+      <span class="pill">위젯 금액: <span id="widget-amount" class="muted">미설정</span></span>
+    </div>
+    <pre id="prepare-log">prepare 요청/응답이 여기에 표시됩니다…</pre>
+    <div id="prepare-result" class="result" style="display:none">
+      <div><span>orderId</span></div><div id="pr-orderId">-</div>
+      <div><span>orderNo</span></div><div id="pr-orderNo">-</div>
+      <div><span>orderName</span></div><div id="pr-orderName">-</div>
+      <div><span>totalAmount</span></div><div id="pr-totalAmount">-</div>
+    </div>
+  </div>
+
+  <!-- 2) 결제위젯 & 결제 버튼 -->
+  <div class="card grid">
+    <h2>2) 결제위젯</h2>
+    <div id="payment-method"></div>
+    <div id="agreement" style="margin-top:8px"></div>
+    <button class="button" id="payment-button" style="margin-top: 12px">결제하기</button>
+    <pre id="widget-log">위젯 초기화/렌더 로그…</pre>
+  </div>
+
+  <!-- 3) 결제 승인(confirm) -->
+  <div class="card grid">
+    <h2>3) 결제 승인 (POST /api/pay/toss/confirm)</h2>
+    <div class="muted">성공 리다이렉트로 돌아오면 URL의 <code>paymentKey</code>, <code>orderId</code>, <code>amount</code>를 자동 감지하여 승인 호출합니다.</div>
+    <div class="row"><label>paymentKey</label><input id="paymentKey" placeholder="성공 URL에서 자동 입력" /></div>
+    <div class="row"><label>orderId</label><input id="confirmOrderId" placeholder="prepare 응답에서 자동 입력" /></div>
+    <div class="row"><label>amount</label><input id="confirmAmount" type="number" placeholder="prepare 응답에서 자동 입력" /></div>
+    <div class="btns">
+      <button id="btn-confirm" class="primary">confirm 호출</button>
+      <span class="pill" id="confirm-status">대기</span>
+    </div>
+    <pre id="confirm-log">confirm 요청/응답이 여기에 표시됩니다…</pre>
+    <div id="confirm-result" class="result" style="display:none">
+      <div><span>orderId</span></div><div id="cf-orderId">-</div>
+      <div><span>approvedAmount</span></div><div id="cf-approvedAmount">-</div>
+      <div><span>method</span></div><div id="cf-method">-</div>
+      <div><span>orderName</span></div><div id="cf-orderName">-</div>
+      <div><span>status</span></div><div id="cf-status">-</div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ---------------- helpers ----------------
+  function $(id){ return document.getElementById(id); }
+  function setText(id, v){ var el=$(id); if(el){ el.textContent = (v!=null ? v : '-') + ''; } }
+  function setVal(id, v){ var el=$(id); if(el){ el.value = (v!=null ? v : ''); } }
+  function show(id){ var el=$(id); if(el){ el.style.display='grid'; } }
+  function hide(id){ var el=$(id); if(el){ el.style.display='none'; } }
+  function pretty(o){ try{ return JSON.stringify(o,null,2) }catch(e){ return String(o) } }
+  function qs(k){ var u=new URL(location.href); return u.searchParams.get(k) || ''; }
+
+  // ---- prepare 응답 정규화 (래핑/키 차이 흡수) ----
+  function normalizePrepareResponse(raw){
+    var d = raw;
+    if (d && typeof d === 'object') {
+      if (d.data     && typeof d.data     === 'object') d = d.data;
+      else if (d.result  && typeof d.result  === 'object') d = d.result;
+      else if (d.payload && typeof d.payload === 'object') d = d.payload;
+    }
+    var orderId   = (d && (d.orderId ?? d.orderTossId ?? d.id ?? d.order_id)) ?? null;
+    var orderName = (d && (d.orderName ?? d.name ?? d.order_name)) ?? null;
+
+    var amt = d ? (d.totalAmount ?? d.amount ?? d.total_amount) : null;
+    if (typeof amt === 'string') amt = Number(amt.replace(/[^\d.-]/g,''));
+    if (typeof amt === 'number' && !Number.isFinite(amt)) amt = null;
+
+    return { orderId, orderName, totalAmount: (amt!=null? Number(amt): null) };
+  }
+
+  // ---------------- 설정/상태 ----------------
+  var CLIENT_KEY = "test_gck_docs_Ovk5rk1EwkEbP0W43n07xlzm"; // 테스트 gck; 필요시 교체
+  var tossPayments = null;
+  var widgets = null;
+  var currentCustomerKey = null;
+  var state = {
+    order: null, // GET /api/order 응답
+    prepared: { orderId:null, orderNo:null, orderName:null, amount:null } // prepare 응답
+  };
+
+  // 결제 버튼은 초기 비활성화
+  document.getElementById('payment-button').disabled = true;
+
+  // 위젯 인스턴스 보장 + 렌더
+  async function ensureWidgets(customerKey){
+    if(!tossPayments){ tossPayments = TossPayments(CLIENT_KEY); }
+    if(!widgets || currentCustomerKey !== customerKey){
+      widgets = tossPayments.widgets({ customerKey: customerKey });
+      currentCustomerKey = customerKey;
+      // 최소 금액 먼저 설정(필수)
+      await widgets.setAmount({ currency:'KRW', value: 100 });
+      await Promise.all([
+        widgets.renderPaymentMethods({ selector:'#payment-method' }),
+        widgets.renderAgreement({ selector:'#agreement' })
+      ]);
+      setText('widget-log', 'widgets 렌더링 완료 (초기 100원 → 주문/prepare로 덮어씀)');
+    }
+  }
+
+  // ---------------- 0) 주문서 조회 ----------------
+  $('btn-fetch-order').addEventListener('click', async function(){
+    var orderNo = $('orderNo').value.trim();
+    if(!orderNo){ alert('주문번호를 입력하세요.'); return; }
+
+    setText('order-state','조회 중…'); $('order-state').className='muted';
+    setText('order-log', '요청 → GET /api/order/' + orderNo);
+    try{
+      var res = await fetch('/api/order/' + orderNo, { method:'GET' });
+      var data = await res.json().catch(function(){ return {}; });
+      setText('order-log', $('order-log').textContent + '\n응답 ← (' + res.status + ')\n' + pretty(data));
+      if(res.ok){
+        state.order = data;
+        setText('oi-orderNo', data.orderNo);
+        setText('oi-memberId', data.memberId);
+        setText('oi-totalPrice', data.orderTotalPrice);
+        setText('oi-status', data.orderStatus);
+        show('order-result');
+        setText('order-state','조회 성공'); $('order-state').className='ok';
+
+        // 표시용 주문명 기본값
+        if(data.orderNo!=null){ setVal('orderName', '주문 #' + data.orderNo); }
+
+        // 위젯 준비(회원이면 memberId = 고정 customerKey, 비회원이면 익명)
+        var ck = (data.memberId && String(data.memberId).trim().length>0) ? String(data.memberId) : TossPayments.ANONYMOUS;
+        await ensureWidgets(ck);
+
+        // 주문서 총액을 위젯 금액으로 즉시 반영
+        var orderAmt = (data.orderTotalPrice!=null ? Number(data.orderTotalPrice) : 0);
+        if(widgets && orderAmt>0){
+          await widgets.setAmount({ currency:'KRW', value: orderAmt });
+          setText('widget-amount', String(orderAmt));
+          setText('widget-log', $('widget-log').textContent + '\n[order] 위젯 금액 = ' + orderAmt);
+        }
+      }else{
+        setText('order-state','조회 실패'); $('order-state').className='bad';
+      }
+    }catch(e){
+      setText('order-log', $('order-log').textContent + '\n에러: ' + String(e));
+      setText('order-state','네트워크 오류'); $('order-state').className='bad';
+    }
+  });
+
+  $('btn-clear-order').addEventListener('click', function(){
+    setVal('orderNo',''); hide('order-result');
+    setText('order-log','주문번호를 입력하고 \'주문서 불러오기\'를 누르세요…');
+    setText('order-state','대기'); $('order-state').className='muted';
+    setVal('orderName',''); setVal('customerName','');
+    state.order=null; state.prepared={orderId:null,orderNo:null,orderName:null,amount:null};
+    setText('widget-amount','미설정');
+    document.getElementById('payment-button').disabled = true;
+  });
+
+  // ---------------- 1) prepare ----------------
+  $('btn-prepare').addEventListener('click', async function(){
+    var orderNoShown = $('oi-orderNo').textContent.trim();
+    if(!orderNoShown || orderNoShown==='-'){ alert('먼저 주문서를 불러오세요.'); return; }
+
+    var payload = { orderNo: Number(orderNoShown) };
+    var nm = $('orderName').value.trim();
+    var cn = $('customerName').value.trim();
+    if(nm) payload.orderName = nm;
+    if(cn) payload.customerName = cn;
+
+    setText('prepare-log', '요청 → POST /api/pay/toss/prepare\n' + pretty(payload));
+    try{
+      var res = await fetch('/api/pay/toss/prepare', {
+        method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
+      });
+      var data = await res.json().catch(function(){ return {}; });
+      setText('prepare-log', $('prepare-log').textContent + '\n응답 ← (' + res.status + ')\n' + pretty(data));
+
+      // ---- 실패/래핑 방어 ----
+      if(!res.ok){
+        alert('prepare 실패: HTTP ' + res.status);
+        return;
+      }
+      if (data && data.isSuccess === false) {
+        alert('prepare 실패: ' + (data.resMessage || '알 수 없는 오류'));
+        return;
+      }
+
+      // ★ 정규화
+      var p = normalizePrepareResponse(data);
+      if (!p || !p.orderId || !(Number(p.totalAmount) > 0)) {
+        alert('prepare 응답이 올바르지 않습니다. (orderId/totalAmount 확인)');
+        return;
+      }
+
+      // ---- 상태 반영 ----
+      state.prepared.orderId   = p.orderId;
+      state.prepared.orderNo   = Number(orderNoShown); // DTO에 orderNo 없으면 조회값 사용
+      state.prepared.orderName = (p.orderName!=null ? p.orderName : (nm || ('주문 #' + orderNoShown)));
+      state.prepared.amount    = Number(p.totalAmount);
+
+      setText('pr-orderId', state.prepared.orderId);
+      setText('pr-orderNo', state.prepared.orderNo);
+      setText('pr-orderName', state.prepared.orderName);
+      setText('pr-totalAmount', state.prepared.amount);
+      show('prepare-result');
+
+      // confirm 입력 자동 세팅
+      setVal('confirmOrderId', state.prepared.orderId || '');
+      setVal('confirmAmount', state.prepared.amount);
+
+      // 결제 버튼 활성화
+      document.getElementById('payment-button').disabled = false;
+
+      // prepare 응답 금액으로 위젯 금액 덮어쓰기
+      if (widgets && state.prepared.amount>0) {
+        await widgets.setAmount({ currency:'KRW', value: state.prepared.amount });
+        setText('widget-amount', String(state.prepared.amount));
+        setText('widget-log', $('widget-log').textContent + '\n[prepare] 위젯 금액 = ' + state.prepared.amount);
+      }
+    }catch(e){
+      setText('prepare-log', $('prepare-log').textContent + '\n에러: ' + String(e));
+    }
+  });
+
+  // ---------------- 2) 결제하기(위젯) ----------------
+  document.getElementById('payment-button').addEventListener('click', async function(){
+    if(!widgets){ alert('먼저 주문서를 불러오고 prepare까지 실행하세요.'); return; }
+    if(!state.prepared.orderId){
+      alert('먼저 [주문서 불러오기] → [prepare 호출]을 완료해주세요.');
+      return;
+    }
+    var orderId   = state.prepared.orderId;
+    var orderName = state.prepared.orderName || '주문';
+
+    var successUrl = window.location.href; // 이 페이지로 리다이렉트 → 자동 confirm
+    var failUrl    = window.location.href;
+
+    // 결제 직전 금액 동기화(안전)
+    if (state.prepared.amount>0) {
+      await widgets.setAmount({ currency:'KRW', value: Number(state.prepared.amount) });
+    }
+
+    try{
+      await widgets.requestPayment({
+        orderId: orderId,
+        orderName: orderName,
+        successUrl: successUrl,
+        failUrl: failUrl
+      });
+    }catch(e){
+      setText('widget-log', $('widget-log').textContent + '\nrequestPayment 에러: ' + String(e));
+    }
+  });
+
+  // ---------------- 3) confirm ----------------
+  async function callConfirm(pk, oid, amt){
+    var payload = { paymentKey: pk, orderId: oid, totalAmount: Number(amt||0) };
+    setText('confirm-log', '요청 → POST /api/pay/toss/confirm\n' + pretty(payload));
+    setText('confirm-status','승인 중…'); $('confirm-status').className='pill';
+    try{
+      var res = await fetch('/api/pay/toss/confirm', {
+        method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
+      });
+      var data = await res.json().catch(function(){ return {}; });
+      setText('confirm-log', $('confirm-log').textContent + '\n응답 ← (' + res.status + ')\n' + pretty(data));
+      if(res.ok){
+        setText('cf-orderId', data.orderId);
+        setText('cf-approvedAmount', data.approvedAmount);
+        setText('cf-method', data.method);
+        setText('cf-orderName', data.orderName);
+        setText('cf-status', data.status);
+        show('confirm-result');
+        setText('confirm-status','승인 성공'); $('confirm-status').className='pill ok';
+      }else{
+        setText('confirm-status','승인 실패'); $('confirm-status').className='pill bad';
+      }
+    }catch(e){
+      setText('confirm-log', $('confirm-log').textContent + '\n에러: ' + String(e));
+      setText('confirm-status','네트워크 오류'); $('confirm-status').className='pill bad';
+    }
+  }
+
+  document.getElementById('btn-confirm').addEventListener('click', async function(){
+    var pk  = $('paymentKey').value.trim();
+    var oid = $('confirmOrderId').value.trim();
+    var amt = $('confirmAmount').value.trim();
+    if(!pk || !oid){ alert('paymentKey와 orderId를 입력하세요.'); return; }
+    if(!amt || Number(amt)<=0){ alert('amount를 확인하세요.'); return; }
+    await callConfirm(pk, oid, amt);
+  });
+
+  // ---------------- 성공 URL 자동 승인 ----------------
+  window.addEventListener('DOMContentLoaded', async function(){
+    var pk = qs('paymentKey'), oid = qs('orderId'), amt = qs('amount');
+    if(pk && oid && amt){
+      setVal('paymentKey', pk); setVal('confirmOrderId', oid); setVal('confirmAmount', amt);
+      setText('confirm-status','성공 URL 감지 → 자동 승인 시도'); $('confirm-status').className='pill';
+      await callConfirm(pk, oid, amt);
+    }
+  });
+</script>
+</body>
+</html>

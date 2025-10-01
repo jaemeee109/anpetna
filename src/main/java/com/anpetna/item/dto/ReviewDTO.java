@@ -1,10 +1,15 @@
 package com.anpetna.item.dto;
 
-import com.anpetna.image.dto.ImageListDTO;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
-public class ReviewDTO extends ImageListDTO {
+@Getter
+@Setter
+@NoArgsConstructor
+public class ReviewDTO {
 
     private Long reviewId;
 
@@ -15,5 +20,9 @@ public class ReviewDTO extends ImageListDTO {
     private LocalDateTime regDate;
 
     private ItemDTO itemId;
+
+    private String imageUrl;
+
+    private String writer;
 
 }

@@ -17,7 +17,6 @@ import java.util.List;
 @AllArgsConstructor
 @Builder
 @Check(constraints = "review_rating BETWEEN 1 AND 5")  // 애플리케이션 레벨 제약
-@ToString(exclude = "images")
 public class ReviewEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -42,18 +41,8 @@ public class ReviewEntity {
     @JoinColumn(name = "member_id", nullable = false, referencedColumnName = "member_id")
     private MemberEntity memberId;
 
-    @Builder.Default
-    @OneToMany(mappedBy = "review", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<ImageEntity> images = new ArrayList<>();
-    //  최대 5장
-
-    public void addImage(ImageEntity image) {
-        images.add(image);
-        image.setReview(this);
-    }
-    public void removeImage(ImageEntity image) {
-        images.remove(image);
-        image.setReview(null);
-    }
+    @OneToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    @JoinColumn(name = "image")
+    private ImageEntity image;
 
 }

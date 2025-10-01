@@ -54,18 +54,29 @@ public class BoardGuard {
     }
 
     /* ========= 상세 읽기 =========
-       - NOTICE/FAQ: 비회원 포함 모두 허용
-       - FREE/QNA  : 회원 이상(= 로그인 필요)
-         * QNA는 개인정보 성격 → 본인 또는 관리자만 허용
+   - NOTICE: 로그인 필수
+   - FAQ   : 비회원 포함 모두 허용
+   - FREE  : 로그인 필수
+   - QNA   : 작성자 또는 관리자만
+   - 비밀글: 작성자 또는 관리자만
     */
     public boolean canReadOne(Long bno, Authentication a) {
         BoardEntity e = boardRepo.findById(bno).orElse(null);
         if (e == null) return false;
 
+        boolean owner = isOwner(e, a);
+        boolean admin = isAdmin(a);
+
+        // 비밀글이면 작성자 또는 관리자만
+        if (Boolean.TRUE.equals(e.getIsSecret())) {
+            return owner || admin;
+        }
+
         return switch (e.getBoardType()) {
-            case NOTICE, FAQ -> true;
-            case FREE -> isAuth(a); // 로그인만 되어 있으면 열람 가능
-            case QNA -> isAdmin(a) || isOwner(e, a); // 본인/관리자만
+            case NOTICE -> isAuth(a);
+            case FAQ -> true;
+            case FREE -> isAuth(a);
+            case QNA -> admin || owner;
             default -> true;
         };
     }

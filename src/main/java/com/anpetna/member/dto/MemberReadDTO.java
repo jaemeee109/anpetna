@@ -22,6 +22,7 @@ public class MemberReadDTO {
                 .memberEmail(memberEntity.getMemberEmail())
                 .memberPhone(memberEntity.getMemberPhone())
                 .memberRoadAddress(memberEntity.getMemberRoadAddress())
+                .memberDetailAddress(memberEntity.getMemberDetailAddress())
                 .memberZipCode(memberEntity.getMemberZipCode())
                 .social(memberEntity.isMemberSocial())
                 .memberHasPet(memberEntity.getMemberHasPet())

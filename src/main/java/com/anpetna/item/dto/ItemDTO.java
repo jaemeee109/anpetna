@@ -1,16 +1,16 @@
 package com.anpetna.item.dto;
 
-import com.anpetna.image.dto.ImageListDTO;
 import com.anpetna.item.constant.ItemCategory;
 import com.anpetna.item.constant.ItemSellStatus;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.ToString;
+import lombok.*;
+
+import java.util.List;
 
 @Getter
+@Setter
 @ToString
 @NoArgsConstructor
-public class ItemDTO extends ImageListDTO {
+public class ItemDTO {
 
     private Long itemId; // 상품코드
 
@@ -25,5 +25,9 @@ public class ItemDTO extends ImageListDTO {
     private ItemSellStatus itemSellStatus; // 상품 판매상태
 
     private ItemCategory itemCategory; // 상품 카테고리
+
+    private List<String> thumbnails;    // 썸네일 url 목록
+
+    private int quantity;   // 장바구니에 담긴 개수
 
 }

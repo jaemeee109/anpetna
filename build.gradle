@@ -34,65 +34,64 @@ repositories {
 }
 
 dependencies {
-    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
-    implementation 'org.springframework.boot:spring-boot-starter-validation'
-    implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
-    implementation 'org.springframework.boot:spring-boot-starter-security'
+
     implementation 'org.springframework.boot:spring-boot-starter-web'
     //developmentOnly 'org.springframework.boot:spring-boot-devtools'
-    runtimeOnly 'org.mariadb.jdbc:mariadb-java-client'
-    annotationProcessor 'org.projectlombok:lombok'
-    testImplementation 'org.springframework.boot:spring-boot-starter-test'
-    testImplementation 'org.springframework.security:spring-security-test'
-    testImplementation 'com.h2database:h2'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-    implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
-    implementation 'nz.net.ultraq.thymeleaf:thymeleaf-layout-dialect:3.1.0'
-
-    compileOnly 'org.projectlombok:lombok'                                  /* 롬북 */
-    annotationProcessor 'org.projectlombok:lombok'                          /* 롬북 */
-    testCompileOnly 'org.projectlombok:lombok'                              /* 롬북 */
-    testAnnotationProcessor 'org.projectlombok:lombok'                      /* 롬북 */
-
-    implementation 'org.modelmapper:modelmapper:3.1.0'
-
-    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
-
     implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.modelmapper:modelmapper:3.1.0'
+    compileOnly 'org.jetbrains:annotations:24.1.0'// JetBrains @NotNull 등 컴파일 전용 어노테이션
 
-    implementation "com.querydsl:querydsl-jpa:${queryDslVersion}:jakarta"
 
+    // ---lombok---
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+    testCompileOnly 'org.projectlombok:lombok'
+    testAnnotationProcessor 'org.projectlombok:lombok'
+
+
+    // ---security---
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'io.jsonwebtoken:jjwt-api:0.11.5'	// jwt - security
     runtimeOnly  'io.jsonwebtoken:jjwt-impl:0.11.5'
     runtimeOnly  'io.jsonwebtoken:jjwt-jackson:0.11.5'	// JSON 직렬화
 
-    // JetBrains @NotNull 등 컴파일 전용 어노테이션
-    compileOnly 'org.jetbrains:annotations:24.1.0'
-    testCompileOnly 'org.jetbrains:annotations:24.1.0'
+
+    // ---data  처리---
+    runtimeOnly 'org.mariadb.jdbc:mariadb-java-client'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation "com.querydsl:querydsl-jpa:${queryDslVersion}:jakarta"
 
     annotationProcessor(
             "jakarta.persistence:jakarta.persistence-api",
             "jakarta.annotation:jakarta.annotation-api",
-            "com.querydsl:querydsl-apt:${queryDslVersion}:jakarta")
+            "com.querydsl:querydsl-apt:${queryDslVersion}:jakarta"
+    )
 
-    //Actuator : 애플리케이션 상태와 운영 정보를 확인할 수 있는 엔드포인트 제공
-    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+
+    // ---배포 / 운영---
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'    //Actuator : 애플리케이션 상태와 운영 정보를 확인할 수 있는 엔드포인트 제공
+
+
+    // ---test---
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.security:spring-security-test'
+    testImplementation 'com.h2database:h2'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    testCompileOnly 'org.jetbrains:annotations:24.1.0'
 }
 
 tasks.named('test') {
     useJUnitPlatform()
 }
-sourceSets {
 
+sourceSets {
     main {
         java {
             srcDirs = [
                     "$projectDir/src/main/java",
-                    "$projectDir/build/generated",
                     "$buildDir/generated/sources/annotationProcessor/java/main"
             ]
         }
     }
 }
-
-compileJava.dependsOn('clean')

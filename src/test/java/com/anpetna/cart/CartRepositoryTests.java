@@ -66,8 +66,8 @@ class CartRepositoryTests {
         item.setItemName("테스트상품");
         item.setItemPrice(10000);
         item.setItemStock(5);
-        item.setItemDetail("상세설명");
-        item.setItemSellStatus(1);
+//        item.setItemDetail("상세설명");
+//        item.setItemSellStatus(1);
         item.setItemSaleStatus(30);
         item.setItemCategory(ItemCategory.FEED);
       //  item.setItemThumbsId("thumb-1");
