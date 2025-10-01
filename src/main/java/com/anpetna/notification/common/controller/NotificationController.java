@@ -5,12 +5,16 @@ import com.anpetna.core.coreDto.PageResponseDTO;
 import com.anpetna.notification.common.dto.MarkReadRes;
 import com.anpetna.notification.common.dto.NotificationDTO;
 import com.anpetna.notification.common.dto.UnreadCountRes;
+import com.anpetna.notification.common.repository.NotificationRepository;
 import com.anpetna.notification.common.service.NotificationService;
 import com.anpetna.notification.common.dto.DeleteNotificationRes;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("/notification")
@@ -18,6 +22,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 public class NotificationController {
 
     private final NotificationService notificationService;
+    private final NotificationRepository notificationRepository;
 
     /** 알림 목록 조회 (전체 또는 unreadOnly=true) */
     @GetMapping
@@ -60,6 +65,14 @@ public class NotificationController {
             @RequestHeader(value = "Last-Event-ID", required = false) String lastEventId
     ) {
         return notificationService.connect(me, lastEventId);
+    }
+
+    /* 알림함에서 클릭한번으로 모든 미읽음 알림을 읽음으로 처리하기 */
+    @PostMapping("/mark-all-read")
+    public Map<String, Object> markAllRead(@AuthenticationPrincipal UserDetails user){
+        String memberId = user.getUsername();
+        int updated = notificationRepository.markAllRead(memberId);
+        return Map.of("ok", true, "updated", updated);
     }
 }
 

@@ -7,6 +7,8 @@ import com.anpetna.board.dto.createBoard.CreateBoardReq;
 import com.anpetna.board.dto.createBoard.CreateBoardRes;
 import com.anpetna.board.dto.deleteBoard.DeleteBoardReq;
 import com.anpetna.board.dto.deleteBoard.DeleteBoardRes;
+import com.anpetna.board.dto.likeCountTop5.LikeCountTop5Res;
+import com.anpetna.board.dto.noticeTop5.NoticeTop5Res;
 import com.anpetna.board.dto.readOneBoard.ReadOneBoardReq;
 import com.anpetna.board.dto.readOneBoard.ReadOneBoardRes;
 import com.anpetna.board.dto.updateBoard.UpdateBoardReq;
@@ -40,4 +42,10 @@ public interface BoardService {
     DeleteBoardRes deleteBoard(DeleteBoardReq deleteBoardReq, String memberId);
 
     UpdateBoardRes likeBoard(Long bno, String memberId);
+
+    // NOTICE 중에서 최신순 5개
+    List<NoticeTop5Res> getNoticeTop5();
+
+    // FREE 게시물 중 좋아요 많은순 5개
+    List<LikeCountTop5Res> getLikeCountTop5();
 }

@@ -1,5 +1,6 @@
 package com.anpetna.pay.service;
 
+import com.anpetna.notification.feature.order.service.OrderNotificationService;
 import com.anpetna.order.domain.OrdersEntity;
 import com.anpetna.pay.constant.TossPaymentMethod;
 import com.anpetna.pay.constant.TossPaymentStatus;
@@ -33,6 +34,7 @@ public class TossPaymentService {
 
     private final RestTemplate restTemplate = new RestTemplate();
     private final TossPaymentRepository tossPaymentRepository;
+    private final OrderNotificationService orderNotificationService;
 
     //결제창 url 생성
     @Transactional
@@ -99,6 +101,7 @@ public class TossPaymentService {
         try {
             ResponseEntity<Map> res = restTemplate.postForEntity(url, entity, Map.class);
             if (!res.getStatusCode().is2xxSuccessful()) {
+                orderNotificationService.notifyOrderFail(orderId);
                 throw new IllegalStateException("결제 승인 실패: http=" + res.getStatusCode() + ", body=" + res.getBody());
             }
             @SuppressWarnings("unchecked")
@@ -107,6 +110,7 @@ public class TossPaymentService {
             return resBody;
 
         } catch (HttpStatusCodeException e) {
+            orderNotificationService.notifyOrderFail(orderId);
             String err = e.getResponseBodyAsString();
             throw new IllegalStateException("Toss confirm error: http=" + e.getStatusCode() + ", body=" + err, e);
         }
@@ -152,6 +156,13 @@ public class TossPaymentService {
 
         tossPaymentRepository.save(entity);
         log.info("[Toss] saved payment. id={}, key={}", entity.getPaymentNo(), paymentKey);
+
+        if (entity.getTossPaymentStatus() == TossPaymentStatus.DONE) {
+            String memberId = order.getMemberId().getMemberId();
+            String orderIdStr = String.valueOf(order.getOrdersId());
+
+            orderNotificationService.notifyOrderSuccess(memberId, amount, orderIdStr);
+        }
     }
 
     // ---------- helpers ----------

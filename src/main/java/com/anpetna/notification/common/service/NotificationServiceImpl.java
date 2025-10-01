@@ -4,9 +4,12 @@ import com.anpetna.core.coreDto.PageRequestDTO;
 import com.anpetna.core.coreDto.PageResponseDTO;
 import com.anpetna.member.domain.MemberEntity;
 import com.anpetna.member.repository.MemberRepository;
+import com.anpetna.notification.common.constant.NotificationType;
+import com.anpetna.notification.common.constant.TargetType;
 import com.anpetna.notification.common.domain.NotificationEntity;
 import com.anpetna.notification.common.dto.*;
 import com.anpetna.notification.common.repository.NotificationRepository;
+import com.anpetna.notification.common.constant.NotificationVariant;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -157,6 +160,10 @@ public class NotificationServiceImpl implements NotificationService {
                     .orElse(null); // 행위자가 삭제/없음 등일 경우 null 허용(알림은 보낼 수 있게)
         }
 
+        NotificationVariant variant = cmd.getVariant() == null
+                ? NotificationVariant.DEFAULT
+                : cmd.getVariant();
+
         // 2) Notification 엔티티 구성 및 저장
         //    - type/targetType/targetId는 알림의 분류와 클릭 시 이동할 대상 식별에 필요
         //    - nTitle/nMessage는 목록·토스트 등에 표시할 요약
@@ -170,6 +177,7 @@ public class NotificationServiceImpl implements NotificationService {
                 .nTitle(cmd.getTitle())
                 .nMessage(cmd.getMessage())
                 .linkUrl(cmd.getLinkUrl())
+                .variant(variant)
                 .isRead(false)                               // 신규 알림은 기본 미읽음
                 .build();
 
@@ -192,4 +200,33 @@ public class NotificationServiceImpl implements NotificationService {
 
         return dto;
     }
+
+    @Override
+    @Transactional
+    public void notify(String receiverMemberId, NotificationType type, TargetType targetType, String targetId) {
+
+        MemberEntity receiver = memberRepository.findByMemberId(receiverMemberId)
+                .orElseThrow(() -> new EntityNotFoundException("receiver not found: " + receiverMemberId));
+
+        NotificationEntity entity = NotificationEntity.builder()
+                .receiver(receiver)
+                .notificationType(type)
+                .targetType(targetType)
+                .targetId(targetId)
+                .isRead(false)
+                .build();
+
+        NotificationEntity saved = repo.save(entity);
+        NotificationDTO dto = NotificationDTO.from(saved);
+        repo.flush();
+
+        afterCommit(() -> sse.broadcast(
+                receiverMemberId,
+                SseEmitter.event()
+                        .name("notification")
+                        .id(saved.getEventId())
+                        .data(dto)
+        ));
+    }
+
 }

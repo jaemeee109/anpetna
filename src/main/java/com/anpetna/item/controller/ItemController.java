@@ -8,6 +8,7 @@ import com.anpetna.item.dto.deleteItem.DeleteItemReq;
 import com.anpetna.item.dto.deleteItem.DeleteItemRes;
 import com.anpetna.item.dto.modifyItem.ModifyItemReq;
 import com.anpetna.item.dto.modifyItem.ModifyItemRes;
+import com.anpetna.item.dto.modifyItem.UpdateItemStockReq;
 import com.anpetna.item.dto.registerItem.RegisterItemReq;
 import com.anpetna.item.dto.registerItem.RegisterItemRes;
 
@@ -28,6 +29,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -104,6 +106,20 @@ public class ItemController {
         var getAllResult = itemService.getAllItems(getReq);
         return new ApiResult<>(getAllResult);
     }
+
+
+
+
+    // ERP 재고
+    @PutMapping("/{itemId}/stock")
+    public ResponseEntity<?> updateItemStock(
+            @PathVariable Long itemId,
+            @RequestBody UpdateItemStockReq req
+    ) {
+        itemService.updateStock(itemId, req.getItemStock());
+        return ResponseEntity.ok(Map.of("itemId", itemId, "itemStock", req.getItemStock(), "res", "UPDATED"));
+    }
+
 
     //REST 철학 : 리소스를 명확하게 표현하고, 동사는 HTTP 메서드로 해결
     //순수 백엔드 설계 + 다양한 클라이언트 (웹, 앱) 를 고려한다면 RESTful이 맞고,

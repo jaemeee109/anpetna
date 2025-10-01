@@ -1,11 +1,13 @@
 package com.anpetna.notification.feature.comment.service;
 
+import com.anpetna.board.constant.BoardType;
 import com.anpetna.board.domain.BoardEntity;
 import com.anpetna.board.domain.CommentEntity;
 import com.anpetna.notification.common.constant.NotificationType;
 import com.anpetna.notification.common.constant.TargetType;
 import com.anpetna.notification.common.dto.CreateNotificationCmd;
 import com.anpetna.notification.common.service.NotificationService;
+import com.anpetna.notification.common.constant.NotificationVariant;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -21,7 +23,16 @@ public class CommentNotificationService {
             return; // 자기 글에 자기 댓글 → 알림 생략
         }
 
-        String title = postAuthorID + "회원님, 게시물에 새로운 댓글이 달렸습니다.";
+        boolean isQna = boardRef.getBoardType() == BoardType.QNA;
+
+        String title = isQna
+                ? "내 QNA에 답변이 달렸습니다."
+                : postAuthorID + "회원님, 게시물에 새로운 댓글이 달렸습니다.";
+
+        NotificationVariant variant = isQna
+                ? NotificationVariant.QNA_COMMENT
+                : NotificationVariant.DEFAULT;
+
         String linkUrl = "/board/readOne/" + boardRef.getBno();
 
         notificationService.createAndPush(
@@ -34,6 +45,7 @@ public class CommentNotificationService {
                         .title(title)
                         .message(comment.getCContent())
                         .linkUrl(linkUrl)
+                        .variant(variant)
                         .build()
         );
     }

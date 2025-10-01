@@ -8,6 +8,8 @@ import com.anpetna.board.dto.createBoard.CreateBoardReq;
 import com.anpetna.board.dto.createBoard.CreateBoardRes;
 import com.anpetna.board.dto.deleteBoard.DeleteBoardReq;
 import com.anpetna.board.dto.deleteBoard.DeleteBoardRes;
+import com.anpetna.board.dto.likeCountTop5.LikeCountTop5Res;
+import com.anpetna.board.dto.noticeTop5.NoticeTop5Res;
 import com.anpetna.board.dto.readOneBoard.ReadOneBoardReq;
 import com.anpetna.board.dto.readOneBoard.ReadOneBoardRes;
 import com.anpetna.board.dto.updateBoard.UpdateBoardReq;
@@ -417,6 +419,26 @@ public class BoardServiceImpl implements BoardService {
                 .bno(e.getBno())
                 .bLikeCount(e.getBLikeCount())
                 .build();
+    }
+
+    /* ============================ 공지글 최신순 5개 ============================ */
+    @Override
+    public List<NoticeTop5Res> getNoticeTop5() {
+        Pageable top5 = PageRequest.of(0, 5);
+        return boardJpaRepository.noticeCreateDateTop5(BoardType.NOTICE, top5)
+                .stream()
+                .map(NoticeTop5Res::from)
+                .toList();
+    }
+
+    /* ============================ 게시물 좋아요 순 5개 ============================ */
+    @Override
+    public List<LikeCountTop5Res> getLikeCountTop5() {
+        Pageable top5 = PageRequest.of(0, 5);
+        return boardJpaRepository.freeLikeCountTop5(BoardType.FREE, top5)
+                .stream()
+                .map(LikeCountTop5Res::from)
+                .toList();
     }
 }
 

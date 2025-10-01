@@ -109,12 +109,17 @@ public class OrderController {
      * GET /anpetna/order/{ordersId}
      */
     @GetMapping("/{ordersId}")
-    public ApiResult<ReadOneOrdersRes> getOrderDetail(
-            @PathVariable @Min(1) Long ordersId
-    ) {
+    public ApiResult<ReadOneOrdersRes> getOrderDetail(@PathVariable Long ordersId) {
+        if (ordersId == null || ordersId < 1) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST,
+                    "ordersId must be >= 1"
+            );
+        }
         ReadOneOrdersRes body = ordersService.getDetail(ordersId);
-        return new ApiResult<>(body); // 200 OK
+        return new ApiResult<>(body);
     }
+
 
     // ==============================================================
 

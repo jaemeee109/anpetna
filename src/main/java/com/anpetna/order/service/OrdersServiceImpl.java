@@ -5,7 +5,8 @@ import com.anpetna.cart.repository.CartRepository;
 import com.anpetna.item.domain.ItemEntity;
 import com.anpetna.item.repository.ItemRepository;
 import com.anpetna.member.domain.MemberEntity;
-import com.anpetna.member.repository.MemberRepository;            // ✅ ADDED
+import com.anpetna.member.repository.MemberRepository;
+import com.anpetna.notification.feature.stock.service.StockLowNotificationService;
 import com.anpetna.order.constant.OrdersStatus;
 import com.anpetna.order.domain.AddressEntity;
 import com.anpetna.order.domain.OrderEntity;
@@ -25,6 +26,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import com.anpetna.item.constant.ItemSellStatus;
+
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -47,6 +50,7 @@ public class OrdersServiceImpl implements OrdersService {
     private final CartRepository cartRepository;
     //    private static final int FREE_SHIPPING_THRESHOLD = 100_000; // 10만원 이상 무료 배송
     private final MemberRepository memberRepository;
+    private final StockLowNotificationService stockLowNotificationService;
 
     // 기존에는 임의로 설정한 배송비와 무료배송비용 사용.
     // 이를 DTO에 추가하여 입력한 값을 배송비, 무료배송비용으로 사용하게끔 변경.
@@ -73,16 +77,13 @@ public class OrdersServiceImpl implements OrdersService {
                 .totalAmount(0)
                 .build();
 
-        //  배송비: 프론트에서 값을 넘겨주면 사용, 없으면 기본 배송비 부여
+        // 배송비
         final int shippingFee =
                 (req.getShippingFee() == null ? DEFAULT_SHIPPING_FEE : req.getShippingFee());
         orders.setShippingFee(shippingFee);
 
-        // 배송지: checkout 페이지에서 입력한 배송지 정보 반영
-        // (createOrder() 경로와 동일한 방식. 기존 메서드에는 누락되어 있던 부분)
+        // 배송지
         orders.setShippingAddress(toAddressEntity(req.getShippingAddress()));
-        // ※ useSavedAddress(true) 같은 회원 프로필 재사용 로직은 이 메서드에서는 처리하지 않고,
-        //   프론트가 shippingAddress를 채워 보내도록 통일. (필요하면 이후 memberRepository 주입 후 분기 추가 가능)
 
         int totalQty = 0;
         int totalAmt = 0;
@@ -97,8 +98,7 @@ public class OrdersServiceImpl implements OrdersService {
 
             OrderEntity line = OrderEntity.builder()
                     .item(item)
-                    .price(item.getItemPrice())          // ★ NOTE: 현재 라인 price는 "단가"를 저장합니다.
-                    // (주석엔 총액처럼 보이지만 로직은 단가 기준입니다)
+                    .price(item.getItemPrice())   // 단가 저장
                     .quantity(qty)
                     .orders(orders)
                     .build();
@@ -107,12 +107,23 @@ public class OrdersServiceImpl implements OrdersService {
             totalQty += qty;
             totalAmt += item.getItemPrice() * qty;
 
+            // ================== "즉시 재고 차감(ITEM)"==================
+            int cur = Math.max(0, item.getItemStock());
+            int next = cur - qty;
+            if (next < 0) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "재고가 부족합니다. itemId=" + itemId + ", 요청수량=" + qty + ", 현재고=" + cur);
+            }
+            item.setItemStock(next);
+            item.setItemSellStatus(next <= 0 ? ItemSellStatus.SOLD_OUT : ItemSellStatus.SELL);
+            itemRepository.save(item);
+            // =======================================================================
+
         } else if (req.getMode() == CreateOrderReq.Mode.CART) {
             if (req.getItemIds() == null || req.getItemIds().isEmpty()) {
                 throw new IllegalArgumentException("장바구니에서 구매할 itemIds가 비었습니다.");
             }
             for (Long itemId : req.getItemIds()) {
-                // ✅ CHANGED: CartRepository는 String memberId를 받으므로 엔티티에서 꺼내 전달
                 CartEntity c = cartRepository.findByMember_MemberIdAndItem_ItemId(memberId, itemId)
                         .orElseThrow(() -> new IllegalArgumentException("장바구니에 해당 상품이 없습니다: " + itemId));
 
@@ -121,7 +132,7 @@ public class OrdersServiceImpl implements OrdersService {
 
                 OrderEntity line = OrderEntity.builder()
                         .item(item)
-                        .price(item.getItemPrice())      // ★ NOTE: 단가 저장
+                        .price(item.getItemPrice())  // 단가 저장
                         .quantity(qty)
                         .orders(orders)
                         .build();
@@ -130,28 +141,40 @@ public class OrdersServiceImpl implements OrdersService {
                 totalQty += qty;
                 totalAmt += item.getItemPrice() * qty;
 
-                // 구매 완료 후 장바구니에서 제거
+                // 장바구니 비우기
                 cartRepository.delete(c);
+
+                // ================== [B] 여기서 "즉시 재고 차감(CART)"을 수행 ==================
+                int cur = Math.max(0, item.getItemStock());
+                int next = cur - qty;
+                if (next < 0) {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT,
+                            "재고가 부족합니다. itemId=" + item.getItemId() + ", 요청수량=" + qty + ", 현재고=" + cur);
+                }
+                item.setItemStock(next);
+                item.setItemSellStatus(next <= 0 ? ItemSellStatus.SOLD_OUT : ItemSellStatus.SELL);
+                itemRepository.save(item);
+                // =======================================================================
+                stockLowNotificationService.notifyStockLow(item, next);
+
             }
         } else {
             throw new IllegalArgumentException("지원하지 않는 mode: " + req.getMode());
         }
 
-        // 3) 헤더 집계값 + 대표 이미지 설정 (대표 이미지가 없으면 빈 문자열로 보정해 NOT NULL 회피)
+        // 3) 헤더 집계값 + 대표 이미지
         orders.setItemQuantity(totalQty);
+        orders.setTotalAmount(totalAmt + shippingFee); // 소계 + 배송비
+        String thumb = firstImageUrlFromHeader(orders);
+        orders.setOrdersThumbnail(thumb != null ? thumb : "");
 
-        // [OLD] orders.setTotalAmount(totalAmt);
-        orders.setTotalAmount(totalAmt + shippingFee); // [CHANGED] 총 금액 = 소계 + 배송비 (createOrder와 일치)
-
-        String thumb = firstImageUrlFromHeader(orders); // 동일 클래스에 이미 존재하는 보조 메소드
-        orders.setOrdersThumbnail(thumb != null ? thumb : ""); // 대표 이미지가 없으면 빈 문자열
-
-        // 4) 한 번만 최종 저장 (라인은 cascade=persist로 함께 저장)
+        // 4) 저장 (라인은 cascade=persist)
         OrdersEntity saved = ordersRepository.save(orders);
 
         // 5) 응답
         return new CreateOrderRes(saved.getOrdersId());
     }
+
     // =========================================
 
 
@@ -177,38 +200,66 @@ public class OrdersServiceImpl implements OrdersService {
 
     //상태(관리자)
     private static final Map<OrdersStatus, Set<OrdersStatus>> ALLOWED = Map.of(
-            OrdersStatus.PAID,            Set.of(OrdersStatus.SHIPMENT_READY),
-            OrdersStatus.SHIPMENT_READY,  Set.of(OrdersStatus.SHIPPED),
-            OrdersStatus.SHIPPED,         Set.of(OrdersStatus.DELIVERED)
+            OrdersStatus.PAID,           Set.of(OrdersStatus.SHIPMENT_READY, OrdersStatus.CANCELLED, OrdersStatus.REFUNDED, OrdersStatus.CONFIRMATION),
+            OrdersStatus.SHIPMENT_READY, Set.of(OrdersStatus.PAID, OrdersStatus.SHIPPED, OrdersStatus.CANCELLED),
+            OrdersStatus.SHIPPED,        Set.of(OrdersStatus.DELIVERED, OrdersStatus.REFUNDED, OrdersStatus.CONFIRMATION),
+            OrdersStatus.DELIVERED,      Set.of(OrdersStatus.CONFIRMATION, OrdersStatus.REFUNDED)
     );
 
-    //관리자 상태 변경
+
+
     @Override
     @Transactional
     public ReadOneOrdersRes adminStatus(Long ordersId, OrdersStatus next, String reason) {
 
+        // 주문 로드
         OrdersEntity o = ordersRepository.findById(ordersId).orElseThrow(() ->
                 new ResponseStatusException(HttpStatus.NOT_FOUND, "주문 없음: " + ordersId));
 
-        // 허용 전이 검증
-        if (!ALLOWED.getOrDefault(o.getStatus(), Set.of()).contains(next)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "허용되지 않은 전이: " + o.getStatus() + " -> " + next);
+        // 허용 전이 검증(기존 ALLOWED 맵 사용)
+        OrdersStatus prev = o.getStatus();
+        if (!ALLOWED.getOrDefault(prev, Set.of()).contains(next)) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "허용되지 않은 전이: " + prev + " -> " + next
+            );
         }
 
-        switch (next) {
-            case SHIPMENT_READY ->
-                o.setStatus(OrdersStatus.SHIPMENT_READY);
-                // 필요시 포장 준비 로직만 추가
-            case SHIPPED        -> o.setStatus(OrdersStatus.SHIPPED);
-            case DELIVERED ->
-                o.setStatus(OrdersStatus.DELIVERED);
-            default -> throw new ResponseStatusException(HttpStatus.CONFLICT, "이 메서드로는 처리 불가");
-        }
-
+        // 상태 변경
         o.setStatus(next);
-        return toReadOne(o);
+
+        /* ✅ 재고 복원: 주문취소/환불로 전이될 때만 재고를 되돌립니다. */
+        if (next == OrdersStatus.CANCELLED || next == OrdersStatus.REFUNDED) {
+            if (o.getOrderItems() != null) {
+                for (OrderEntity line : o.getOrderItems()) {
+                    ItemEntity item = line.getItem();
+                    if (item == null) continue;
+
+                    int qty = Math.max(1, line.getQuantity());
+                    int cur = Math.max(0, item.getItemStock());
+                    int restored = cur + qty;
+
+                    item.setItemStock(restored);
+                    item.setItemSellStatus(restored <= 0 ? ItemSellStatus.SOLD_OUT : ItemSellStatus.SELL);
+
+                    // 영속 컨텍스트에 붙어 있으므로 save() 없어도 되지만, 확실히 하려면 아래 한 줄 유지 가능
+                    itemRepository.save(item);
+                }
+            }
+        }
+
+        // (중요) ✅ 구매확정 전이 시 추가 차감 로직은 더 이상 없음
+        //  - 차감은 create(...)에서 이미 처리됨
+        //  - CONFIRMATION 이동은 재고 변화 없음
+
+        // 최종 응답(파일 내 존재하는 변환 메서드 사용)
+        return toReadOneOrdersRes(o);
     }
+
+
+
+
+
 
     private ReadOneOrdersRes toReadOne(OrdersEntity o) { /* 매핑 */ return null; }
 
