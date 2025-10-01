@@ -79,14 +79,13 @@ pipeline {
 
     stage('Build (Gradle)') {
       steps {
-        sh '''
-          set -euxo pipefail
-          chmod +x ./gradlew || true
-          ./gradlew clean bootJar -x test
-
-          # 산출물 확인
-          ls -l build/libs/*.jar
-        '''
+          sh '''
+            set -euxo pipefail
+            chmod +x ./gradlew || true
+            export GRADLE_OPTS="-Dorg.gradle.jvmargs=-Xmx1024m -Dfile.encoding=UTF-8"
+            ./gradlew --no-daemon -Dorg.gradle.workers.max=2 clean bootJar -x test
+            ls -l build/libs/*.jar
+          '''
       }
     }
 
@@ -132,7 +131,7 @@ pipeline {
             TARGET="app-${NEXT_COLOR}"
 
             # ── compose 기본 파일의 ${DOCKERHUB_REPO}/${IMAGE_TAG} 미설정으로 인한 오류 방지:
-            # 기본 파일이 전체 서비스를 파싱할 때 변수가 비어 있으면 ':-blue' 같은 잘못된 참조가 생길 수 있으니
+            # 기본 파일이 전체 서비스를 파싱할 때 변수가 비어 있으면 ':-blue' 같은 잘못된 참조가 생길 수 있다
             # 아래처럼 유효한 기본값을 export 해둔다(override가 TARGET의 image를 덮어쓴다).
             export DOCKERHUB_REPO="${DOCKERHUB_REPO}"
             export IMAGE_TAG="${IMAGE_TAG}"
