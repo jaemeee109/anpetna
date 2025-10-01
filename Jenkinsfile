@@ -3,26 +3,24 @@ pipeline {
 
   options {
     timestamps()
-    ansiColor('xterm')              // AnsiColor 플러그인 없으면 주석
+    ansiColor('xterm')
     disableConcurrentBuilds()
   }
 
   environment {
-    // ── Git/Deploy 기본값
     GIT_REPO           = 'https://github.com/jaemeee109/anpetna.git'
     BRANCH             = 'MASTER'
     DOCKERHUB_REPO     = 'rayoh95/anpetna'
 
-    // ── 서버 경로(워커 컨테이너에 볼륨 마운트되어 있어야 함)
     APP_DIR            = '/opt/anpetna/app'
     NGINX_DIR          = '/opt/anpetna/nginx'
     NGINX_ACTIVE_VAR   = '/opt/anpetna/nginx/conf.d/active-upstream.var'
 
-    // ── 컨테이너/네트워크 명
+    // 컨테이너/네트워크 명
     NGINX_CONTAINER    = 'anpetna-nginx'
     DOCKER_NETWORK     = 'anpetna_net'
 
-    // ── 헬스/버전 태그
+    // 헬스/버전 태그
     HEALTH_TIMEOUT_SEC = '180'
     IMAGE_TAG_BASE     = "v1.0.${env.BUILD_NUMBER}"   // color는 뒤에서 붙임
   }
@@ -42,7 +40,6 @@ pipeline {
           docker version >/dev/null
           docker compose version >/dev/null
 
-          # 네트워크 없으면 생성 (external 네트워크면 이미 존재할 수도 있음)
           docker network ls | grep -w "${DOCKER_NETWORK}" >/dev/null || docker network create ${DOCKER_NETWORK} || true
 
           # active-upstream.var 최초 생성 (없으면 app-blue로 시작)
@@ -74,31 +71,45 @@ pipeline {
           ).trim()
           env.CURRENT_COLOR = (active in ['blue','green']) ? active : 'blue'
           env.NEXT_COLOR    = (env.CURRENT_COLOR == 'blue') ? 'green' : 'blue'
-          env.IMAGE_TAG     = env.IMAGE_TAG_BASE   // compose 변수 안전용(override가 최종 반영)
+          env.IMAGE_TAG     = env.IMAGE_TAG_BASE
           echo "CURRENT=${env.CURRENT_COLOR}, NEXT=${env.NEXT_COLOR}, IMAGE_TAG_BASE=${env.IMAGE_TAG_BASE}"
         }
       }
     }
 
-    stage('Build (Gradle)') {
-      steps {
-        sh '''
-          set -euxo pipefail
-          chmod +x ./gradlew || true
-          export GRADLE_OPTS="-Dorg.gradle.jvmargs=-Xmx1024m -Dfile.encoding=UTF-8"
-          # Gradle이 코어를 다 먹지 않도록 병렬 워커 수를 1로 제한
-          ./gradlew --no-daemon --max-workers=1 \
-            -Dorg.gradle.workers.max=1 \
-            -Dorg.gradle.jvmargs="-Xmx1024m -Dfile.encoding=UTF-8" \
-            clean bootJar -x test
-          ls -l build/libs/*.jar
-        '''
-      }
-    }
+   stage('Build (Gradle)') {
+     options { timeout(time: 15, unit: 'MINUTES') }   // 빌드가 정말 멈출 때 대기 제한
+     steps {
+       sh '''
+         set -euxo pipefail
+         chmod +x ./gradlew || true
+
+         # Gradle 네트워크 타임아웃/재시도(전역)
+         cat > gradle.properties <<'EOF'
+         org.gradle.daemon=false
+         org.gradle.parallel=false
+         org.gradle.caching=true
+         # HTTP 타임아웃(ms)
+         systemProp.org.gradle.internal.http.connectionTimeout=30000
+         systemProp.org.gradle.internal.http.socketTimeout=60000
+         # 재시도(Gradle 8.6+)
+         systemProp.org.gradle.internal.http.retry.max=3
+         EOF
+
+         # 로그를 상세히, 콘솔 플러시를 잘 하도록 plain 모드
+         ./gradlew \
+           --no-daemon \
+           --console=plain \
+           --max-workers=1 -Dorg.gradle.workers.max=1 \
+           --info --stacktrace \
+           clean bootJar -x test
+       '''
+     }
+   }
 
     stage('Docker Build & Push') {
       environment {
-        DOCKER_BUILDKIT = '1'        // 빌드 안정/속도 개선
+        DOCKER_BUILDKIT = '1'
         COMPOSE_DOCKER_CLI_BUILD = '1'
       }
       steps {
@@ -140,7 +151,6 @@ pipeline {
             IMAGE=$(cat image.tag)
             TARGET="app-${NEXT_COLOR}"
 
-            # compose가 전체 서비스를 파싱할 때 비어있는 변수가 있으면 오류나므로 기본값 export
             export DOCKERHUB_REPO="${DOCKERHUB_REPO}"
             export IMAGE_TAG="${IMAGE_TAG}"
 
