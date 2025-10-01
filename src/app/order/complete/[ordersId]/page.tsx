@@ -1,13 +1,11 @@
 // src/app/order/complete/[ordersId]/page.tsx
+'use client'
 import Link from 'next/link';
+import {useParams} from 'next/navigation';
 import PawIcon from '@/components/icons/Paw';
 
-export default async function OrderCompletePage({
-  params,
-}: {
-  params: Promise<{ ordersId: string }>;
-}) {
-  const { ordersId } = await params;
+export default function OrderCompletePage() {
+  const { ordersId } = useParams<{ ordersId: string }>();
   const id = Array.isArray(ordersId) ? ordersId[0] : ordersId;
 
   return (

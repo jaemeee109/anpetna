@@ -1,0 +1,22 @@
+# 버전관리
+.git
+../../Desktop/front-develop-backup/.gitignore
+
+# IDE
+.idea
+
+# 빌드 산출물
+.next
+out
+
+# 의존성 (빌드 단계에서 npm ci로 다시 설치)
+node_modules
+
+# 환경 파일
+.env.*
+
+# 기타
+Dockerfile
+docker-compose*.yml
+README.md
+*.log

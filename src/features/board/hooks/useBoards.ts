@@ -102,3 +102,4 @@ export function useLikeBoard() {
 
 // 선택: 밖으로 타입 노출
 export type { FetchBoardsParams } from '@/features/board/data/board.api';
+export * from '@/features/board/hooks/useBoards';

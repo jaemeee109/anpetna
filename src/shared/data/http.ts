@@ -11,7 +11,7 @@ const env = (k: string, fallback = "") => {
 };
 
 // 기본값: .env 비어 있어도 동작
-const BASE = env("NEXT_PUBLIC_API_BASE_URL", "http://192.168.0.160:8000");
+const BASE = env("NEXT_PUBLIC_API_BASE_URL");
 const PREFIX = env("NEXT_PUBLIC_API_PREFIX", "");
 
 // 디버그
