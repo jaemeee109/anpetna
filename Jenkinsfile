@@ -86,7 +86,11 @@ pipeline {
           set -euxo pipefail
           chmod +x ./gradlew || true
           export GRADLE_OPTS="-Dorg.gradle.jvmargs=-Xmx1024m -Dfile.encoding=UTF-8"
-          ./gradlew --no-daemon -Dorg.gradle.workers.max=2 clean bootJar -x test
+          # Gradle이 코어를 다 먹지 않도록 병렬 워커 수를 1로 제한
+          ./gradlew --no-daemon --max-workers=1 \
+            -Dorg.gradle.workers.max=1 \
+            -Dorg.gradle.jvmargs="-Xmx1024m -Dfile.encoding=UTF-8" \
+            clean bootJar -x test
           ls -l build/libs/*.jar
         '''
       }
