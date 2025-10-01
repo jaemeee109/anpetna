@@ -81,6 +81,8 @@ pipeline {
      options { timeout(time: 15, unit: 'MINUTES') }   // 빌드가 정말 멈출 때 대기 제한
      steps {
        sh '''
+         export JAVA_HOME=/opt/java/openjdk
+         export PATH="$JAVA_HOME/bin:$PATH"
          set -euxo pipefail
          chmod +x ./gradlew || true
 
