@@ -141,21 +141,21 @@ public class OrdersServiceImpl implements OrdersService {
                 totalQty += qty;
                 totalAmt += item.getItemPrice() * qty;
 
-                // 장바구니 비우기
-                cartRepository.delete(c);
-
-                // ================== [B] 여기서 "즉시 재고 차감(CART)"을 수행 ==================
-                int cur = Math.max(0, item.getItemStock());
-                int next = cur - qty;
-                if (next < 0) {
-                    throw new ResponseStatusException(HttpStatus.CONFLICT,
-                            "재고가 부족합니다. itemId=" + item.getItemId() + ", 요청수량=" + qty + ", 현재고=" + cur);
-                }
-                item.setItemStock(next);
-                item.setItemSellStatus(next <= 0 ? ItemSellStatus.SOLD_OUT : ItemSellStatus.SELL);
-                itemRepository.save(item);
-                // =======================================================================
-                stockLowNotificationService.notifyStockLow(item, next);
+//                // 장바구니 비우기
+//                cartRepository.delete(c);
+//
+//                // ================== [B] 여기서 "즉시 재고 차감(CART)"을 수행 ==================
+//                int cur = Math.max(0, item.getItemStock());
+//                int next = cur - qty;
+//                if (next < 0) {
+//                    throw new ResponseStatusException(HttpStatus.CONFLICT,
+//                            "재고가 부족합니다. itemId=" + item.getItemId() + ", 요청수량=" + qty + ", 현재고=" + cur);
+//                }
+//                item.setItemStock(next);
+//                item.setItemSellStatus(next <= 0 ? ItemSellStatus.SOLD_OUT : ItemSellStatus.SELL);
+//                itemRepository.save(item);
+//                // =======================================================================
+//                stockLowNotificationService.notifyStockLow(item, next);
 
             }
         } else {
