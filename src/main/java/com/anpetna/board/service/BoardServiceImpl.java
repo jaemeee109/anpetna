@@ -1,7 +1,9 @@
 package com.anpetna.board.service;
 
 import com.anpetna.board.constant.BoardType;
+import com.anpetna.board.constant.LikeTargetType;
 import com.anpetna.board.domain.BoardEntity;
+import com.anpetna.board.domain.LikeEntity;
 import com.anpetna.board.dto.BoardDTO;
 import com.anpetna.board.dto.ImageOrderReq;
 import com.anpetna.board.dto.createBoard.CreateBoardReq;
@@ -16,6 +18,7 @@ import com.anpetna.board.dto.updateBoard.UpdateBoardReq;
 import com.anpetna.board.dto.updateBoard.UpdateBoardRes;
 import com.anpetna.board.event.BoardCreatedEvent;
 import com.anpetna.board.repository.BoardJpaRepository;
+import com.anpetna.board.repository.LikeJpaRepository;
 import com.anpetna.core.coreDto.PageRequestDTO;
 import com.anpetna.core.coreDto.PageResponseDTO;
 import com.anpetna.image.domain.ImageEntity;
@@ -28,6 +31,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -56,6 +60,7 @@ public class BoardServiceImpl implements BoardService {
     private final ModelMapper modelMapper;
     private final ApplicationEventPublisher publisher;
     private final LikeNotificationService likeNotificationService;
+    private final LikeJpaRepository likeJpaRepository; // 공용 좋아요 테이블 레포지토리 주입 (중복 좋아요 방지/토글 판정용)
 
     /* ==================== 관리자 판별용 메서드 추가 ==================== */
     // ★★★ 공통 유틸: 관리자 여부 판별
@@ -399,26 +404,85 @@ public class BoardServiceImpl implements BoardService {
     @Override
     @Transactional
     public UpdateBoardRes likeBoard(Long bno, String memberId) {
+        // 0) 인증 가드
         if (memberId == null || memberId.isBlank()) {
             throw new AccessDeniedException("로그인이 필요합니다.");
         }
 
+        // 1) 대상 게시글 존재 확인 (무결성 보장)
         BoardEntity e = boardJpaRepository.findById(bno)
                 .orElseThrow(() -> new RuntimeException("존재하지 않는 게시글입니다."));
 
-        int currentLike = (e.getBLikeCount() == null ? 0 : e.getBLikeCount());
-        e.setBLikeCount(currentLike + 1);
+        // 2) 현재 사용자가 이 게시글을 이미 좋아요 눌렀는지 조회 (공용 like 테이블)
+        boolean exists = likeJpaRepository.existsByTargetTypeAndTargetIdAndMemberId(
+                LikeTargetType.BOARD, bno, memberId
+        );
 
-        try {
-            likeNotificationService.notifyBoardLike(e, memberId);
-        } catch (Exception ex) {
-            log.warn("notifyBoardLike failed: bno={}, actor={}", bno, memberId, ex);
+        if (exists) {
+            // 3-A) 이미 눌린 상태 → "취소" (좋아요 기록 삭제 + 카운트 -1)
+            likeJpaRepository.findByTargetTypeAndTargetIdAndMemberId(
+                    LikeTargetType.BOARD, bno, memberId).ifPresent(likeJpaRepository::delete);
+
+            // 동시성 안전한 원자적 감소(하한 0)
+            boardJpaRepository.decBoardLike(bno);
+
+            // 최신 카운트는 공용 like 테이블에서 집계 (원본 컬럼은 화면 정렬용 캐시)
+            long latest = likeJpaRepository.countByTargetTypeAndTargetId(LikeTargetType.BOARD, bno);
+
+            return UpdateBoardRes.builder()
+                    .bno(e.getBno())
+                    .bLikeCount((int) latest)
+                    .build();
+        } else {
+            // 3-B) 아직 안 눌림 → "좋아요" (기록 저장 + 카운트 +1)
+            try {
+                likeJpaRepository.save(LikeEntity.builder()
+                        .targetType(LikeTargetType.BOARD)
+                        .targetId(bno)
+                        .memberId(memberId)
+                        .build()
+                );
+                // 동시성 안전한 원자적 증가
+                boardJpaRepository.incBoardLike(bno);
+            } catch (DataIntegrityViolationException dup) {
+                // (경쟁 상황) 같은 시점에 다른 트랜잭션이 먼저 insert한 경우
+                // → 최종 상태는 "좋아요됨"이므로 그대로 진행
+            }
+
+            // 알림(성공/중복 상관없이 최종 좋아요 상태가 ON이면 발송)
+            try {
+                likeNotificationService.notifyBoardLike(e, memberId);
+            } catch (Exception ex) {
+                log.warn("notifyBoardLike failed: bno={}, actor={}", bno, memberId, ex);
+            }
+
+            long latest = likeJpaRepository.countByTargetTypeAndTargetId(LikeTargetType.BOARD, bno);
+
+            return UpdateBoardRes.builder()
+                    .bno(e.getBno())
+                    .bLikeCount((int) latest)
+                    .build();
         }
+    }
 
-        return UpdateBoardRes.builder()
-                .bno(e.getBno())
-                .bLikeCount(e.getBLikeCount())
-                .build();
+    /* ============================ 공지글 최신순 5개 ============================ */
+    @Override
+    public List<NoticeTop5Res> getNoticeTop5() {
+        Pageable top5 = PageRequest.of(0, 5);
+        return boardJpaRepository.noticeCreateDateTop5(BoardType.NOTICE, top5)
+                .stream()
+                .map(NoticeTop5Res::from)
+                .toList();
+    }
+
+    /* ============================ 게시물 좋아요 순 5개 ============================ */
+    @Override
+    public List<LikeCountTop5Res> getLikeCountTop5() {
+        Pageable top5 = PageRequest.of(0, 5);
+        return boardJpaRepository.freeLikeCountTop5(BoardType.FREE, top5)
+                .stream()
+                .map(LikeCountTop5Res::from)
+                .toList();
     }
 
     /* ============================ 공지글 최신순 5개 ============================ */
