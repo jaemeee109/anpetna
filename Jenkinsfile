@@ -205,11 +205,30 @@ pipeline {
 
     stage('Switch Nginx → NEXT') {
       steps {
-        sh '''
-          set -euxo pipefail
-          printf 'set $active_upstream app-%s;\\n' "${NEXT_COLOR}" > "${NGINX_ACTIVE_VAR}"
-          docker exec ${NGINX_CONTAINER} nginx -s reload || docker restart ${NGINX_CONTAINER}
-        '''
+        script {
+          try {
+            sh '''
+              set -euxo pipefail
+              # NEXT로 전환
+              printf 'set $active_upstream app-%s:8080;\\n' "${NEXT_COLOR}" > "${NGINX_ACTIVE_VAR}"
+              docker exec ${NGINX_CONTAINER} nginx -s reload || docker restart ${NGINX_CONTAINER}
+
+              # 전환 검증: Nginx(게이트웨이)를 통해 백엔드 헬스가 통과해야 성공
+              docker pull curlimages/curl:latest || true
+              docker run --rm --network ${DOCKER_NETWORK} curlimages/curl:latest \
+                curl -fsS "http://${NGINX_CONTAINER}/actuator/health" | grep -q '"status":"UP"'
+            '''
+          } catch (err) {
+            // 즉시 롤백
+            sh '''
+              set +e
+              echo "[SWITCH-ROLLBACK] revert to CURRENT"
+              printf 'set $active_upstream app-%s:8080;\\n' "${CURRENT_COLOR}" > "${NGINX_ACTIVE_VAR}" || true
+              docker exec ${NGINX_CONTAINER} nginx -s reload || docker restart ${NGINX_CONTAINER} || true
+            '''
+            error "Switchover verification failed → rolled back to ${env.CURRENT_COLOR}"
+          }
+        }
       }
     }
 
@@ -230,20 +249,25 @@ pipeline {
     success {
       echo "✅ Switched to ${env.NEXT_COLOR} (${env.IMAGE_TAG_BASE}-${env.NEXT_COLOR})"
     }
-    failure {
+    unsuccessful {
       script {
         sh '''
           set +e
-          echo "[ROLLBACK] Switching Nginx back to CURRENT"
-          printf 'set $active_upstream app-%s;\\n' "${CURRENT_COLOR}" > "${NGINX_ACTIVE_VAR}" || true
-          docker exec ${NGINX_CONTAINER} nginx -s reload || true
-          docker compose -f ${APP_DIR}/docker-compose.yml stop app-${NEXT_COLOR} || true
+          echo "[PIPELINE-ROLLBACK] revert Nginx to CURRENT & stop NEXT service"
+
+          # 1) 라우팅 복구
+          printf 'set $active_upstream app-%s:8080;\\n' "${CURRENT_COLOR}" > "${NGINX_ACTIVE_VAR}" || true
+          docker exec ${NGINX_CONTAINER} nginx -s reload || docker restart ${NGINX_CONTAINER} || true
+
+          # 2) NEXT 서비스 중지/정리
+          docker compose -f ${APP_DIR}/docker-compose.yml stop app-${NEXT_COLOR}  || true
+          docker compose -f ${APP_DIR}/docker-compose.yml rm -f app-${NEXT_COLOR} || true
+
+          # 3) (선택) 오버라이드 파일 치우기
+          rm -f ${APP_DIR}/override-app-${NEXT_COLOR}.yml || true
+          rm -f ${APP_DIR}/override-app-${CURRENT_COLOR}.yml || true
         '''
       }
-    }
-    always {
-      // 워크스페이스에 override 파일이 남았을 가능성에 대비(더블 세이프티)
-      sh 'rm -f "${WORKSPACE}"/override-app-*.yml || true'
     }
   }
 }
