@@ -132,7 +132,6 @@ public class OrdersServiceImpl implements OrdersService {
                 totalAmt += item.getItemPrice() * qty;
 
 
-
             }
         } else {
             throw new IllegalArgumentException("지원하지 않는 mode: " + req.getMode());

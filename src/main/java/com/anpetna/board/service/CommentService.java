@@ -24,5 +24,8 @@ public interface CommentService {
     DeleteCommRes deleteComment(DeleteCommReq deleteCommReq);
 
     // 5. 댓글 좋아요
+    // 아래 likeComment는 "토글" 의미로 동작하게 구현합니다.
+    // 최초 클릭: 좋아요 ON (+1)
+    // 다시 클릭: 좋아요 OFF (-1)
     UpdateCommRes likeComment(Long cno);
 }
