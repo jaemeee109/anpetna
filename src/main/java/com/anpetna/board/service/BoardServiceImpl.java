@@ -485,25 +485,7 @@ public class BoardServiceImpl implements BoardService {
                 .toList();
     }
 
-    /* ============================ 공지글 최신순 5개 ============================ */
-    @Override
-    public List<NoticeTop5Res> getNoticeTop5() {
-        Pageable top5 = PageRequest.of(0, 5);
-        return boardJpaRepository.noticeCreateDateTop5(BoardType.NOTICE, top5)
-                .stream()
-                .map(NoticeTop5Res::from)
-                .toList();
-    }
-
-    /* ============================ 게시물 좋아요 순 5개 ============================ */
-    @Override
-    public List<LikeCountTop5Res> getLikeCountTop5() {
-        Pageable top5 = PageRequest.of(0, 5);
-        return boardJpaRepository.freeLikeCountTop5(BoardType.FREE, top5)
-                .stream()
-                .map(LikeCountTop5Res::from)
-                .toList();
-    }
+   
 }
 
 /* 게시물 수정 부분
