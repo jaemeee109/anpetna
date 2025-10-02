@@ -78,33 +78,27 @@ pipeline {
     }
 
    stage('Build (Gradle)') {
-     options { timeout(time: 15, unit: 'MINUTES') }   // 빌드가 정말 멈출 때 대기 제한
      steps {
        sh '''
+         set -euxo pipefail
+
+         # Java 경로 확정 (inbound-agent 이미지 기준)
          export JAVA_HOME=/opt/java/openjdk
          export PATH="$JAVA_HOME/bin:$PATH"
-         set -euxo pipefail
-         chmod +x ./gradlew || true
 
-         # Gradle 네트워크 타임아웃/재시도(전역)
-         cat > gradle.properties <<'EOF'
-         org.gradle.daemon=false
-         org.gradle.parallel=false
-         org.gradle.caching=true
-         # HTTP 타임아웃(ms)
-         systemProp.org.gradle.internal.http.connectionTimeout=30000
-         systemProp.org.gradle.internal.http.socketTimeout=60000
-         # 재시도(Gradle 8.6+)
-         systemProp.org.gradle.internal.http.retry.max=3
-         EOF
+         # Gradle Wrapper 존재/실행 가능 확인
+         test -f ./gradlew || { echo "gradlew not found"; exit 1; }
+         chmod +x ./gradlew
 
-         # 로그를 상세히, 콘솔 플러시를 잘 하도록 plain 모드
-         ./gradlew \
-           --no-daemon \
-           --console=plain \
-           --max-workers=1 -Dorg.gradle.workers.max=1 \
-           --info --stacktrace \
+         # 빌드 (워커 1개, 테스트 스킵)
+         ./gradlew --no-daemon --max-workers=1 \
+           -Dorg.gradle.workers.max=1 \
+           -Dorg.gradle.jvmargs=-Xmx1024m \
+           -Dfile.encoding=UTF-8 \
            clean bootJar -x test
+
+         # 산출물 검증
+         ls -l build/libs/*.jar || { echo "JAR not found under build/libs"; exit 1; }
        '''
      }
    }
