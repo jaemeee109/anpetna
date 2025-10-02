@@ -3,8 +3,11 @@ package com.anpetna.exception;
 import com.anpetna.ApiError;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.web.ErrorResponseException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import com.anpetna.member.service.MemberService;
@@ -79,6 +82,14 @@ public class GlobalExceptionHandler {
     }
 
 
+    /** JSON 파싱/본문 누락 등 400 처리 (권장 보강) */
+    @ExceptionHandler({ HttpMessageNotReadableException.class, MissingServletRequestParameterException.class })
+    public ResponseEntity<ApiError> handleReadableOrMissing(Exception e) {
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(new ApiError(HttpStatus.BAD_REQUEST.value(), "요청을 처리할 수 없습니다."));
+    }
+
     /** 회원가입 시 중복 아이디 예외 발생하면 409 에러 + “이미 가입한 ID 입니다” 메시지 반환*/
     @ExceptionHandler(MemberService.MemberIdExistException.class)
     public ResponseEntity<ApiError> handleMemberIdExist(MemberService.MemberIdExistException e) {
@@ -92,9 +103,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiError> handleDataIntegrity(DataIntegrityViolationException e) {
         return ResponseEntity
-                .status(HttpStatus.BAD_REQUEST)
-                .body(new ApiError(HttpStatus.BAD_REQUEST.value(), "요청을 처리할 수 없습니다."));
+                .status(HttpStatus.CONFLICT)
+                .body(new ApiError(HttpStatus.CONFLICT.value(), "요청을 처리할 수 없습니다."));
     }
+
+
 
 
     /** 그 외 예외 → 500 */
