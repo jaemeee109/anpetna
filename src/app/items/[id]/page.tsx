@@ -336,7 +336,7 @@ export default function ItemDetailPage() {
                     await addMut.mutateAsync({ itemId: Number(id), quantity: Math.max(1, Number(qty || 1)) });
                     alert('장바구니에 담겼습니다.');
                   } catch (err) {
-                    alert(pickHttpErrorMessage(err));
+                   
                   }
                 }}
 
@@ -376,7 +376,7 @@ export default function ItemDetailPage() {
                   //  통과 시에만 주문서로 이동
                   location.href = `/order/checkout?itemId=${parsedId}&qty=${q}`;
                 } catch (err) {
-                  alert(pickHttpErrorMessage(err)); // 예: "현재 남은 재고는 n개입니다. 주문 수량을 조정해주세요"
+                 
                 }
               }}
 

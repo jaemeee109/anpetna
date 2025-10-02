@@ -15,10 +15,10 @@ type Row = {
   bno?: number;
   bTitle?: string; title?: string; btitle?: string;
   bContent?: string; content?: string; bcontent?: string;
- bWriter?: string; writer?: string; memberId?: string; bwriter?: string; 
+  bWriter?: string; writer?: string; memberId?: string; bwriter?: string; 
   createDate?: string; createdAt?: string; regDate?: string;
   qnaCategory?: string; category?: string; 
-  bCategory?: string; cat?: string; group?: string; section?: string; type2?: string; qCategory?: string;
+  Category?: string; cat?: string; group?: string; section?: string; type2?: string; qCategory?: string;
   commentsCount?: number; commentCount?: number; replyCount?: number;
 };
 
@@ -228,6 +228,8 @@ export default function QnaPage() {
     return () => { alive = false; };
   }, [view, list, base, token]);
 
+  
+
 // (교체 후) QNA 작성 제출 - FormData + 'json' 파트 전송
 const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
   e.preventDefault();
@@ -255,13 +257,59 @@ const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
   setSubmitting(true);
   try {
  
-    const body = {
-        boardType: 'QNA',
-        bTitle: title,
-        bWriter: writer || undefined,
-        bContent: content,
-        bCategory: cat,  
-      };
+    
+        const memberId =
+          (typeof window !== 'undefined' &&
+            (localStorage.getItem('memberId') || sessionStorage.getItem('memberId'))) ||
+          '';
+
+        if (!memberId) {
+          alert('로그인이 필요합니다.');
+          setSubmitting(false);
+          return;
+        }
+
+        const catToCode = (k: Cat) => {
+          switch (k) {
+            case '회원계정': return 'ACCOUNT';
+            case '주문/배송': return 'ORDER';
+            case '교환/반품': return 'RETURN';
+            case '이용안내': return 'GUIDE';
+            default: return 'ETC';
+          }
+        };
+
+        
+        const label = String(cat ?? '').trim();
+        const code =
+          label === '회원계정' ? 'ACCOUNT' :
+          label === '주문/배송' ? 'ORDER'  :
+          label === '교환/반품' ? 'RETURN' :
+          label === '이용안내' ? 'GUIDE'  : 'ETC';
+
+        const body = {
+          // 기본 필수
+          boardType: 'QNA',
+          bTitle: String(title ?? '').trim(),
+          bContent: String(content ?? '').trim(),
+
+          // 작성자: 서버 인증 사용자와 100% 동일하게
+          bWriter: String(memberId ?? '').trim(),
+
+          // 카테고리: 어떤 필드를 읽어도 동일하게 인식되도록 모두 전송
+          category: code,          // enum/코드 기대 케이스
+          qnaCategory: code,       // qnaCategory를 쓰는 구현 대비
+          bCategory: code,         // bCategory를 쓰는 구현 대비
+          categoryName: label,     // (혹시 라벨을 쓰는 구현 대비)
+          qnaCategoryName: label,  // (혹시 라벨 별칭 대비)
+
+          // 선택 필드들: 누락으로 인한 충돌 방지 (boolean/기본값)
+          isSecret: false,
+          secret: false,
+        };
+
+
+        
 
     //  multipart/form-data 생성: 'json' 파트로 본문 전송
     const fd = new FormData();
@@ -308,6 +356,7 @@ const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
 
 
 
+
   function normalizeCat(label: string): Cat {
     const s = String(label ?? '').trim();
     if (!s) return '기타';
@@ -324,9 +373,7 @@ const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     const raw =
       r.qnaCategory ??
       r.category ??
-      r.category ??
-      r.bCategory ??
-      r.qCategory ??
+      r.Category ??
       r.cat ??
       r.group ??
       r.section ??

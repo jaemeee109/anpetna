@@ -132,10 +132,21 @@ export default function LoginPage() {
 
       if (!role) role = 'USER';
 
-      // 4) Application Storage에 항상 기록
+      // Application Storage에 항상 기록
       localStorage.setItem('memberRole', role);
 
-      // 5) 헤더 즉시 반영
+      //블랙리스트 계정 로그인 차단
+      if (role === 'BLACKLIST') {
+        purgeAuthArtifacts?.();
+        try {
+          localStorage.removeItem('memberRole');
+        } catch {}
+        window.alert('해당 계정은 이용이 제한되어 로그인할 수 없습니다');
+        return; 
+        }
+
+
+      // 헤더 즉시 반영
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new Event('auth-changed'));
       }

@@ -84,38 +84,61 @@ export default function DeleteAccountPage() {
 
   const canSubmit = useMemo(() => !!memberId && !!password && agree && !submitting, [memberId, password, agree, submitting]);
 
-  async function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    if (!canSubmit) return;
-    try {
-      setSubmitting(true);
-      setErr(null);
-      setOk(null);
-
-     async function onSubmit(e: FormEvent) {
+async function onSubmit(e: FormEvent) {
   e.preventDefault();
   if (!canSubmit) return;
 
-  try {
-    setSubmitting(true);
-    setErr(null);
-    setOk(null);
+  setSubmitting(true);
+  setErr(null);
+  setOk(null);
 
+  try {
     const url = apiURL(`/member/delete`);
     const resp = await fetch(url, {
       method: 'POST',
       credentials: 'include',
       headers: authHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ memberPw: password }),
+      body: JSON.stringify({ memberId, currentPw: password  }),
     });
 
+    // 401: 토큰만료 로그인 요구
     if (resp.status === 401) {
       const t = await parseJsonSafe(resp);
-      alert(t?.resMessage || t?.message || '잘못입력하셨습니다');
+      alert(t?.resMessage || t?.message || '로그인이 필요합니다. 다시 로그인해 주세요.');
       return;
     }
 
+    // 403: 본인아님
+    if (resp.status === 403) {
+      const t = await parseJsonSafe(resp);
+      alert(t?.resMessage || t?.message || '본인 계정으로만 탈퇴할 수 있습니다.');
+      return;
+    }
+
+    // 400: 비밀번호 불일치 
+    if (resp.status === 400) {
+      const t = await parseJsonSafe(resp);
+      alert(t?.resMessage || t?.message || '비밀번호가 일치하지 않습니다.');
+      return;
+    }
+    //  409: 연결 데이터(FK) 등으로 처리 불가 (방어 목적)
+      if (resp.status === 409) {
+        const t = await parseJsonSafe(resp);
+        alert(t?.resMessage || t?.message || '연결된 데이터로 인해 탈퇴 처리에 실패했습니다.');
+        return;
+      }
+
+
+      // 500: 서버 내부 오류 — 화면에 RAW 에러를 찍지 않고 얼럿뜨게함
+        if (resp.status >= 500) {
+          const t = await parseJsonSafe(resp);
+          alert(t?.resMessage || t?.message || '서버 오류로 탈퇴 처리에 실패했습니다.');
+          return;
+        }
+
+
     if (!resp.ok) {
+      // 그 외 서버 오류
       const t = await parseJsonSafe(resp);
       throw new Error(
         `회원 탈퇴 실패\nHTTP ${resp.status} ` +
@@ -123,26 +146,19 @@ export default function DeleteAccountPage() {
       );
     }
 
+    //  성공 처리: 인증 흔적 제거 후 홈으로
     purgeAuthArtifacts();
     setOk('회원 탈퇴가 완료되었습니다.');
     alert('계정이 삭제되었습니다. 이용해 주셔서 감사합니다.');
     router.replace('/');
   } catch (e: any) {
-    setErr(e?.message || '회원 탈퇴 처리 중 오류가 발생했습니다.');
+    setErr(e?.message || '회원 탈퇴 처리 중 오류가 발생했습니다.잠시 후 다시 시도해 주세요.');
   } finally {
     setSubmitting(false);
   }
 }
 
 
-      // 성공: 로컬 인증 흔적 제거
-      
-    } catch (e: any) {
-      setErr(e?.message || '회원 탈퇴 처리 중 오류가 발생했습니다.');
-    } finally {
-      setSubmitting(false);
-    }
-  }
 
   return (
     <main className="mx-auto max-w-[570px] px-4 py-8 text-center">
