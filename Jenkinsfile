@@ -78,9 +78,9 @@ pipeline {
     }
 
    stage('Build (Gradle)') {
-     options { timeout(time: 20, unit: 'MINUTES') }   // 빌드 타임아웃
+     options { timeout(time: 20, unit: 'MINUTES') }
      steps {
-       retry(2) {                                     // 네트워크 흔들릴 때 재시도
+       retry(2) {
          sh '''#!/bin/sh
    set -euxo pipefail
 
@@ -91,7 +91,7 @@ pipeline {
    export GRADLE_USER_HOME="$WORKSPACE/.gradle-cache"
    mkdir -p "$GRADLE_USER_HOME"
 
-   # 네트워크 타임아웃 여유
+   # 네트워크 타임아웃 여유 (🚨 EOF는 맨 앞열!)
    cat > "$GRADLE_USER_HOME/gradle.properties" <<'EOF'
    org.gradle.daemon=false
    org.gradle.console=plain
@@ -127,7 +127,6 @@ pipeline {
          sh '''#!/bin/sh
    set -euxo pipefail
 
-   # 필수 환경변수 확인 (Select Color 스테이지에서 설정됨)
    : "${DOCKERHUB_REPO:?DOCKERHUB_REPO not set}"
    : "${IMAGE_TAG_BASE:?IMAGE_TAG_BASE not set}"
    : "${NEXT_COLOR:?NEXT_COLOR not set}"
@@ -138,10 +137,9 @@ pipeline {
    [ -f "$JAR_PATH" ] || { echo "JAR not found under build/libs"; exit 1; }
 
    IMAGE_BASE="${DOCKERHUB_REPO}:${IMAGE_TAG_BASE}"
-   # blue/green 모두 만들기 (manifest unknown 방지)
+   # 반대 색상도 미리 태깅 (manifest unknown 예방)
    if [ "${NEXT_COLOR}" = "green" ]; then OTHER_COLOR="blue"; else OTHER_COLOR="green"; fi
 
-   # 한 번 빌드해서 태그만 여러 개
    docker build --pull \
      --build-arg JAR_FILE="$JAR_PATH" \
      -t "${IMAGE_BASE}" \
@@ -150,12 +148,12 @@ pipeline {
    docker tag "${IMAGE_BASE}" "${IMAGE_BASE}-${NEXT_COLOR}"
    docker tag "${IMAGE_BASE}" "${IMAGE_BASE}-${OTHER_COLOR}"
 
-   # 푸시(베이스 + 색상 2개)
    docker push "${IMAGE_BASE}"
    docker push "${IMAGE_BASE}-${NEXT_COLOR}"
    docker push "${IMAGE_BASE}-${OTHER_COLOR}"
 
-   # 기록 파일 (후속 스테이지에서 참조 가능)
+   # 배포 스테이지 호환: NEXT 이미지 한 줄짜리 파일과 전체 목록 둘 다 남김
+   echo "${IMAGE_BASE}-${NEXT_COLOR}" > image.tag
    printf '%s\n' \
      "${IMAGE_BASE}" \
      "${IMAGE_BASE}-${NEXT_COLOR}" \
@@ -174,40 +172,40 @@ pipeline {
           usernamePassword(credentialsId: 'db_userpass', usernameVariable: 'DB_USER', passwordVariable: 'DB_PASS')
         ]) {
           sh '''
-            set -euxo pipefail
-            IMAGE=$(cat image.tag)
-            TARGET="app-${NEXT_COLOR}"
+    set -euxo pipefail
+    TARGET="app-${NEXT_COLOR}"
 
-            export DOCKERHUB_REPO="${DOCKERHUB_REPO}"
-            export IMAGE_TAG="${IMAGE_TAG}"
+    # image.tag가 없더라도 계산해서 사용 가능
+    if [ -f image.tag ]; then
+      IMAGE=$(cat image.tag)
+    else
+      IMAGE="${DOCKERHUB_REPO}:${IMAGE_TAG_BASE}-${NEXT_COLOR}"
+    fi
 
-            # 민감정보가 남지 않도록 override 파일은 워크스페이스(에이전트 디렉토리)에 임시 생성 후 사용/삭제
-            OVERRIDE_FILE="${WORKSPACE}/override-${TARGET}.yml"
-            cat > "${OVERRIDE_FILE}" <<EOF
-            services:
-              ${TARGET}:
-                image: ${IMAGE}
-                environment:
-                  SPRING_DATASOURCE_URL: "${DB_URL}"
-                  SPRING_DATASOURCE_USERNAME: "${DB_USER}"
-                  SPRING_DATASOURCE_PASSWORD: "${DB_PASS}"
-                  SPRING_PROFILES_ACTIVE: "prod"
-                networks:
-                  - ${DOCKER_NETWORK}
-            networks:
-              ${DOCKER_NETWORK}:
-                external: true
-            EOF
+    OVERRIDE_FILE="${WORKSPACE}/override-${TARGET}.yml"
+    cat > "${OVERRIDE_FILE}" <<EOF
+    services:
+      ${TARGET}:
+        image: ${IMAGE}
+        environment:
+          SPRING_DATASOURCE_URL: "${DB_URL}"
+          SPRING_DATASOURCE_USERNAME: "${DB_USER}"
+          SPRING_DATASOURCE_PASSWORD: "${DB_PASS}"
+          SPRING_PROFILES_ACTIVE: "prod"
+        networks:
+          - ${DOCKER_NETWORK}
+    networks:
+      ${DOCKER_NETWORK}:
+        external: true
+    EOF
 
-            # 항상 최신 이미지로 갱신 후 기동
-            docker compose -f ${APP_DIR}/docker-compose.yml -f "${OVERRIDE_FILE}" pull ${TARGET} || true
-            docker compose -f ${APP_DIR}/docker-compose.yml -f "${OVERRIDE_FILE}" up -d ${TARGET}
+    docker compose -f ${APP_DIR}/docker-compose.yml -f "${OVERRIDE_FILE}" pull ${TARGET} || true
+    docker compose -f ${APP_DIR}/docker-compose.yml -f "${OVERRIDE_FILE}" up -d ${TARGET}
 
-            # 임시 파일 즉시 삭제(로그에 값은 마스킹 처리됨)
-            shred -u "${OVERRIDE_FILE}" 2>/dev/null || rm -f "${OVERRIDE_FILE}"
+    shred -u "${OVERRIDE_FILE}" 2>/dev/null || rm -f "${OVERRIDE_FILE}"
 
-            docker ps --format 'table {{.Names}}\\t{{.Image}}\\t{{.Status}}' | grep -E "${TARGET}"
-          '''
+    docker ps --format 'table {{.Names}}\\t{{.Image}}\\t{{.Status}}' | grep -E "${TARGET}"
+    '''
         }
       }
     }
