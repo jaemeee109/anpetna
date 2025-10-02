@@ -91,13 +91,13 @@ pipeline {
    export GRADLE_USER_HOME="$WORKSPACE/.gradle-cache"
    mkdir -p "$GRADLE_USER_HOME"
 
-   # 네트워크 타임아웃 여유 (🚨 EOF는 맨 앞열!)
-   cat > "$GRADLE_USER_HOME/gradle.properties" <<'EOF'
-   org.gradle.daemon=false
-   org.gradle.console=plain
-   systemProp.org.gradle.internal.http.connectionTimeout=120000
-   systemProp.org.gradle.internal.http.socketTimeout=120000
-   EOF
+   # 네트워크 타임아웃 여유
+   printf '%s\n' \
+     'org.gradle.daemon=false' \
+     'org.gradle.console=plain' \
+     'systemProp.org.gradle.internal.http.connectionTimeout=120000' \
+     'systemProp.org.gradle.internal.http.socketTimeout=120000' \
+     > "$GRADLE_USER_HOME/gradle.properties"
 
    test -f ./gradlew || { echo "gradlew not found"; exit 1; }
    chmod +x ./gradlew
@@ -109,7 +109,10 @@ pipeline {
      --info --stacktrace --console=plain \
      clean bootJar -x test
 
-   ls -l build/libs/*.jar
+   # 산출물 확인(없으면 실패)
+   JAR_PATH=$(ls -1 build/libs/*.jar | head -n1 || true)
+   [ -f "$JAR_PATH" ] || { echo "JAR not found under build/libs"; exit 1; }
+   ls -l "$JAR_PATH"
    '''
        }
      }
