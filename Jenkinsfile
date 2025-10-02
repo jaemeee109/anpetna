@@ -82,23 +82,32 @@ pipeline {
        sh '''
          set -euxo pipefail
 
-         # Java 경로 확정 (inbound-agent 이미지 기준)
          export JAVA_HOME=/opt/java/openjdk
          export PATH="$JAVA_HOME/bin:$PATH"
 
-         # Gradle Wrapper 존재/실행 가능 확인
+         # 캐시 위치를 워크스페이스로 바꿔 권한/IO 이슈 우회 (원인 분리)
+         export GRADLE_USER_HOME="$WORKSPACE/.gradle-cache"
+         mkdir -p "$GRADLE_USER_HOME"
+         cat > "$GRADLE_USER_HOME/gradle.properties" <<'EOF'
+   org.gradle.daemon=false
+   org.gradle.console=plain
+   # (선택) 네트워크 타임아웃 완화
+   systemProp.org.gradle.internal.http.connectionTimeout=60000
+   systemProp.org.gradle.internal.http.socketTimeout=60000
+   EOF
+   
          test -f ./gradlew || { echo "gradlew not found"; exit 1; }
          chmod +x ./gradlew
 
-         # 빌드 (워커 1개, 테스트 스킵)
+         # 상세 로그/스택트레이스로 진행상황을 보이게
          ./gradlew --no-daemon --max-workers=1 \
            -Dorg.gradle.workers.max=1 \
            -Dorg.gradle.jvmargs=-Xmx1024m \
            -Dfile.encoding=UTF-8 \
+           --info --stacktrace --console=plain \
            clean bootJar -x test
 
-         # 산출물 검증
-         ls -l build/libs/*.jar || { echo "JAR not found under build/libs"; exit 1; }
+         ls -l build/libs/*.jar
        '''
      }
    }
