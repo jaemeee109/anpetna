@@ -152,7 +152,7 @@ export default function LoginPage() {
       }
       router.replace('/');
     } catch (e: any) {
-      setErr(e?.message || '로그인에 실패했습니다.');
+      setErr(e?.message || '아이디/비밀번호를 잘 못 입력하셨습니다.');
     } finally {
       setSubmitting(false);
     }

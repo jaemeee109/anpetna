@@ -86,24 +86,23 @@ async function jsonFetch<T = any>(url: string, init?: RequestInit): Promise<T> {
     try { data = JSON.parse(text); } catch { data = null; }
   }
 
-  const isLoginApi = /\/jwt\/login(?:\b|$)/.test(url);
+    const isLoginApi = /\/jwt\/login(?:\b|$)/.test(url);
 
   if (!r.ok) {
-    // ✅ 로그인 실패는 상태코드가 무엇이든(400/401/404/500 등) 동일하게 처리
+    // 로그인 실패는 공통 유틸에서 alert를 띄우지 않고, 호출부가 1회만 안내하도록 위임
     if (isLoginApi) {
-      alert('아이디/비밀번호를 잘못 입력하셨습니다. 다시 입력해주세요');
-      // 화면에는 아무 HTML/에러본문도 노출하지 않도록 고정된 코드만 throw
+      // 고정된 신호만 던져서 상위에서 '한 번'만 처리하게 함
       throw new Error('INVALID_CREDENTIALS');
     }
 
-    // ✅ 일반 오류: HTML 본문을 화면에 흘리지 않도록 안전 메시지로만 throw
     const msg =
       (isJson && data && (data.message || data.error)) ||
       `HTTP ${r.status}`;
     throw new Error(String(msg));
   }
 
-  // ✅ 정상인데 HTML이 오면(예: 프록시/라우팅 오류) 화면 노출 방지
+
+  //  정상인데 HTML이 오면(예: 프록시/라우팅 오류) 화면 노출 방지
   if (isHtml) {
     // 필요 시 콘솔로만 일부 확인
     console.warn('[jsonFetch] Unexpected HTML response for', url);

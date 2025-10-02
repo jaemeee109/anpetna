@@ -1,7 +1,7 @@
 // src/app/order/pay/[ordersId]/page.tsx
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 
 function resolveApiBase(): string {
@@ -46,8 +46,12 @@ async function loadToss(clientKey: string): Promise<any> {
 export default function OrderPayPage() {
   const { ordersId } = useParams<{ ordersId: string }>();
   const router = useRouter();
+  const ranRef = useRef(false); // ✅ 이 페이지에서 결제 시도는 1회만
 
   useEffect(() => {
+    if (ranRef.current) return;     // ✅ 재마운트/되돌아오기 등에 의한 반복 실행 방지
+    ranRef.current = true;
+
     (async () => {
       try {
         const id = Number(Array.isArray(ordersId) ? ordersId[0] : ordersId);
@@ -81,16 +85,12 @@ export default function OrderPayPage() {
           failUrl: `${origin}/order/pay/fail?ordersId=${id}`,
         });
       } catch (e: any) {
-  alert(e?.message || '결제를 취소하였습니다.');
-  if (typeof window !== 'undefined' && window.history.length > 1) {
-    router.back();
-  } else {
-    router.replace('/order/checkout');
-  }
-}
-
+        // ✅ 위젯 내부에서 취소/닫기 등으로 reject가 발생하는 경우:
+        //    back()로 되돌리면 다시 이 페이지를 타는 루프가 생길 수 있으므로 fail 페이지로 고정 이동
+        alert(e?.message || '결제를 취소하였습니다.');
+        const id = Number(Array.isArray(ordersId) ? ordersId[0] : ordersId);
+        router.replace(`/order/pay/fail?ordersId=${Number.isFinite(id) ? id : ''}`);
+      }
     })();
   }, [ordersId, router]);
-
-  return <div className="px-4 py-10 text-center">결제 페이지로 이동 중…</div>;
 }

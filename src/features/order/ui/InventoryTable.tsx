@@ -98,7 +98,7 @@ export default function InventoryTable({ from, to }: InventoryProps) {
     let pg0 = 0; // ★ 0-base
     const sz = 200;
 
-    const P = new Set<string>(['PENDING', 'PAID', 'SHIPMENT_READY', 'SHIPPED', 'DELIVERED']);
+    const P = new Set<string>(['PAID', 'SHIPMENT_READY', 'SHIPPED', 'DELIVERED']);
     const inprocIds: number[] = [];
     const confIds: number[] = [];
 
