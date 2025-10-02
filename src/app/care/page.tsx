@@ -79,13 +79,6 @@ export default function CarePage() {
     void fetchVenues(center.lat, center.lng, true);
   }
 
-  /** 스크립트 callback 연결/해제 */
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    (window as any).__initNaverMap = initMap;
-    return () => { (window as any).__initNaverMap = undefined; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [center.lat, center.lng]);
 
   /** 마커 전체 제거 */
   function clearMarkers() {
@@ -293,6 +286,40 @@ const goReserve = (v: NearbyVenue) => {
   router.push(`/care/reserve/${id}?name=${name}`);
 };
 
+// 지도 1회 초기화 가드
+const initedRef = useRef(false);
+
+function initMapOnce(retry = 0) {
+  if (initedRef.current) return;
+
+  const nv = getNaver();
+  // 스크립트가 막 로드된 직후 maps 네임스페이스가 준비되기 전에 onReady가 호출될 수 있어
+  // 몇 번만 재시도하여 초기화 보장
+  if (!mapEl.current || !nv?.maps) {
+    if (retry < 30) {
+      setTimeout(() => initMapOnce(retry + 1), 100);
+    }
+    return;
+  }
+
+  // 원래 initMap 내용 그대로 이곳에서 실행
+  const nmap = new nv.maps.Map(mapEl.current, {
+    center: new nv.maps.LatLng(center.lat, center.lng),
+    zoom: 13,
+  });
+  mapRef.current = nmap;
+
+  initedRef.current = true;
+
+  // 최초 진입 시 매장 목록/마커 로드
+  void fetchVenues(center.lat, center.lng, true);
+}
+
+
+
+
+
+
 
 
   return (
@@ -303,14 +330,15 @@ const goReserve = (v: NearbyVenue) => {
       {NAVER_ID ? (
         <>
           <Script
-            id="naver-maps"
-            src={`https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${encodeURIComponent(
-              NAVER_ID!
-            )}&submodules=geocoder&callback=__initNaverMap`}
-            strategy="afterInteractive"
-            onReady={() => { try { (window as any).__initNaverMap?.(); } catch {} }}
-          />
-          <div ref={mapEl} className="care-map" aria-label="케어 매장 지도" />
+          id="naver-maps"
+          src={`https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${encodeURIComponent(
+            NAVER_ID!
+          )}&submodules=geocoder`}
+          strategy="afterInteractive"
+          onReady={() => { try { initMapOnce(); } catch {} }}
+        />
+        <div ref={mapEl} className="care-map" aria-label="케어 매장 지도" />
+
         </>
       ) : (
         <div className="care-map care-map-empty">

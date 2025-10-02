@@ -260,27 +260,116 @@ export async function modifyMember(body: ModifyMemberReq): Promise<ReadMemberOne
 }
 
 export async function removeMember(): Promise<void> {
-  // 백엔드는 GET /member/delete 사용
-  await http.get('/member/delete');
-  // 로컬 인증 흔적 제거
-  purgeAuthArtifacts();
-}
+  let lastErr: any;
 
-export async function signup(body: JoinMemberReq): Promise<JoinMemberRes> {
-  const paths = ['/jwt/signup','/member/signup','/jwt/signup'];
   for (const b of bases()) {
-    for (const p of paths) {
-      try {
-        return await jsonFetch<JoinMemberRes>(`${b}${p}`, {
-          method:'POST', credentials:'include',
-          headers:{ 'Content-Type':'application/json' },
-          body: JSON.stringify(body),
-        });
-      } catch {}
+    const url = `${b}/member/delete`;
+    try {
+      const resp = await fetch(url, {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json; charset=utf-8',
+          ...authHeaders(),
+        },
+      });
+
+      const ct = resp.headers.get('content-type') || '';
+      const isJson = /application\/json/i.test(ct);
+      const text = await resp.text().catch(() => '');
+      let data: any = null;
+      if (isJson && text) {
+        try { data = JSON.parse(text); } catch { data = null; }
+      }
+
+      if (!resp.ok) {
+        // 비밀번호 불일치 → 401이면 숫자 노출 대신 안내문구
+        if (resp.status === 401) {
+          alert('비밀번호가 일치하지 않습니다. 다시 입력해 주세요.');
+          throw new Error('INVALID_PASSWORD');
+        }
+        //  기타 오류도 가독성 있는 메시지로
+        const msg =
+          (isJson && data && (data.message || data.error || data.detail || data.msg)) ||
+          text ||
+          `요청 실패 (HTTP ${resp.status})`;
+        alert(msg);
+        throw new Error(String(msg));
+      }
+
+      // 성공 시 인증 흔적 제거
+      purgeAuthArtifacts();
+      return;
+    } catch (e) {
+      lastErr = e;
+      // 다음 base 후보로 계속 시도
     }
   }
+
+  if (lastErr instanceof Error) throw lastErr;
+  throw new Error('회원 탈퇴 실패');
+}
+
+
+export async function signup(body: JoinMemberReq): Promise<JoinMemberRes> {
+  const paths = ['/jwt/signup', '/member/signup', '/jwt/signup'];
+  let lastErr: any;
+
+  for (const b of bases()) {
+    for (const p of paths) {
+      const url = `${b}${p}`;
+      try {
+        const r = await fetch(url, {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json; charset=utf-8',
+          },
+          body: JSON.stringify(body),
+        });
+
+        const ct = r.headers.get('content-type') || '';
+        const isJson = /application\/json/i.test(ct);
+        const text = await r.text().catch(() => '');
+        let data: any = null;
+        if (isJson && text) {
+          try { data = JSON.parse(text); } catch { data = null; }
+        }
+
+        if (!r.ok) {
+          // 본문으로부터 메시지 우선 추출
+          const msg =
+            (isJson && data && (data.message || data.error || data.detail || data.msg)) ||
+            text ||
+            `HTTP ${r.status}`;
+
+          //  400/409/500 + "duplicate/중복/이미/already/exist" → 중복 가입으로 간주
+          const lower = String(msg).toLowerCase();
+          const isDupStatus = r.status === 400 || r.status === 409 || r.status === 500;
+          const isDupText = /duplicate|중복|이미|already|exist/.test(lower);
+          if (isDupStatus && isDupText) {
+            // 호출측에서 그대로 alert에 쓸 수 있게 한글 메시지로 고정
+            throw new Error('이미 존재하는 회원입니다.');
+          }
+
+          throw new Error(String(msg));
+        }
+
+        // 정상: JSON이면 파싱 데이터, 아니면 undefined (기존 jsonFetch 반환 규약과 호환)
+        return (isJson ? (data as JoinMemberRes) : (undefined as unknown as JoinMemberRes));
+      } catch (e) {
+        lastErr = e;
+        // 다음 후보(base/path)로 계속 시도
+      }
+    }
+  }
+
+  if (lastErr instanceof Error) throw lastErr;
   throw new Error('회원가입 실패');
 }
+
 
 /** 로그인 */
 export async function login(body: LoginReq): Promise<LoginRes> {

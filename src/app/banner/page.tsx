@@ -43,6 +43,36 @@ async function safeJson<T = any>(res: Response): Promise<T | null> {
   }
 }
 
+/** ===== 토큰 유틸: localStorage → sessionStorage → 쿠키 fallback ===== */
+function getCookie(name: string) {
+  if (typeof document === 'undefined') return null;
+  const safe = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const m = document.cookie.match(new RegExp('(?:^|; )' + safe + '=([^;]*)'));
+  return m ? decodeURIComponent(m[1]) : null;
+}
+function getTokenFromStorage(): string {
+  if (typeof window === 'undefined') return '';
+  let t =
+    localStorage.getItem('accessToken') ||
+    sessionStorage.getItem('accessToken') ||
+    localStorage.getItem('access_token') ||
+    sessionStorage.getItem('access_token') ||
+    '';
+  if (!t) {
+    const raw =
+      getCookie('Authorization') ||
+      getCookie('authorization') ||
+      getCookie('accessToken') ||
+      '';
+    if (raw) t = raw.replace(/^Bearer\s+/i, '');
+  }
+  return t || '';
+}
+function authHeaders(): HeadersInit {
+  const t = getTokenFromStorage();
+  return t ? { Authorization: t.startsWith('Bearer ') ? t : `Bearer ${t}` } : {};
+}
+
 export default function AdminBannerPage() {
   const [banners, setBanners] = useState<Banner[]>([]);
 
@@ -61,16 +91,15 @@ export default function AdminBannerPage() {
 
   /** 배너 목록 조회 */
   async function fetchBanners() {
-    const token = localStorage.getItem('accessToken');
+    const token = getTokenFromStorage();
     if (!token) {
       alert('관리자 토큰이 없습니다. 먼저 로그인하세요.');
+      setBanners([]);
       return;
     }
 
     const url = `${resolveApiBase()}/adminPage/banner/allList?page=0&size=20&sort=sortOrder,asc`;
-    const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const res = await fetch(url, { headers: authHeaders() });
 
     if (res.status === 401 || res.status === 403) {
       alert('관리자 인증이 필요합니다. 관리자 계정으로 로그인 후 다시 시도하세요.');
@@ -88,12 +117,12 @@ export default function AdminBannerPage() {
     setBanners(Array.isArray(list) ? list : []);
   }
 
-  /** 배너 등록 (Create: multipart/form-data + @ModelAttribute CreateBannerReq + @RequestPart("image")) */
+  /** 배너 등록 */
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!file) return alert('이미지를 선택하세요');
 
-    const token = localStorage.getItem('accessToken');
+    const token = getTokenFromStorage();
     if (!token) {
       alert('관리자 토큰이 없습니다. 먼저 로그인하세요.');
       return;
@@ -103,15 +132,12 @@ export default function AdminBannerPage() {
     formData.append('image', file);
     formData.append('linkUrl', linkUrl);
     formData.append('sortOrder', String(sortOrder));
-    formData.append('active', String(active)); // ✅ 필수값: active
-
-    // startAt/endAt 사용 시 ISO-8601 로 추가: formData.append('startAt', '2025-09-25T09:00:00');
-    // formData.append('endAt', '2025-09-30T23:59:59');
+    formData.append('active', String(active));
 
     const res = await fetch(`${resolveApiBase()}/adminPage/banner/create`, {
       method: 'POST',
       body: formData,
-      headers: { Authorization: `Bearer ${token}` },
+      headers: authHeaders(),
     });
 
     if (!res.ok) {
@@ -126,12 +152,12 @@ export default function AdminBannerPage() {
     fetchBanners();
   }
 
-  /** 배너 수정 (Update: multipart/form-data + @ModelAttribute UpdateBannerReq + 선택 이미지) */
+  /** 배너 수정 */
   async function handleUpdate(e: React.FormEvent) {
     e.preventDefault();
     if (!editId) return;
 
-    const token = localStorage.getItem('accessToken');
+    const token = getTokenFromStorage();
     if (!token) {
       alert('관리자 토큰이 없습니다. 먼저 로그인하세요.');
       return;
@@ -140,17 +166,13 @@ export default function AdminBannerPage() {
     const formData = new FormData();
     formData.append('linkUrl', editLink);
     formData.append('sortOrder', String(editOrder));
-    formData.append('active', String(editActive)); // UpdateBannerReq는 null 허용이나, 명시적으로 보내면 반영됨
+    formData.append('active', String(editActive));
     if (editFile) formData.append('image', editFile);
 
-    // 필요 시 시간 필드도 동일 포맷으로:
-    // formData.append('startAt', '2025-09-25T09:00:00');
-    // formData.append('endAt', '2025-09-30T23:59:59');
-
     const res = await fetch(`${resolveApiBase()}/adminPage/banner/update/${editId}`, {
-      method: 'POST', // 컨트롤러가 @PostMapping("/update/{bannerId}")
+      method: 'POST',
       body: formData,
-      headers: { Authorization: `Bearer ${token}` },
+      headers: authHeaders(),
     });
 
     if (!res.ok) {
@@ -163,20 +185,20 @@ export default function AdminBannerPage() {
     fetchBanners();
   }
 
-  /** 배너 삭제 (Delete) */
+  /** 배너 삭제 */
   async function handleDelete(id?: number) {
     if (!id) return;
     if (!confirm('삭제하시겠습니까?')) return;
 
-    const token = localStorage.getItem('accessToken');
+    const token = getTokenFromStorage();
     if (!token) {
       alert('관리자 토큰이 없습니다. 먼저 로그인하세요.');
       return;
     }
 
     const res = await fetch(`${resolveApiBase()}/adminPage/banner/delete/${id}`, {
-      method: 'POST', // 컨트롤러가 @PostMapping("/delete/{bannerId}")
-      headers: { Authorization: `Bearer ${token}` },
+      method: 'POST',
+      headers: authHeaders(),
     });
 
     if (!res.ok) {
@@ -213,7 +235,6 @@ export default function AdminBannerPage() {
           value={sortOrder}
           onChange={(e) => setSortOrder(Number(e.target.value))}
         />
-        {/* active 스위치 */}
         <label className="admin-flag">
           <input
             type="checkbox"
@@ -255,7 +276,7 @@ export default function AdminBannerPage() {
         ))}
       </div>
 
-      {/* 수정 폼 (선택된 경우만 노출) */}
+      {/* 수정 폼 */}
       {editId && (
         <form onSubmit={handleUpdate} className="admin-banner-form">
           <h2>배너 수정</h2>

@@ -1,7 +1,8 @@
 // src/app/member/info/page.tsx
 'use client';
 
-import { useEffect, useMemo, useState, FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import type { ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import PawIcon from '@/components/icons/Paw';
 
@@ -55,8 +56,9 @@ export default function MemberInfoPage() {
     memberDetailAddress: '',
     memberHasPet: 'N',
   });
-  const set = <K extends keyof MemberForm>(k: K, v: MemberForm[K]) =>
+  function set<K extends keyof MemberForm>(k: K, v: MemberForm[K]) {
     setForm((f) => ({ ...f, [k]: v }));
+  }
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -87,7 +89,6 @@ export default function MemberInfoPage() {
     return m ? decodeURIComponent(m[1]) : null;
   }
 
-  // 토큰을 LS/쿠키 여러 키에서 탐색
   function getAccessToken(): string | null {
     if (typeof window === 'undefined') return null;
     const ls = localStorage;
@@ -112,7 +113,14 @@ export default function MemberInfoPage() {
     return h;
   }
 
-  // JWT payload 디코딩(멤버 아이디 추출용)
+  function hasAnyAuth(): boolean {
+    try {
+      return !!(getAccessToken() || getCookie('JSESSIONID'));
+    } catch {
+      return false;
+    }
+  }
+
   function decodeJwtPayload(token?: string | null): any | null {
     if (!token) return null;
     const parts = token.split('.');
@@ -127,7 +135,49 @@ export default function MemberInfoPage() {
 
   const nz = (v: any, dflt = '') => String(v ?? '').trim() || dflt;
 
-  // -------- 내 정보 로드: 토큰/LS에서 id → /member/my_page/{id} 먼저 --------
+  /** 객체/응답에서 memberId 후보를 안전 추출 (문자/숫자만) */
+  function pickIdFrom(anyVal: any): string {
+    const val = anyVal && typeof anyVal === 'object' ? anyVal : {};
+    const candList: any[] = [
+      (val as any).memberId,
+      (val as any).loginId,
+      (val as any).username,
+      (val as any).id,
+      (val as any).result?.memberId,
+      (val as any).result?.loginId,
+      (val as any).result?.username,
+      (val as any).result?.id,
+      (val as any).data?.memberId,
+      (val as any).data?.id,
+    ];
+    const cand = candList.find(
+      (x) => typeof x === 'string' || typeof x === 'number'
+    );
+    return cand !== undefined ? String(cand) : '';
+  }
+
+  /** 응답(JSON)에서 회원 프로필 객체를 한 번에 뽑기 */
+  function pickProfileFrom(json: any): any | null {
+    const j = json ?? {};
+    const src =
+      j?.result?.readMemberOne ??
+      j?.result?.readOneMember ??
+      j?.result?.member ??
+      j?.result ??
+      j?.data ??
+      j?.item ??
+      j?.member ??
+      null;
+    // 최소 필드 하나라도 있으면 프로필로 간주
+    if (src && typeof src === 'object') {
+      const hasAny =
+        src.memberId ?? src.id ?? src.memberName ?? src.name ?? src.email ?? src.memberEmail;
+      return hasAny ? src : null;
+    }
+    return null;
+  }
+
+  // ---------------- 내 정보 로드(관리자/일반 공통) ----------------
   useEffect(() => {
     let mounted = true;
 
@@ -136,117 +186,122 @@ export default function MemberInfoPage() {
       setErr(null);
       setOk(null);
 
+      // 상세 조회 시도(여러 경로 순차 시도)
+      const tryDetailById = async (id: string): Promise<boolean> => {
+        const paths = [
+          `/member/my_page/${encodeURIComponent(id)}`, // 일반 사용자 우선 경로
+          `/member/readOne/${encodeURIComponent(id)}`, // 관리자/권한 차단 시 보조 경로
+        ];
+        for (const p of paths) {
+          try {
+            const r = await fetch(api(p), {
+              method: 'GET',
+              credentials: 'include',
+              headers: authHeaders(),
+            });
+            if (!r.ok) continue;
+
+            const data = await r.json().catch(() => ({} as any));
+            const src = pickProfileFrom(data);
+            if (!src) continue;
+
+            if (!mounted) return true;
+            setForm({
+              memberId: nz(src.memberId || src.id),
+              memberPw: '',
+              memberName: nz(src.memberName || src.name),
+              memberBirthY: nz(src.memberBirthY || src.birthY),
+              memberBirthM: nz(src.memberBirthM || src.birthM).padStart(2, '0'),
+              memberBirthD: nz(src.memberBirthD || src.birthD).padStart(2, '0'),
+              memberBirthGM: ((src.memberBirthGM || src.birthGM || src.solarLunar) === '음력'
+                ? '음력'
+                : '양력') as GM,
+              memberEmail: nz(src.memberEmail || src.email),
+              memberPhone: nz(src.memberPhone || src.phone || src.tel),
+              memberZipCode: nz(src.memberZipCode || src.zipCode),
+              memberRoadAddress: nz(src.memberRoadAddress || src.roadAddress),
+              memberDetailAddress: nz(src.memberDetailAddress || src.detailAddress),
+              memberHasPet: ((src.memberHasPet || src.hasPet) === 'Y' ? 'Y' : 'N') as YesNo,
+            });
+            return true;
+          } catch {
+            // 다음 후보 계속
+          }
+        }
+        return false;
+      };
+
       try {
+        // 1) 토큰/LS에서 id 추출 → 상세 조회
         const ls = typeof window !== 'undefined' ? window.localStorage : null;
         const token = getAccessToken();
         const payload = decodeJwtPayload(token);
-        const idFromToken = payload?.memberId || payload?.username || payload?.sub || '';
+        const idFromToken =
+          payload?.memberId || payload?.loginId || payload?.username || payload?.sub || '';
         const idFromLs =
           ls?.getItem('memberId') || ls?.getItem('loginId') || ls?.getItem('username') || '';
+        let myId = String(idFromToken || idFromLs || '');
 
-        let myId = idFromToken || idFromLs;
-
-        // 1) 먼저 id가 있으면 바로 상세 조회
         if (myId) {
-          const infoRes = await fetch(api(`/member/my_page/${encodeURIComponent(myId)}`), {
+          const ok = await tryDetailById(myId);
+          if (ok) return;
+        }
+
+        // 2) 무인자 me 엔드포인트에서 프로필/아이디 확보
+        try {
+          const meRes = await fetch(api('/member/readOne'), {
             method: 'GET',
             credentials: 'include',
             headers: authHeaders(),
           });
+          if (meRes.ok) {
+            const meJson = await meRes.json().catch(() => ({} as any));
 
-          if (infoRes.ok) {
-            const data = await infoRes.json().catch(() => ({} as any));
-            const src =
-              data?.result?.readMemberOne ||
-              data?.result?.readOneMember ||
-              data?.result?.member ||
-              data?.result ||
-              data;
-
-            if (mounted) {
-              setForm({
-                memberId: nz(src.memberId || src.id),
-                memberPw: '',
-                memberName: nz(src.memberName || src.name),
-                memberBirthY: nz(src.memberBirthY || src.birthY),
-                memberBirthM: nz(src.memberBirthM || src.birthM).padStart(2, '0'),
-                memberBirthD: nz(src.memberBirthD || src.birthD).padStart(2, '0'),
-                memberBirthGM: ((src.memberBirthGM || src.birthGM || src.solarLunar) === '음력'
-                  ? '음력'
-                  : '양력') as GM,
-                memberEmail: nz(src.memberEmail || src.email),
-                memberPhone: nz(src.memberPhone || src.phone || src.tel), // ✅ src로 수정
-                memberZipCode: nz(src.memberZipCode || src.zipCode),
-                memberRoadAddress: nz(src.memberRoadAddress || src.roadAddress),
-                memberDetailAddress: nz(src.memberDetailAddress || src.detailAddress),
-                memberHasPet: ((src.memberHasPet || src.hasPet) === 'Y' ? 'Y' : 'N') as YesNo,
-              });
+            // (a) 프로필이 통째로 오면 바로 채우고 끝
+            const meProfile = pickProfileFrom(meJson);
+            if (meProfile) {
+              if (mounted) {
+                setForm({
+                  memberId: nz(meProfile.memberId || meProfile.id),
+                  memberPw: '',
+                  memberName: nz(meProfile.memberName || meProfile.name),
+                  memberBirthY: nz(meProfile.memberBirthY || meProfile.birthY),
+                  memberBirthM: nz(meProfile.memberBirthM || meProfile.birthM).padStart(2, '0'),
+                  memberBirthD: nz(meProfile.memberBirthD || meProfile.birthD).padStart(2, '0'),
+                  memberBirthGM:
+                    ((meProfile.memberBirthGM || meProfile.birthGM || meProfile.solarLunar) === '음력'
+                      ? '음력'
+                      : '양력') as GM,
+                  memberEmail: nz(meProfile.memberEmail || meProfile.email),
+                  memberPhone: nz(meProfile.memberPhone || meProfile.phone || meProfile.tel),
+                  memberZipCode: nz(meProfile.memberZipCode || meProfile.zipCode),
+                  memberRoadAddress: nz(meProfile.memberRoadAddress || meProfile.roadAddress),
+                  memberDetailAddress: nz(meProfile.memberDetailAddress || meProfile.detailAddress),
+                  memberHasPet: ((meProfile.memberHasPet || meProfile.hasPet) === 'Y' ? 'Y' : 'N') as YesNo,
+                });
+              }
+              return;
             }
-            return; // 상세 조회 성공했으면 끝
+
+            // (b) 프로필은 없지만 id만 있으면 상세 재시도
+            myId = pickIdFrom(meJson);
+            if (myId) {
+              const ok = await tryDetailById(myId);
+              if (ok) return;
+            }
           }
+        } catch {
+          // 무인자 me가 없거나 실패 → 아래로
         }
 
-        // 2) 토큰/LS에서 못 얻었거나 실패하면 '/member/readOne'로 보조 조회
-        const meRes = await fetch(api('/member/readOne'), {
-          method: 'GET',
-          credentials: 'include',
-          headers: authHeaders(),
-        });
-
-        if (!meRes.ok) {
-          // me가 401/403이어도 my_page로 이미 시도했으니 여기서 최종 로그인 이동
+        // 3) 최종 실패 처리
+        if (!hasAnyAuth()) {
           router.replace('/member/login');
-          return;
-        }
-
-        const meJson = await meRes.json().catch(() => ({} as any));
-        myId = meJson?.result || meJson?.memberId || meJson?.id;
-        if (!myId) {
-          router.replace('/member/login');
-          return;
-        }
-
-        // 3) me에서 얻은 id로 상세 조회
-        const infoRes2 = await fetch(api(`/member/my_page/${encodeURIComponent(myId)}`), {
-          method: 'GET',
-          credentials: 'include',
-          headers: authHeaders(),
-        });
-
-        if (!infoRes2.ok) {
-          router.replace('/member/login');
-          return;
-        }
-
-        const data2 = await infoRes2.json().catch(() => ({} as any));
-        const src2 =
-          data2?.result?.readMemberOne ||
-          data2?.result?.readOneMember ||
-          data2?.result?.member ||
-          data2?.result ||
-          data2;
-
-        if (mounted) {
-          setForm({
-            memberId: nz(src2.memberId || src2.id),
-            memberPw: '',
-            memberName: nz(src2.memberName || src2.name),
-            memberBirthY: nz(src2.memberBirthY || src2.birthY),
-            memberBirthM: nz(src2.memberBirthM || src2.birthM).padStart(2, '0'),
-            memberBirthD: nz(src2.memberBirthD || src2.birthD).padStart(2, '0'),
-            memberBirthGM: ((src2.memberBirthGM || src2.birthGM || src2.solarLunar) === '음력'
-              ? '음력'
-              : '양력') as GM,
-            memberEmail: nz(src2.memberEmail || src2.email),
-            memberPhone: nz(src2.memberPhone || src2.phone || src2.tel),
-            memberZipCode: nz(src2.memberZipCode || src2.zipCode),
-            memberRoadAddress: nz(src2.memberRoadAddress || src2.roadAddress),
-            memberDetailAddress: nz(src2.memberDetailAddress || src2.detailAddress),
-            memberHasPet: ((src2.memberHasPet || src2.hasPet) === 'Y' ? 'Y' : 'N') as YesNo,
-          });
+        } else {
+          if (mounted) setErr('내 정보 조회에 실패했습니다.');
         }
       } catch (e: any) {
-        setErr(e?.message || '내 정보 조회 중 오류');
+        if (mounted) setErr(e?.message || '내 정보 조회 중 오류');
       } finally {
         if (mounted) setLoading(false);
       }
@@ -257,7 +312,7 @@ export default function MemberInfoPage() {
     };
   }, [router]);
 
-  // -------- 저장 --------
+  // ---------------- 저장(비번 공란은 필드 제거) ----------------
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (submitting || loading) return;
@@ -266,7 +321,12 @@ export default function MemberInfoPage() {
 
     try {
       setSubmitting(true);
-      const flat = { ...form, memberPw: (form.memberPw ?? '').trim() };
+
+      const flat: any = { ...form };
+      if (typeof flat.memberPw === 'string') {
+        flat.memberPw = flat.memberPw.trim();
+        if (!flat.memberPw) delete flat.memberPw; // 공란이면 덮어쓰기 방지
+      }
 
       const resp = await fetch(api('/member/modify'), {
         method: 'POST',
@@ -282,7 +342,7 @@ export default function MemberInfoPage() {
       if (!resp.ok) throw new Error(`회원 정보 수정 실패 (HTTP ${resp.status})`);
 
       setOk('수정이 완료되었습니다.');
-      set('memberPw', '');
+      set('memberPw', ''); // 저장 후 입력칸은 다시 공란 유지
     } catch (e: any) {
       setErr(e?.message || '회원 정보 수정 중 오류');
     } finally {
@@ -299,7 +359,9 @@ export default function MemberInfoPage() {
 
   return (
     <main className="mx-auto max-w-[720px] px-4 py-8 text-center">
-      <h1 className="text-2xl font-semibold mb-6">My Information&nbsp;<PawIcon/></h1>
+      <h1 className="text-2xl font-semibold mb-6">
+        My Information&nbsp;<PawIcon/>
+      </h1>
       <hr className="border-gray-200 mb-[40px]" />
 
       <form onSubmit={onSubmit}>
@@ -316,7 +378,6 @@ export default function MemberInfoPage() {
 
         <Row label="NAME"><input className="input" value={form.memberName} disabled /></Row>
 
-        {/* NAME 바로 아래 TEL 추가 (디자인 동일: className="input") */}
         <Row label="TEL">
           <input
             className="input"
@@ -396,7 +457,7 @@ export default function MemberInfoPage() {
   );
 }
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
+function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="row">
       <span className="label">{label}</span>

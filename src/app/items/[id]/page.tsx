@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useAddCart } from '@/features/cart/hooks/useCart';
 import ReviewSection from '@/features/review/ui/ReviewSection';
+import { pickHttpErrorMessage } from '@/shared/data/http';
 
 
 /** 가격 포맷(1,000 단위 + 원) */
@@ -320,19 +321,25 @@ export default function ItemDetailPage() {
             <button
               type="button"
               className="btn-3d btn-white btn-cta rounded border"
-              onClick={() => {
-                // ✅ 비회원 가드
-                if (!getAccessToken()) {
-                  alert('로그인 후 이용이 가능합니다');
-                  return;
-                }
-                // ✅ 품절 가드
-                if (soldOut) {
-                  alert('품절된 상품입니다');
-                  return;
-                }
-                addMut.mutate({ itemId: Number(id), quantity: Math.max(1, Number(qty || 1)) });
-              }}
+              onClick={async () => {
+                  
+                  if (!getAccessToken()) {
+                    alert('로그인 후 이용이 가능합니다');
+                    return;
+                  }
+                 
+                  if (soldOut) {
+                    alert('품절된 상품입니다');
+                    return;
+                  }
+                  try {
+                    await addMut.mutateAsync({ itemId: Number(id), quantity: Math.max(1, Number(qty || 1)) });
+                    alert('장바구니에 담겼습니다.');
+                  } catch (err) {
+                    alert(pickHttpErrorMessage(err));
+                  }
+                }}
+
               disabled={addMut.isPending}
             >
               장바구니
@@ -340,29 +347,39 @@ export default function ItemDetailPage() {
             <button
               type="button"
               className="btn-3d btn-white btn-cta rounded border"
-              onClick={() => {
-                // ✅ 비회원 가드
+             onClick={async () => {
+
                 if (!getAccessToken()) {
                   alert('로그인 후 이용이 가능합니다');
                   return;
                 }
-                // ✅ 품절 가드
+                
                 if (soldOut) {
                   alert('품절된 상품입니다');
                   return;
                 }
-                // 현재 페이지 params에서 [id] 추출 (기존 로직 유지)
-                const m = location.pathname.match(/\/items\/(\d+)/);
-                const id = m ? Number(m[1]) : 0;
 
-                // ✅ 선택 수량 그대로 전달 + 파라미터 키는 'qty'
+
+                const m = location.pathname.match(/\/items\/(\d+)/);
+                const parsedId = m ? Number(m[1]) : 0;
                 const q = Math.max(1, Number(qty || 1));
-                if (id > 0) {
-                  location.href = `/order/checkout?itemId=${id}&qty=${q}`;
-                } else {
+
+                if (parsedId <= 0) {
                   alert('상품 정보를 확인할 수 없습니다.');
+                  return;
+                }
+
+                try {
+                  // 재고 부족 시 여기서 에러로 떨어져서 아래로 이동하지 않음
+                  await addMut.mutateAsync({ itemId: parsedId, quantity: q });
+
+                  //  통과 시에만 주문서로 이동
+                  location.href = `/order/checkout?itemId=${parsedId}&qty=${q}`;
+                } catch (err) {
+                  alert(pickHttpErrorMessage(err)); // 예: "현재 남은 재고는 n개입니다. 주문 수량을 조정해주세요"
                 }
               }}
+
             >
               주문하기
             </button>

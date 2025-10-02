@@ -26,6 +26,23 @@ const VENUE_PATHS = {
   ADMIN_ROOT: withPrefix('/admin/venue'),
 } as const;
 
+
+
+async function postWithRetry<T = any>(url: string, body: any, retry = 1): Promise<T> {
+  try {
+    const { data } = await http.post(url, body);
+    return (data?.result ?? data) as T;
+  } catch (err: any) {
+    // 네트워크/5xx 계열만 1회 재시도
+    const code = Number(err?.response?.status ?? 0);
+    if (retry > 0 && (code === 0 || code >= 500)) {
+      return postWithRetry<T>(url, body, retry - 1);
+    }
+    throw err;
+  }
+}
+
+
 function pickArray<T = any>(data: any): T[] {
   if (Array.isArray(data)) return data as T[];
   if (Array.isArray(data?.items)) return data.items as T[]; 
@@ -76,21 +93,19 @@ export async function createHospitalReservation(
   venueId: number,
   body: CreateHospitalReservationReq
 ): Promise<CreateReservationRes> {
-  // 백엔드 스펙에 맞춰 venueId를 경로에 포함
-  const url = `${VENUE_PATHS.VENUE_ROOT}/${venueId}/hospital/reservations`; // :contentReference[oaicite:9]{index=9}
-  const { data } = await http.post(url, body);
-  return data as CreateReservationRes;
+  const url = `${VENUE_PATHS.VENUE_ROOT}/${venueId}/hospital/reservations`;
+  return await postWithRetry<CreateReservationRes>(url, body);
 }
-
 
 // 호텔 예약 생성 — POST /venue/{venueId}/hotel/reservations
 export async function createHotelReservation(
   venueId: number,
   body: CreateHotelReservationReq
 ): Promise<CreateReservationRes> {
-  const { data } = await http.post(`${VENUE_PATHS.VENUE_ROOT}/${venueId}/hotel/reservations`, body);
-  return data as CreateReservationRes;
+  const url = `${VENUE_PATHS.VENUE_ROOT}/${venueId}/hotel/reservations`;
+  return await postWithRetry<CreateReservationRes>(url, body);
 }
+
 
 /** 관리자: 예약 리스트 — GET /admin/venue/reservations */
 export async function adminListReservations(params: {

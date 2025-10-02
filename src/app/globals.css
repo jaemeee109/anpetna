@@ -1,3 +1,4 @@
+/*src/app/globals.css*/
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -384,4 +385,19 @@ a.faq-ask:focus {
   margin-top: 4px;
   margin-bottom: 20px; /* 원하는 px 값으로 줄이기 */
 }
+
+/* ===== Header nav guard: 페이지 CSS가 헤더를 오염하지 않도록 스코프 강화 ===== */
+.apn-header .apn-nav .pill { border: 1px solid #ffffff !important; }
+
+/* 상단 1뎁스 탭만 윤곽선 표시 (드롭다운 내부 버튼에는 적용 안 함) */
+.apn-header .apn-nav > .pill.pill--active { outline: 2px solid #111; }
+.apn-header .apn-nav .dropdown .pill { outline: none !important; }
+
+/* 드롭다운 메뉴 기본 박스 보장 */
+.apn-header .apn-nav .dropdown-menu {
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 8px 24px rgba(0,0,0,.08);
+}
+
+
 

@@ -1,5 +1,4 @@
 // app/layout.tsx
-export const dynamic = 'force-dynamic';
 import type { ReactNode } from 'react';
 import './globals.css';
 import Header from '@/components/layout/Header';

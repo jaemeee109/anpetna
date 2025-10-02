@@ -98,11 +98,12 @@ export const itemApi = {
   if (orderByPrice) url.searchParams.set('orderByPrice', orderByPrice);
   if (orderBySales) url.searchParams.set('orderBySales', orderBySales);
 
-  // 페이지: UI 1-base → 서버 0-base
-  const page0 = Math.max(0, Number(params.page ?? 1) - 1);
-  const size  = Math.max(1, Number(params.size ?? 12));
-  url.searchParams.set('page', String(page0));
-  url.searchParams.set('size', String(size));
+
+const page0 = Math.max(0, Number(params.page ?? 0));
+const size  = Math.max(1, Number(params.size ?? 12));
+url.searchParams.set('page', String(page0));
+url.searchParams.set('size', String(size));
+
 
   // 품절 제외 옵션(선택)
   if (params.excludeSoldOut) {

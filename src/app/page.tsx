@@ -4,7 +4,8 @@ import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import './home.css';
 import Heading from '@/components/icons/Heading';
-import HeartIcon from '@/src/components/icons/HeartIcon';
+import HeartIcon from '@/components/icons/HeartIcon';
+
 function resolveApiBase(): string {
   const envBase =
     (process.env.NEXT_PUBLIC_API_BASE as string | undefined) ||

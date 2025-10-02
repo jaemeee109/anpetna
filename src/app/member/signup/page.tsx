@@ -1,6 +1,8 @@
+// src/app/member/signup/page.tsx
 'use client';
 
-import { useMemo, useState, FormEvent } from 'react';
+import { useMemo, useState } from 'react';
+import type { FormEvent, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 
 type GM = '양력' | '음력';
@@ -26,13 +28,24 @@ interface Form {
 export default function SignupPage() {
   const router = useRouter();
 
-  // YYYY/MM/DD 옵션
+  // YYYY/MM/DD 옵션 (만 14세 이상 상한 적용)
   const years = useMemo(() => {
-    const now = new Date().getFullYear();
-    return Array.from({ length: 100 }, (_, i) => String(now - i));
+    const now = new Date();
+    const maxYear = now.getFullYear() - 14; // 만 14세 기준
+    const minYear = Math.max(1900, maxYear - 100);
+    const arr: number[] = [];
+    for (let y = maxYear; y >= minYear; y--) arr.push(y);
+    return arr;
   }, []);
-  const months = useMemo(() => Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0')), []);
-  const days = useMemo(() => Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, '0')), []);
+
+  const months = useMemo(
+    () => Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0')),
+    []
+  );
+  const days = useMemo(
+    () => Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, '0')),
+    []
+  );
 
   const [form, setForm] = useState<Form>({
     memberId: '',
@@ -68,12 +81,15 @@ export default function SignupPage() {
         }`.replace(/:$/, '')
       : '');
 
-  // 접두어 포함 URL 생성
-  function apiWithPrefix(path: string) {
-    const prefix = (process.env.NEXT_PUBLIC_API_PREFIX as string | undefined) ?? '/anpetna';
-    const normalized = path.startsWith('/') ? path : `/${path}`;
-    return new URL(`${prefix}${normalized}`, BASE).toString();
-  }
+
+function apiWithPrefix(path: string) {
+  const raw = process.env.NEXT_PUBLIC_API_PREFIX;
+  const prefix = typeof raw === 'string' ? raw.trim() : '';
+  const normalized = path.startsWith('/') ? path : `/${path}`;
+  const finalPath = prefix ? `${prefix}${normalized}` : normalized;
+  return new URL(finalPath, BASE).toString();
+}
+
   // 접두어 없이 URL 생성
   function apiNoPrefix(path: string) {
     const normalized = path.startsWith('/') ? path : `/${path}`;
@@ -82,127 +98,127 @@ export default function SignupPage() {
 
   // 안전 트림 + 기본값
   const nz = (v: string, dflt = '-') => (String(v ?? '').trim() || dflt);
+
   async function readBody(resp: Response) {
     const text = await resp.text().catch(() => '');
     try {
       const j = text ? JSON.parse(text) : null;
       if (j && typeof j === 'object') {
         const msg =
-          j.message || j.error || j.detail || j.msg || j.status || j.reason || JSON.stringify(j, null, 2);
+          (j as any).message ||
+          (j as any).error ||
+          (j as any).detail ||
+          (j as any).msg ||
+          (j as any).status ||
+          (j as any).reason ||
+          JSON.stringify(j, null, 2);
         return typeof msg === 'string' ? msg : JSON.stringify(msg, null, 2);
       }
     } catch {}
     return text;
   }
 
-  // === 가입 제출 ===
-  async function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    if (submitting) return;
-
-    if (!form.memberId.trim() || !form.memberPw.trim() || !form.memberName.trim()) {
-      setErr('ID, PASSWORD, NAME은 필수입니다.');
-      return;
-    }
-    if (!form.memberBirthY || !form.memberBirthM || !form.memberBirthD) {
-      setErr('생년월일(YYYY/MM/DD)을 선택해주세요.');
-      return;
-    }
-    if (!form.memberEmail.includes('@')) {
-      setErr("이메일에 '@'를 포함해 입력해주세요.");
-      return;
-    }
-
-    try {
-      setSubmitting(true);
-      setErr(null);
-
-      // 보수적으로 값 보정
-      const flat = {
-        memberId: nz(form.memberId),
-        memberPw: nz(form.memberPw),
-        memberName: nz(form.memberName),
-
-        memberBirthY: nz(form.memberBirthY),
-        memberBirthM: nz(form.memberBirthM.padStart(2, '0')),
-        memberBirthD: nz(form.memberBirthD.padStart(2, '0')),
-        memberBirthGM: (form.memberBirthGM || '양력') as GM,
-
-        memberGender: 'U',
-        memberHasPet: (form.memberHasPet || 'N') as YesNo,
-
-        memberPhone: nz(form.memberPhone, '00000000000'),
-        smsStsYn: (form.smsStsYn || 'N') as YesNo,
-
-        memberEmail: nz(form.memberEmail, 'user@example.com'),
-        emailStsYn: 'N' as YesNo,
-
-        memberRoadAddress: nz(form.memberRoadAddress, '-'),
-        memberZipCode: nz(form.memberZipCode, '00000'),
-        memberDetailAddress: nz(form.memberDetailAddress, '-'),
-
-        memberRole: 'USER' as any,
-        memberSocial: false,
-        memberEtc: '',
-        social: false,
-        etc: '',
-      };
-
-      // 래핑 DTO 동시 제공(모르는 키는 서버가 무시)
-      const bodyJSON = JSON.stringify({ ...flat, memberDTO: { ...flat } });
-
-      // ▶ 1순위: 접두어 포함 (/member/join)
-      const url1 = apiWithPrefix('/member/join');
-      let resp = await fetch(url1, {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json; charset=utf-8',
-          Accept: 'application/json, text/plain, */*',
-        },
-        body: bodyJSON,
-      });
-
-      // ▶ 404면 접두어 없는 경로로 폴백 (/member/join)
-      if (resp.status === 404) {
-        const url2 = apiNoPrefix('/member/join');
-        resp = await fetch(url2, {
-          method: 'POST',
-          credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json; charset=utf-8',
-            Accept: 'application/json, text/plain, */*',
-          },
-          body: bodyJSON,
-        });
-      }
-
-      if (!resp.ok) {
-        const body = await readBody(resp);
-        if (/duplicate|unique|exists|duplicated|already/i.test(body)) {
-          throw new Error('이미 사용 중인 아이디입니다. 다른 아이디로 시도해주세요.');
-        }
-        if (/password|encoder|bcrypt|illegal/i.test(body)) {
-          throw new Error('비밀번호 처리 중 서버 오류가 발생했습니다. 너무 짧거나 허용되지 않는 문자가 포함됐을 수 있어요.');
-        }
-        if (/null|nullable|not\s*null|constraint/i.test(body)) {
-          throw new Error(`필수 항목 누락으로 가입이 거절되었습니다.\n서버 메시지: ${body}`);
-        }
-        throw new Error(`회원가입 실패 (HTTP ${resp.status})\n${body || '(본문 없음)'}`);
-      }
-
-      alert('회원가입이 완료되었습니다. 로그인 페이지로 이동합니다.');
-      router.replace('/member/login');
-    } catch (e: any) {
-      setErr(e?.message || '회원가입 중 오류가 발생했습니다.');
-    } finally {
-      setSubmitting(false);
-    }
+  // 간단 이메일 유효성
+  function validateEmail(s: string): boolean {
+    const v = String(s || '').trim();
+    if (!v.includes('@')) return false;
+    // 필요시 정교화 가능: /.+@.+\..+/
+    return true;
   }
+
+// === 가입 제출 ===
+const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
+  e.preventDefault();
+  setErr('');
+
+  // 이메일 검증
+  if (!validateEmail(form.memberEmail)) {
+    setErr("이메일 형식이 올바르지 않습니다. '@'를 포함해 입력해주세요.");
+    return;
+  }
+
+  // 만 14세 검증
+  const now = new Date();
+  const by = parseInt(form.memberBirthY || '0', 10);
+  const bm = parseInt(form.memberBirthM || '0', 10);
+  const bd = parseInt(form.memberBirthD || '0', 10);
+  if (!by || !bm || !bd) {
+    setErr('생년월일을 모두 선택해주세요.');
+    return;
+  }
+  const birth = new Date(by, bm - 1, bd);
+  const minAllowed = new Date(now.getFullYear() - 14, now.getMonth(), now.getDate());
+  if (birth > minAllowed) {
+    alert('만 14세 미만은 가입할 수 없습니다.');
+    return;
+  }
+
+  setSubmitting(true);
+  try {
+    // 백엔드 DTO 키에 맞춰 전송 (기존 그대로)
+    const body = {
+      ...form,
+      memberGender: 'U',
+      emailStsYn: 'N',
+      memberRole: 'USER',
+      memberSocial: false,
+      memberEtc: '',
+    };
+
+    const resp = await fetch(apiWithPrefix('/member/join'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    if (!resp.ok) {
+      // ▼ 서버 응답 본문에서 resMessage/메시지 우선 추출
+      const raw = await resp.text().catch(() => '');
+      let json: any = null;
+      try { json = raw ? JSON.parse(raw) : null; } catch {}
+      const serverMsg =
+        json?.resMessage ||
+        json?.message ||
+        json?.error ||
+        json?.detail ||
+        json?.reason ||
+        raw;
+
+      // ▼ 중복 아이디 판단: 상태 409 또는 메시지 키워드
+      const lower = String(serverMsg || '').toLowerCase();
+      const isDupStatus = resp.status === 409; // (전역 핸들러 적용 시)
+      const isDupText =
+        lower.includes('duplicate') ||
+        lower.includes('already') ||
+        lower.includes('중복') ||
+        lower.includes('이미');
+
+      if (isDupStatus || isDupText) {
+        alert('이미 가입한 ID 입니다');
+        // 화면에 JSON/원문을 출력하지 않도록 err 상태는 건드리지 않고 종료
+        return;
+      }
+
+      // 그 외 실패는 깔끔한 알럿만
+      alert(serverMsg || `회원가입 실패 (HTTP ${resp.status})`);
+      return; // 화면에 JSON 노출 방지
+    }
+
+    alert('가입되었습니다.');
+    router.replace('/member/login');
+  } catch (e: any) {
+    // 네트워크/예외 등은 알럿만 보여주고 화면에는 노출하지 않음
+    alert(e?.message || '가입 실패');
+    setErr(null);
+  } finally {
+    setSubmitting(false);
+  }
+};
+
 
   return (
     <main className="mx-auto max-w-[720px] px-4 py-8 text-center">
-      <br></br>
+      <br />
       <h1 className="text-2xl font-semibold mb-4 flex items-center justify-center gap-2 ">
         Join Us &nbsp;
         <svg
@@ -214,41 +230,78 @@ export default function SignupPage() {
           <circle cx="7" cy="7" r="2.2" />
           <circle cx="12" cy="6" r="2.2" />
           <circle cx="17" cy="7" r="2.2" />
-          <path d="M12 12c-3 0-5.5 2-5.5 4.5 0 1.4 1 2.5 2.5 2.5 1.1 0 2.1-.6 3-1 0.9.4 1.9 1 3 1 1.5 0 2.5-1.1 2.5-2.5 0-2.5-2.5-4.5-5.5-4.5z"/>
+          <path d="M12 12c-3 0-5.5 2-5.5 4.5 0 1.4 1 2.5 2.5 2.5 1.1 0 2.1-.6 3-1 0.9.4 1.9 1 3 1 1.5 0 2.5-1.1 2.5-2.5 0-2.5-2.5-4.5-5.5-4.5z" />
         </svg>
       </h1>
 
       <hr className="border-gray-200 mb-6" />
-      <br></br>
+      <br />
 
       <form onSubmit={onSubmit}>
         <Row label="ID">
-          <input className="input" value={form.memberId} onChange={e => set('memberId', e.target.value)} />
+          <input
+            className="input"
+            value={form.memberId}
+            onChange={(e) => set('memberId', e.target.value)}
+          />
         </Row>
 
         <Row label="PASSWORD">
-          <input className="input" type="password" value={form.memberPw} onChange={e => set('memberPw', e.target.value)} />
+          <input
+            className="input"
+            type="password"
+            value={form.memberPw}
+            onChange={(e) => set('memberPw', e.target.value)}
+          />
         </Row>
 
         <Row label="NAME">
-          <input className="input" value={form.memberName} onChange={e => set('memberName', e.target.value)} />
+          <input
+            className="input"
+            value={form.memberName}
+            onChange={(e) => set('memberName', e.target.value)}
+          />
         </Row>
 
         <Row label="Birthday">
           <div className="inline-flex flex-nowrap items-center gap-2">
-            <select className="input input--smw" value={form.memberBirthY} onChange={e => set('memberBirthY', e.target.value)}>
+            <select
+              className="input input--smw"
+              value={form.memberBirthY}
+              onChange={(e) => set('memberBirthY', e.target.value)}
+            >
               <option value="">YEAR</option>
-              {years.map(y => <option key={y} value={y}>{y}</option>)}
+              {years.map((y) => (
+                <option key={y} value={y}>
+                  {y}
+                </option>
+              ))}
             </select>
             <span>&nbsp;</span>
-            <select className="input input--xs" value={form.memberBirthM} onChange={e => set('memberBirthM', e.target.value)}>
+            <select
+              className="input input--xs"
+              value={form.memberBirthM}
+              onChange={(e) => set('memberBirthM', e.target.value)}
+            >
               <option value="">MONTH</option>
-              {months.map(m => <option key={m} value={m}>{m}</option>)}
+              {months.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
             </select>
             <span>&nbsp;</span>
-            <select className="input input--xs" value={form.memberBirthD} onChange={e => set('memberBirthD', e.target.value)}>
+            <select
+              className="input input--xs"
+              value={form.memberBirthD}
+              onChange={(e) => set('memberBirthD', e.target.value)}
+            >
               <option value="">DAY</option>
-              {days.map(d => <option key={d} value={d}>{d}</option>)}
+              {days.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
             </select>
             <span>&nbsp;</span>
 
@@ -275,14 +328,18 @@ export default function SignupPage() {
 
         <Row label="PhoneNumber">
           <div className="inline-flex items-center gap-3">
-            <input className="input" value={form.memberPhone} onChange={e => set('memberPhone', e.target.value)} />
+            <input
+              className="input"
+              value={form.memberPhone}
+              onChange={(e) => set('memberPhone', e.target.value)}
+            />
             <label className="inline-flex items-center gap-1 text-sm text-gray-400">
-              &nbsp;  SMS&nbsp;
+              &nbsp; SMS&nbsp;
               <input
                 type="checkbox"
                 className="checkbox"
                 checked={form.smsStsYn === 'Y'}
-                onChange={e => set('smsStsYn', e.target.checked ? 'Y' : 'N')}
+                onChange={(e) => set('smsStsYn', e.target.checked ? 'Y' : 'N')}
               />
             </label>
           </div>
@@ -293,12 +350,16 @@ export default function SignupPage() {
             className="input"
             placeholder="'@' 포함해서 입력해주세요"
             value={form.memberEmail}
-            onChange={e => set('memberEmail', e.target.value)}
+            onChange={(e) => set('memberEmail', e.target.value)}
           />
         </Row>
 
         <Row label="ZipCode">
-          <input className="input input--xs" value={form.memberZipCode} onChange={e => set('memberZipCode', e.target.value)} />
+          <input
+            className="input input--xs"
+            value={form.memberZipCode}
+            onChange={(e) => set('memberZipCode', e.target.value)}
+          />
         </Row>
 
         <Row label="RoadAddress">
@@ -306,7 +367,7 @@ export default function SignupPage() {
             className="input input--lgw"
             placeholder="도로명 주소를 입력해주세요"
             value={form.memberRoadAddress}
-            onChange={e => set('memberRoadAddress', e.target.value)}
+            onChange={(e) => set('memberRoadAddress', e.target.value)}
           />
         </Row>
 
@@ -315,7 +376,7 @@ export default function SignupPage() {
             className="input input--lgw"
             placeholder="상세 주소를 입력해주세요"
             value={form.memberDetailAddress}
-            onChange={e => set('memberDetailAddress', e.target.value)}
+            onChange={(e) => set('memberDetailAddress', e.target.value)}
           />
         </Row>
 
@@ -342,11 +403,11 @@ export default function SignupPage() {
           </div>
         </Row>
 
-        <br></br>
+        <br />
         <div className="h-2" />
         <hr className="border-gray-200" />
         <div className="h-4" />
-        <br></br>
+        <br />
 
         <div className="flex justify-center gap-3">
           <button type="submit" className="btn-3d btn-white text-black" disabled={submitting}>
@@ -357,11 +418,15 @@ export default function SignupPage() {
           </button>
         </div>
 
-        <br></br><br></br><br></br><br></br><br></br>
+        <br />
+        <br />
+        <br />
+        <br />
+        <br />
 
         {err && (
           <pre className="text-red-600 text-xs text-left mt-2 whitespace-pre-wrap break-words max-w-[720px] mx-auto">
-{err}
+            {err}
           </pre>
         )}
       </form>
@@ -391,23 +456,34 @@ export default function SignupPage() {
           width: 220px;
           vertical-align: middle;
         }
-        .input--xs { width: 100px; }
-        .input--smw { width: 120px; }
-        .input--lgw { width: 260px; }
-        .checkbox { width: 12px; height: 12px; }
+        .input--xs {
+          width: 100px;
+        }
+        .input--smw {
+          width: 120px;
+        }
+        .input--lgw {
+          width: 260px;
+        }
+        .checkbox {
+          width: 12px;
+          height: 12px;
+        }
         .btn-3d {
           padding: 8px 14px;
           border-radius: 10px;
           border: 1px solid #2222;
           background: #fff;
         }
-        .btn-white { background: #fff; }
+        .btn-white {
+          background: #fff;
+        }
       `}</style>
     </main>
   );
 }
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
+function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="row">
       <span className="label">{label}</span>

@@ -17,6 +17,7 @@ import {
   useUpdateComment,
 } from "@/features/board/hooks/useComments";
 import { normalizeCommentPage } from "@/features/board/data/comment.api";
+import { pickHttpErrorMessage } from '@/shared/data/http';
 
 const WRAP = "mx-auto w-full max-w-[960px] px-4";
 
@@ -302,9 +303,13 @@ export default function BoardDetailPage({
 
       {/* 좋아요 */}
       <div className="flex justify-center mt-[40px] mb-[64px]">
-        <button
+       <button
           type="button"
-          onClick={() => likeMut.mutate(id)}
+          onClick={() =>
+            likeMut.mutate(id, {
+              onError: (err: any) => alert(pickHttpErrorMessage(err)),
+            })
+          }
           className="btn-3d btn-white"
         >
           좋아요 {likeCount}
@@ -376,12 +381,16 @@ export default function BoardDetailPage({
 
                     <div className="flex gap-2 text-xs text-gray-600">
                       <button
-                        type="button"
-                        onClick={() => likeCommMut.mutate(c.cno)}
-                        className="btn-3d btn-white"
-                      >
-                        좋아요 {lk}
-                      </button>
+                      type="button"
+                      onClick={() =>
+                        likeCommMut.mutate(c.cno, {
+                          onError: (err: any) => alert(pickHttpErrorMessage(err)),
+                        })
+                      }
+                      className="btn-3d btn-white"
+                    >
+                      좋아요 {lk}
+                    </button>
                       {mine && (
                         <>
                           <button

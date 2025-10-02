@@ -1,3 +1,4 @@
+//src/features/board/board/data/comments/types.ts
 // 댓글 타입 (백엔드 응답의 키가 조금 달라도 안전하게 사용할 수 있게 최소 필드만 정의)
 export type CommentItem = {
   cno: number;

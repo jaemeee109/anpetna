@@ -34,18 +34,33 @@ function authHeaders(): Record<string, string> {
   return { Authorization: val };
 }
 function clearLocalAuth() {
-  try { localStorage.removeItem('accessToken'); } catch {}
-  try { localStorage.removeItem('refreshToken'); } catch {}
-  try { localStorage.removeItem('memberId'); } catch {}
-  try { localStorage.removeItem('memberRole'); } catch {}
-  try { sessionStorage.removeItem('accessToken'); } catch {}
-  try { sessionStorage.removeItem('refreshToken'); } catch {}
-  deleteCookie('Authorization');
-  deleteCookie('accessToken');
-  deleteCookie('refreshToken');
-  deleteCookie('JSESSIONID');
-  deleteCookie('memberRole');
+  try {
+    // 토큰류
+    localStorage.removeItem("accessToken");
+    sessionStorage.removeItem("accessToken");
+    localStorage.removeItem("access_token");
+    sessionStorage.removeItem("access_token");
+    localStorage.removeItem("Authorization");
+    sessionStorage.removeItem("Authorization");
+
+    // 사용자 아티팩트 전부 제거
+    localStorage.removeItem("memberId");
+    localStorage.removeItem("memberRole");
+    localStorage.removeItem("loginId");   // 
+    localStorage.removeItem("username");  // 
+
+    // 쿠키 제거(Authorization 등)
+    document.cookie = "Authorization=; Max-Age=0; path=/";
+    document.cookie = "authorization=; Max-Age=0; path=/";
+    document.cookie = "accessToken=; Max-Age=0; path=/";
+  } catch {}
 }
+function dispatchAuthChanged() {
+  try {
+    window.dispatchEvent(new Event('auth-changed'));
+  } catch {}
+}
+
 function hasAnyLocalAuth(): boolean {
   if (typeof window === 'undefined') return false;
   return !!(
@@ -266,55 +281,15 @@ function getRefreshTokenFromStorage(): string {
   } catch { return ''; }
 }
 
-// (변경 블록) Header.tsx 안의 handleLogout 함수만 교체
-async function handleLogout() {
-  const base =
-    process.env.NEXT_PUBLIC_API_BASE ||
-    (typeof window !== 'undefined'
-      ? window.location.origin.replace(':3000', ':8000')
-      : '');
 
-  const refresh = getRefreshTokenFromStorage();
-  const auth = authHeaders();
-
-  console.log("[logout] base =", base);
-  console.log("[logout] has Authorization =", !!auth.Authorization);
-  console.log("[logout] refreshToken length =", refresh?.length);
-  console.log("[logout] preview refreshToken (first 24) =", refresh?.slice(0, 24));
-
-  const payload = { refreshToken: refresh };
-  console.log("[logout] payload =", payload);
-
+function handleLogout() {
   try {
-    // 1) /jwt/logout : JSON 바디에 refreshToken, 헤더에 Authorization
-    const r1 = await fetch(new URL('/jwt/logout', base), {
-  method: 'POST',
-  credentials: 'include',
-  headers: {
-    ...auth,                               //  Authorization 헤더 정상 부착
-    'Content-Type': 'application/json',    //  JSON 바디 명시
-  },
-  body: JSON.stringify({ refreshToken: refresh }),
-});
-
-    const body1 = await r1.text();
-    console.log("[logout] /jwt/logout status =", r1.status);
-    console.log("[logout] /jwt/logout body   =", body1);
-
-    // 2) (선택) /member/logout 은 현재 백엔드에 엔드포인트가 없습니다.
-    //    네트워크에 "No static resource member/logout." 이 찍히는 이유가 이것입니다.
-    //    불필요하니 호출을 제거합니다.
-  } catch (e) {
-    console.error("[logout] error", e);
+    clearLocalAuth();
+    dispatchAuthChanged(); 
+  } finally {
+    //  모든 페이지에서 로그아웃 시 메인으로
+    if (typeof window !== 'undefined') window.location.assign('/');
   }
-
-  // 로컬 인증 흔적 정리 + 헤더 동기화
-  clearLocalAuth();
-  setMyOpen(false);
-  setSysOpen(false);
-  setAuthed(false);
-  setAdmin(false);
-  try { window.dispatchEvent(new Event('auth-changed')); } catch {}
 }
 
 

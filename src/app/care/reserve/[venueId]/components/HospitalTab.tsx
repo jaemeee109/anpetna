@@ -59,17 +59,26 @@ export default function HospitalTab({ venueId }: Props) {
   const years = useMemo(buildBirthYears, []);
 
   // 의사 목록 로드(원본 로직 유지)
-  useEffect(() => {
-    if (doctors || !(venueId > 0)) return;
-    (async () => {
-      try {
-        const list = await venueApi.listDoctors(venueId);
-        setDoctors(list || []);
-      } catch {
-        setDoctors([]);
-      }
-    })();
-  }, [venueId, doctors]);
+ useEffect(() => {
+  if (!(venueId > 0)) { setDoctors([]); return; }
+  (async () => {
+    try {
+      const list = await venueApi.listDoctors(venueId);
+      setDoctors(list || []);
+    } catch {
+      setDoctors([]);
+    }
+  })();
+}, [venueId]);
+
+
+// venue가 바뀌면 선택된 의사/시간/불가시간 초기화
+useEffect(() => {
+  setDoctorId('');
+  setTime('');
+  setUnavailableTimes([]);
+}, [venueId]);
+
 
   // 의사/날짜 변경 시 예약 불가 시간 갱신(원본 로직 유지)
   useEffect(() => {

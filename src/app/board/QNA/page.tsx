@@ -228,54 +228,85 @@ export default function QnaPage() {
     return () => { alive = false; };
   }, [view, list, base, token]);
 
-  async function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    if (submitting) return;
-    if (!title.trim() || !content.trim()) {
-      setErr('제목과 내용을 입력해 주세요.');
-      return;
-    }
-    if (!token) {
-      setErr('로그인이 필요합니다.');
-      return;
-    }
-    setErr(null);
-    try {
-      setSubmitting(true);
+// (교체 후) QNA 작성 제출 - FormData + 'json' 파트 전송
+const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  e.preventDefault();
+  setErr('');
 
-      const fd = new FormData();
-      fd.append(
-        'json',
-        new Blob([JSON.stringify({
-          bTitle: title,
-          bContent: content,
-          bWriter: writer,
-          boardType: 'QNA',
-          noticeFlag: false,
-          isSecret: false,
-          qnaCategory: cat, category: cat,  bCategory: cat, qCategory: cat, cat,
-        })], { type: 'application/json' }),
-        'payload.json'
-      );
-
-      const resp = await fetch(new URL('/board/create', base), {
-        method: 'POST',
-        credentials: 'include',
-        headers: authHeaders(undefined, /*json=*/false),
-        body: fd,
-      });
-
-      if (!resp.ok) {
-        const text = await resp.text();
-        throw new Error(`등록 실패 (HTTP ${resp.status})\n${text.slice(0, 200)}`);
-      }
-      router.replace('/board/QNA?view=mine');
-    } catch (e: any) {
-      setErr(e?.message || '등록 중 오류가 발생했습니다.');
-    } finally {
-      setSubmitting(false);
-    }
+  // 관리자 차단 (현재 페이지 상단의 로직과 동일 기준)
+  const roleStr =
+    (typeof window !== 'undefined' &&
+      (
+        localStorage.getItem('memberRole') ||
+        sessionStorage.getItem('memberRole') ||
+        ((): string => {
+          try {
+            const m = document.cookie.match(/(?:^|;\s*)memberRole=([^;]+)/);
+            return m ? decodeURIComponent(m[1]) : '';
+          } catch { return ''; }
+        })()
+      )) || '';
+  const isAdmin = roleStr.toUpperCase() === 'ADMIN' || roleStr.toUpperCase() === 'ROLE_ADMIN';
+  if (isAdmin) {
+    alert('관리자는 문의하기를 작성할 수 없습니다.');
+    return;
   }
+
+  setSubmitting(true);
+  try {
+ 
+    const body = {
+        boardType: 'QNA',
+        bTitle: title,
+        bWriter: writer || undefined,
+        bContent: content,
+        bCategory: cat,  
+      };
+
+    //  multipart/form-data 생성: 'json' 파트로 본문 전송
+    const fd = new FormData();
+    fd.append('json', new Blob([JSON.stringify(body)], { type: 'application/json' }));
+    // 첨부가 있으면 아래처럼 추가
+    // files.forEach(f => fd.append('files', f));
+
+    const url = new URL('/board/create', base).toString();
+    const resp = await fetch(url, {
+      method: 'POST',
+      credentials: 'include',
+      // ❗ FormData 사용 시 Content-Type 수동 지정 금지 (브라우저가 boundary 포함해 설정)
+      headers: authHeaders(undefined, false), // Authorization만 자동 부착
+      body: fd,
+    });
+
+    if (!resp.ok) {
+  if (resp.status === 401 || resp.status === 403) {
+    alert('로그인이 필요합니다.');
+    return;
+  }
+  const raw = await resp.text().catch(() => '');
+  let json: any = null;
+  try { json = raw ? JSON.parse(raw) : null; } catch {}
+  const msg =
+    json?.resMessage ||
+    json?.message ||
+    '입력값을 확인해주세요.';
+  alert(msg);        // 화면에  JSON 노출 금지
+  return;            // throw하지 않아 하단 setErr에 긴 문자열이 들어가지 않음
+}
+
+
+    alert('문의가 등록되었습니다.');
+    router.replace('/board/QNA?view=mine'); // 등록 후 "나의 문의내역"으로 이동 (원하시면 변경)
+ } catch (e: any) {
+  alert(e?.message || '작성 실패'); 
+  setErr(null);                     //  화면에 원문 노출 방지
+} finally {
+    setSubmitting(false);
+  }
+};
+
+
+
 
   function normalizeCat(label: string): Cat {
     const s = String(label ?? '').trim();

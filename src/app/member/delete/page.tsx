@@ -92,23 +92,48 @@ export default function DeleteAccountPage() {
       setErr(null);
       setOk(null);
 
-      // ✅ 백엔드에 맞춰 /member/delete (GET)만 호출
-      const url = apiURL(`/member/delete`);
-      const resp = await fetch(url, {
-        method: 'GET',
-        credentials: 'include',
-        headers: authHeaders(), // Authorization만 추가
-      });
+     async function onSubmit(e: FormEvent) {
+  e.preventDefault();
+  if (!canSubmit) return;
 
-      if (!resp.ok) {
-        const t = await parseJsonSafe(resp);
-        throw new Error(`회원 탈퇴 실패\nHTTP ${resp.status} ${typeof t?.raw === 'string' ? t.raw : JSON.stringify(t)}`);
-      }
-// 성공: 프로젝트 공통 정리 + 헤더 즉시 갱신
-purgeAuthArtifacts(); // 토큰/쿠키/스토리지 전부 삭제 & 'auth-changed' 이벤트 발행
-setOk('회원 탈퇴가 완료되었습니다.');
-alert('계정이 삭제되었습니다. 이용해 주셔서 감사합니다.');
-router.replace('/');
+  try {
+    setSubmitting(true);
+    setErr(null);
+    setOk(null);
+
+    const url = apiURL(`/member/delete`);
+    const resp = await fetch(url, {
+      method: 'POST',
+      credentials: 'include',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ memberPw: password }),
+    });
+
+    if (resp.status === 401) {
+      const t = await parseJsonSafe(resp);
+      alert(t?.resMessage || t?.message || '잘못입력하셨습니다');
+      return;
+    }
+
+    if (!resp.ok) {
+      const t = await parseJsonSafe(resp);
+      throw new Error(
+        `회원 탈퇴 실패\nHTTP ${resp.status} ` +
+        (typeof t?.raw === 'string' ? t.raw : JSON.stringify(t))
+      );
+    }
+
+    purgeAuthArtifacts();
+    setOk('회원 탈퇴가 완료되었습니다.');
+    alert('계정이 삭제되었습니다. 이용해 주셔서 감사합니다.');
+    router.replace('/');
+  } catch (e: any) {
+    setErr(e?.message || '회원 탈퇴 처리 중 오류가 발생했습니다.');
+  } finally {
+    setSubmitting(false);
+  }
+}
+
 
       // 성공: 로컬 인증 흔적 제거
       

@@ -285,8 +285,21 @@ const onPay = async () => {
     // (6) 완료 페이지로 이동
     router.replace(`/order/pay/${ordersId}`);
   } catch (e: any) {
-    alert(e?.message || '주문 처리 중 오류가 발생했습니다.');
+  // axios 에러든 fetch 에러든 최대한 상태코드/메시지 추출
+  const status =
+    e?.response?.status ?? e?.cause?.status ?? e?.status ??
+    Number((e?.message || '').match(/\bHTTP\s*(\d{3})\b/)?.[1] || NaN);
+  const msg =
+    e?.response?.data?.message || e?.response?.data?.error ||
+    e?.message || '오류가 발생했습니다.';
+
+  if (status === 409 || /재고.*부족/i.test(msg)) {
+    alert('재고 수 부족으로 주문할 수 없습니다.');
+    return;
   }
+  alert(msg);
+}
+
 };
 
 

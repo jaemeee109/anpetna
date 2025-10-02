@@ -48,9 +48,9 @@ export default function ReservePage() {
 
         {/* 탭 콘텐츠 */}
         {tab === 'HOSPITAL' ? (
-          <HospitalTab venueId={venueId} venueName={venueName} />
+         <HospitalTab key={venueId} venueId={venueId} venueName={venueName} />
         ) : (
-          <HotelTab venueId={venueId} venueName={venueName} />
+          <HotelTab    key={venueId} venueId={venueId} venueName={venueName} />
         )}
 
         {/* ───────────────────────────────────────────────

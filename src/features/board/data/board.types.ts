@@ -1,3 +1,4 @@
+// src/features/board/data/board.types.ts
 // 서버 Enum과 맞춤
 export type BoardType = 'NOTICE' | 'FAQ' | 'FREE' | 'QNA' | 'REVIEW' | 'EVENT';
 

@@ -11,7 +11,7 @@ const env = (k: string, fallback = "") => {
 };
 
 // 기본값: .env 비어 있어도 동작
-const BASE = env("NEXT_PUBLIC_API_BASE_URL");
+const BASE = env("NEXT_PUBLIC_API_BASE_URL", "http://192.168.0.160:8000");
 const PREFIX = env("NEXT_PUBLIC_API_PREFIX", "");
 
 // 디버그
@@ -190,6 +190,7 @@ instance.interceptors.response.use(
   (res) => res,
   (error) => {
     const status = error?.response?.status ?? 0;
+
     if (status === 401 || status === 403) {
       // 현재 보유한 인증 흔적이 있는지로 "미로그인" vs "만료" 추정
       const hasToken = !!getAccessToken();
@@ -204,9 +205,19 @@ instance.interceptors.response.use(
         redirectToLoginWithNext('로그인 후 이용해주세요');
       }
     }
+
+    // 서버 메시지를 표준화해 에러 객체에 붙여줍니다.
+    const msg =
+      error?.response?.data?.resMessage ||
+      error?.response?.data?.message ||
+      error?.message ||
+      '오류가 발생했습니다.';
+    (error as any).normalizedMessage = msg;
+
     return Promise.reject(error);
   }
 );
+
 
 /** 요청 인터셉터 */
 instance.interceptors.request.use((config: InternalAxiosRequestConfig) => {
@@ -233,3 +244,13 @@ instance.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 const http = instance;
 export { http };
 export default http;
+
+
+export function pickHttpErrorMessage(e: any): string {
+  return e?.normalizedMessage
+      || e?.response?.data?.resMessage
+      || e?.response?.data?.message
+      || e?.message
+      || '오류가 발생했습니다.';
+}
+

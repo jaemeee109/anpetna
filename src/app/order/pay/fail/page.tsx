@@ -16,9 +16,20 @@ export default function TossFailPage() {
       <p className="mb-2">{message}</p>
       {code ? <p className="text-gray-500 mb-6">({code})</p> : null}
       <div className="flex items-center justify-center gap-3">
-        <button className="btn-3d btn-white !px-4 !py-2" onClick={() => router.replace('/order/checkout')}>
+        <button
+          className="btn-3d btn-white !px-4 !py-2"
+          type="button"
+          onClick={() => {
+            if (typeof window !== 'undefined' && window.history.length > 1) {
+              router.back();
+            } else {
+              router.replace('/order/checkout');
+            }
+          }}
+        >
           주문서로 돌아가기
         </button>
+
         {ordersId ? (
           <button className="btn-3d btn-white !px-4 !py-2" onClick={() => router.replace(`/order/pay/${ordersId}`)}>
             다시 결제

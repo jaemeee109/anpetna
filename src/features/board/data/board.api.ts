@@ -126,10 +126,20 @@ export async function removeBoard(bno: number) {
   return unwrap<any>(r);
 }
 
+
+const likeLock = new Set<number>();
+
 export async function likeBoard(bno: number) {
-  const token = getAccessToken();
-  const r = await http.post(`${BASE_PATH}/like/${bno}`, undefined, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  });
-  return unwrap<any>(r);
+  if (likeLock.has(bno)) return; 
+  likeLock.add(bno);
+  try {
+    const token = getAccessToken();
+    const r = await http.post(`${BASE_PATH}/like/${bno}`, undefined, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    return unwrap<any>(r);
+  } finally {
+    likeLock.delete(bno);
+  }
 }
+

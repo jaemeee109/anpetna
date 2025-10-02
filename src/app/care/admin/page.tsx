@@ -230,6 +230,31 @@ export default function AdminReservePage() {
   // 포털 안전 플래그
   const [isClient, setIsClient] = useState(false);
   useEffect(() => { setIsClient(true); }, []);
+  useEffect(() => {
+  
+  const v = Number(sp.get('venueId') || '0') || 0;
+
+  setVenueId((prev) => {
+    if (prev === v) return prev;
+
+    
+    setPage1(1);
+    setPage2(1);
+    setDoctorId('');
+    setDateH('');
+    setDateT('');
+    setCheckedTop({});
+    setCheckedBot({});
+    setStatusTop({});
+    setStatusBot({});
+    setUnavailableTimes([]);
+    setPendingClose(new Set());
+
+    return v;
+  });
+}, [sp]);
+
+
 
   // body 스크롤 락
   useEffect(() => {
@@ -349,6 +374,15 @@ export default function AdminReservePage() {
   // 페이징 변경 시 재조회
   useEffect(() => { fetchTop(); /* eslint-disable-next-line */ }, [page1, size, tab]);
   useEffect(() => { fetchBot(); /* eslint-disable-next-line */ }, [page2, size, doctorId, dateH, dateT, tab, venueId]);
+
+    function setVenueQuery(nextId: number) {
+      const params = new URLSearchParams(Array.from(sp.entries()));
+      if (nextId) params.set('venueId', String(nextId));
+      else params.delete('venueId');
+      router.push(`/care/admin?${params.toString()}`);
+    }
+
+
 
   async function fetchTop() {
     if (!venueId) return;
@@ -581,11 +615,29 @@ async function applyBulk(which: 'TOP' | 'BOT' | null = null, mode: 'ROW' | 'BULK
     <main className="apn-main mx-auto px-4 max-w-[900px]" style={{ paddingBottom: 40 }}>
       {/* 타이틀 */}
       <div className="admin-head text-center">
-        <h1 className="admin-title">
-          <span>{venueName}</span>
-          <PawIcon className="apn-title-ico" />
-        </h1>
-      </div>
+  <h1 className="admin-title">
+    <span>{venueName}</span>
+    <PawIcon className="apn-title-ico" />
+  </h1>
+
+  {/* ▼ 지점 선택 드롭다운 추가 */}
+  <div style={{ marginTop: 10 }}>
+    <select
+      className="dropdown"
+      value={venueId || ''}
+      onChange={(e) => setVenueQuery(Number(e.target.value) || 0)}
+      aria-label="지점 선택"
+    >
+      <option value="">지점 선택</option>
+      {venues.map(v => (
+        <option key={v.venueId} value={v.venueId}>
+          {v.venueName}
+        </option>
+      ))}
+    </select>
+  </div>
+</div>
+
 
       {/* 탭 */}
       <div className="admin-actions flex items-center justify-center gap-[10px] mt-[16px] mb-[8px]">

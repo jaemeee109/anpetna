@@ -81,10 +81,14 @@ export default function OrderPayPage() {
           failUrl: `${origin}/order/pay/fail?ordersId=${id}`,
         });
       } catch (e: any) {
-        alert(e?.message || '결제 페이지 이동에 실패했습니다.');
-        // 실패 시 주문완료로 보내지 않고, 이전 페이지로
-        router.back();
-      }
+  alert(e?.message || '결제를 취소하였습니다.');
+  if (typeof window !== 'undefined' && window.history.length > 1) {
+    router.back();
+  } else {
+    router.replace('/order/checkout');
+  }
+}
+
     })();
   }, [ordersId, router]);
 

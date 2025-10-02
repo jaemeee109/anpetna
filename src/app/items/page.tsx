@@ -6,7 +6,6 @@ import Image from 'next/image';
 import { useMemo, useState, useEffect } from 'react';
 import { useItemList } from '@/features/item/hooks/useItems';
 import type { ItemCategory, ItemListQuery } from '@/features/item/data/item.types';
-
 import Paw from '@/components/icons/Paw';
 
 /** 카테고리(백엔드 enum 그대로) */
