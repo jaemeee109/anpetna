@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import venueApi from '@/features/venue/data/venue.api';
+import NotificationBell from '@/components/layout/NotificationBell';
 
 /* -------------------- 쿠키/스토리지 유틸 -------------------- */
 function getCookie(name: string) {
@@ -337,6 +338,8 @@ function handleLogout() {
           ) : admin ? (
             <>
               {/* 관리자: MYPAGE(단일 링크 → INFO) | USER | SALES | INV | RESERVATION(드롭다운) | LOGOUT */}
+            <NotificationBell />
+            <span className="sep">|</span>
               <Link href="/member/info" className="btn-link">MYPAGE</Link>
               <span className="sep">|</span>
               <Link href="banner" className="btn-link">BANNER</Link>
@@ -394,6 +397,8 @@ function handleLogout() {
           ) : (
             <>
               {/* 일반 사용자: MYPAGE(드롭: INFO, ORDER, DEL) | CART | LOGOUT */}
+             <NotificationBell />
+              <span className="sep">|</span>
               <div
                 className="dropdown"
                 ref={myRef}

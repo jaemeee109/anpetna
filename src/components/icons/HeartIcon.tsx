@@ -1,4 +1,4 @@
-// components/icons/Heading.tsx
+// components/icons/HeartIcon.tsx
 type IconProps = {
   /** Tailwind 등으로 크기/정렬을 제어할 때 씁니다 */
   className?: string;
