@@ -3,9 +3,10 @@ package com.anpetna.venue.service.hospital;
 
 import com.anpetna.member.domain.MemberEntity;
 import com.anpetna.member.repository.MemberRepository;
-import com.anpetna.notification.feature.reservation.hospital.HospitalNoShowNotification;
-import com.anpetna.notification.feature.reservation.hospital.HospitalReservationConfirmNotificationService;
-import com.anpetna.notification.feature.reservation.hospital.HospitalReservationService;
+import com.anpetna.notification.feature.reservation.service.ReservationReminderService;
+import com.anpetna.notification.feature.reservation.service.hospital.HospitalNoShowNotificationService;
+import com.anpetna.notification.feature.reservation.service.hospital.HospitalReservationConfirmNotificationService;
+import com.anpetna.notification.feature.reservation.service.hospital.HospitalReservationService;
 import com.anpetna.venue.constant.ReservationStatus;
 import com.anpetna.venue.domain.hospital.HospitalReservationEntity;
 import com.anpetna.venue.domain.VenueDoctorEntity;
@@ -26,6 +27,7 @@ import org.springframework.web.server.ResponseStatusException;
 import com.anpetna.venue.dto.member.MyHospitalReservationDetail;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -41,8 +43,11 @@ public class HospitalServiceImpl implements HospitalService {
     private final HospitalReservationRepository hospitalReservationRepository;
     private final HotelReservationRepository hotelReservationRepository;
     private final HospitalReservationConfirmNotificationService hospitalReservationNotificationService;
-    private final HospitalNoShowNotification hospitalNoShowNotification;
+    private final HospitalNoShowNotificationService hospitalNoShowNotification;
     private final HospitalReservationService hospitalReservationService;
+    private final ReservationReminderService reservationReminderService;
+
+    private static final DateTimeFormatter H_FMT = DateTimeFormatter.ofPattern("MM월 dd일 HH:mm");
 
     // 회원의 노쇼 누적 회수(호텔+병원 합산)
     private long getNoShowCountAllServices(String memberId) {
@@ -139,6 +144,24 @@ public class HospitalServiceImpl implements HospitalService {
                 found.getVenue(),
                 found.getAppointmentAt()
         );
+
+        // ⬇️ [추가] 리마인드 알림 스케줄 등록 (24h/3h)
+        String title24h = "[병원 예약 D-1] 내일 " +
+                (found.getDoctor() != null ? found.getDoctor().getName() : "") + "/" +
+                (found.getVenue() != null ? found.getVenue().getVenueName() : "") + " " +
+                found.getAppointmentAt().format(H_FMT) + " 방문 예정입니다.";
+        String title3h = "[병원 예약 임박] " +
+                found.getAppointmentAt().format(DateTimeFormatter.ofPattern("HH:mm")) +
+                " 예약 3시간 전입니다. 10분 전 도착 부탁드립니다.";
+
+        reservationReminderService.handleHospitalStatusChange(
+                String.valueOf(found.getReservationId()),
+                found.getMember().getMemberId(),
+                found.getAppointmentAt(),
+                ReservationStatus.CONFIRMED,
+                title24h, title3h
+        );
+
     }
 
     // 관리자: 노쇼 처리 API
@@ -155,7 +178,18 @@ public class HospitalServiceImpl implements HospitalService {
                 found.getVenue(),
                 found.getAppointmentAt()
         );
+
+        // ⬇️ [추가] 리마인드 잡 전부 취소
+        reservationReminderService.handleHospitalStatusChange(
+                String.valueOf(found.getReservationId()),
+                found.getMember().getMemberId(),
+                found.getAppointmentAt(),
+                ReservationStatus.NOSHOW,
+                null, null
+        );
+
     }
+
     @Transactional(readOnly = true)
     @Override
     public List<AdminHospitalReservationRow> adminList(Long venueId, String status, String memberId) {
@@ -215,6 +249,36 @@ public class HospitalServiceImpl implements HospitalService {
         if (opt.isEmpty()) return false;
         var r = opt.get();
         r.setStatus(next); // JPA dirty checking
+
+        // ⬇️ [추가] 상태 전이 후 리마인드 스케줄 조정
+        if (next == ReservationStatus.CONFIRMED) {
+            String title24h = "[병원 예약 D-1] 내일 " +
+                    (r.getDoctor() != null ? r.getDoctor().getName() : "") + "/" +
+                    (r.getVenue() != null ? r.getVenue().getVenueName() : "") + " " +
+                    r.getAppointmentAt().format(H_FMT) + " 방문 예정입니다.";
+            String title3h = "[병원 예약 임박] " +
+                    r.getAppointmentAt().format(DateTimeFormatter.ofPattern("HH:mm")) +
+                    " 예약 3시간 전입니다. 10분 전 도착 부탁드립니다.";
+
+            reservationReminderService.handleHospitalStatusChange(
+                    String.valueOf(r.getReservationId()),
+                    r.getMember() != null ? r.getMember().getMemberId() : null,
+                    r.getAppointmentAt(),
+                    ReservationStatus.CONFIRMED,
+                    title24h, title3h
+            );
+        } else if (next == ReservationStatus.CANCELED
+                || next == ReservationStatus.NOSHOW
+                || next == ReservationStatus.REJECTED) {
+            reservationReminderService.handleHospitalStatusChange(
+                    String.valueOf(r.getReservationId()),
+                    r.getMember() != null ? r.getMember().getMemberId() : null,
+                    r.getAppointmentAt(),
+                    next,
+                    null, null
+            );
+        }
+
         return true;
     }
 

@@ -1,4 +1,4 @@
-package com.anpetna.notification.feature.reservation.hospital;
+package com.anpetna.notification.feature.reservation.service.hospital;
 
 import com.anpetna.member.domain.MemberEntity;
 import com.anpetna.notification.common.constant.NotificationType;
@@ -14,21 +14,21 @@ import java.time.format.DateTimeFormatter;
 
 @Service
 @RequiredArgsConstructor
-public class HospitalReservationConfirmNotificationService {
+public class HospitalNoShowNotificationService {
 
     private final NotificationService notificationService;
 
-    public void notifyHospitalReservationConfirm(MemberEntity member, String memberId, VenueEntity venue, LocalDateTime at) {
+    public void notifyHospitalNoShow(MemberEntity member, String memberId, VenueEntity venue, LocalDateTime at) {
 
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MM월 dd일 HH시 mm분");
         String formattedAt = at.format(formatter);
 
-        String title = member.getMemberName() + " 회원님, " + formattedAt + " 안펫나 동물병원 " + venue.getVenueName() + " 예약이 확정되었습니다.";
+        String title = member.getMemberName() + " 회원님, " + formattedAt + " 안펫나 동물병원 " + venue.getVenueName() + " 예약이 노쇼 처리되어 취소 되었습니다.";
 
         notificationService.createAndPush(
                 CreateNotificationCmd.builder()
                         .receiverMemberId(memberId)
-                        .notificationType(NotificationType.RESERVATION_HOSPITAL_CONFIRM)
+                        .notificationType(NotificationType.RESERVATION_HOSPITAL_NOSHOW)
                         .targetType(TargetType.RESERVATION)
                         .targetId(venue.getVenueId().toString())
                         .title(title)

@@ -1,4 +1,4 @@
-package com.anpetna.notification.feature.reservation.hotel;
+package com.anpetna.notification.feature.reservation.service.hotel;
 
 import com.anpetna.member.domain.MemberEntity;
 import com.anpetna.notification.common.constant.NotificationType;
