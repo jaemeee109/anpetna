@@ -78,74 +78,94 @@ pipeline {
     }
 
    stage('Build (Gradle)') {
+     options { timeout(time: 20, unit: 'MINUTES') }   // 빌드 타임아웃
      steps {
-       sh '''#!/bin/sh
+       retry(2) {                                     // 네트워크 흔들릴 때 재시도
+         sh '''#!/bin/sh
    set -euxo pipefail
 
    export JAVA_HOME=/opt/java/openjdk
    export PATH="$JAVA_HOME/bin:$PATH"
 
-   # 캐시를 워크스페이스로(권한/락 이슈 회피)
+   # 워크스페이스 내 Gradle 캐시
    export GRADLE_USER_HOME="$WORKSPACE/.gradle-cache"
    mkdir -p "$GRADLE_USER_HOME"
 
-   # gradle.properties 생성 (heredoc 대신 printf 사용)
-   printf '%s\n' \
-     'org.gradle.daemon=false' \
-     'org.gradle.console=plain' \
-     'systemProp.org.gradle.internal.http.connectionTimeout=60000' \
-     'systemProp.org.gradle.internal.http.socketTimeout=60000' \
-     > "$GRADLE_USER_HOME/gradle.properties"
+   # 네트워크 타임아웃 여유
+   cat > "$GRADLE_USER_HOME/gradle.properties" <<'EOF'
+   org.gradle.daemon=false
+   org.gradle.console=plain
+   systemProp.org.gradle.internal.http.connectionTimeout=120000
+   systemProp.org.gradle.internal.http.socketTimeout=120000
+   EOF
 
-   # Gradle Wrapper 실행
    test -f ./gradlew || { echo "gradlew not found"; exit 1; }
    chmod +x ./gradlew
 
    ./gradlew --no-daemon --max-workers=1 \
      -Dorg.gradle.workers.max=1 \
-     -Dorg.gradle.jvmargs=-Xmx1024m \
+     -Dorg.gradle.jvmargs=-Xmx1536m \
      -Dfile.encoding=UTF-8 \
      --info --stacktrace --console=plain \
      clean bootJar -x test
 
-   # 산출물 확인
    ls -l build/libs/*.jar
    '''
+       }
      }
    }
 
-    stage('Docker Build & Push') {
-      environment {
-        DOCKER_BUILDKIT = '1'
-        COMPOSE_DOCKER_CLI_BUILD = '1'
-      }
-      steps {
-        withCredentials([usernamePassword(credentialsId: 'docker-hub-access-token',
-                                          usernameVariable: 'DOCKER_USER',
-                                          passwordVariable: 'DOCKER_PASS')]) {
-          sh '''
-            set -euxo pipefail
-            echo "${DOCKER_PASS}" | docker login -u "${DOCKER_USER}" --password-stdin
+   stage('Docker Build & Push') {
+     environment {
+       DOCKER_BUILDKIT = '1'
+       COMPOSE_DOCKER_CLI_BUILD = '1'
+     }
+     steps {
+       withCredentials([usernamePassword(credentialsId: 'docker-hub-access-token',
+                                         usernameVariable: 'DOCKER_USER',
+                                         passwordVariable: 'DOCKER_PASS')]) {
+         sh '''#!/bin/sh
+   set -euxo pipefail
 
-            JAR_PATH=$(ls -1 build/libs/*.jar | head -n1)
-            [ -f "$JAR_PATH" ] || (echo "JAR not found under build/libs"; exit 1)
+   # 필수 환경변수 확인 (Select Color 스테이지에서 설정됨)
+   : "${DOCKERHUB_REPO:?DOCKERHUB_REPO not set}"
+   : "${IMAGE_TAG_BASE:?IMAGE_TAG_BASE not set}"
+   : "${NEXT_COLOR:?NEXT_COLOR not set}"
 
-            # NEXT 색상 태그
-            IMAGE="${DOCKERHUB_REPO}:${IMAGE_TAG_BASE}-${NEXT_COLOR}"
+   echo "${DOCKER_PASS}" | docker login -u "${DOCKER_USER}" --password-stdin
 
-            docker build --pull \
-              --build-arg JAR_FILE="$JAR_PATH" \
-              -t "$IMAGE" \
-              -f Dockerfile .
+   JAR_PATH=$(ls -1 build/libs/*.jar | head -n1)
+   [ -f "$JAR_PATH" ] || { echo "JAR not found under build/libs"; exit 1; }
 
-            docker push "$IMAGE"
-            docker logout || true
+   IMAGE_BASE="${DOCKERHUB_REPO}:${IMAGE_TAG_BASE}"
+   # blue/green 모두 만들기 (manifest unknown 방지)
+   if [ "${NEXT_COLOR}" = "green" ]; then OTHER_COLOR="blue"; else OTHER_COLOR="green"; fi
 
-            echo "$IMAGE" > image.tag
-          '''
-        }
-      }
-    }
+   # 한 번 빌드해서 태그만 여러 개
+   docker build --pull \
+     --build-arg JAR_FILE="$JAR_PATH" \
+     -t "${IMAGE_BASE}" \
+     -f Dockerfile .
+
+   docker tag "${IMAGE_BASE}" "${IMAGE_BASE}-${NEXT_COLOR}"
+   docker tag "${IMAGE_BASE}" "${IMAGE_BASE}-${OTHER_COLOR}"
+
+   # 푸시(베이스 + 색상 2개)
+   docker push "${IMAGE_BASE}"
+   docker push "${IMAGE_BASE}-${NEXT_COLOR}"
+   docker push "${IMAGE_BASE}-${OTHER_COLOR}"
+
+   # 기록 파일 (후속 스테이지에서 참조 가능)
+   printf '%s\n' \
+     "${IMAGE_BASE}" \
+     "${IMAGE_BASE}-${NEXT_COLOR}" \
+     "${IMAGE_BASE}-${OTHER_COLOR}" > image.tags
+
+   docker logout || true
+   '''
+       }
+     }
+   }
 
     stage('Deploy NEXT (compose override)') {
       steps {
