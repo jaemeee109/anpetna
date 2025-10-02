@@ -61,8 +61,8 @@ public class TossPaymentService {
                 "amount", amount,
                 "orderId", orderId,
                 "orderName", orderName,
-                "successUrl", "http://localhost:8080/toss-success.html",
-                "failUrl", "http://localhost:8080/toss-fail.html"
+                "successUrl", "http://localhost:8000/toss-success.html",
+                "failUrl", "http://localhost:8000/toss-fail.html"
         );
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
 

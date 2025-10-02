@@ -13,6 +13,7 @@ import com.anpetna.member.dto.readMemberOne.ReadMemberOneRes;
 import com.anpetna.member.service.MemberService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -21,6 +22,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
@@ -111,17 +113,23 @@ public class MemberController {
 
 
     //삭제
-    @GetMapping("/delete")
-    @ResponseBody
+    @PostMapping(value = "/delete",
+            consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE)
     @Transactional
-    public ApiResult<DeleteMemberRes> delete(Authentication authentication)
-            throws MemberService.MemberIdExistException {
+    public ApiResult<DeleteMemberRes> deleteJson(
+            @RequestBody @Valid DeleteMemberReq body,
+            Authentication authentication
+    ) {
 
-        DeleteMemberReq deleteMemberReq = new DeleteMemberReq();
-        deleteMemberReq.setMemberId(authentication.getName());
-
-        var delete = memberService.delete(deleteMemberReq);
-        return new ApiResult<>(delete);
+        // 인증 가드
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "인증이 필요합니다.");
+        }
+        // 서버가 신뢰하는 로그인 계정만 대상으로
+        body.setMemberId(authentication.getName());
+        var res = memberService.delete(body);
+        return new ApiResult<>(res);
     }
     //    ============================================
 //    프론트에서 계정주/관리자가 삭제버튼을 누름

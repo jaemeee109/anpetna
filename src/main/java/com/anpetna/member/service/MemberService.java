@@ -25,7 +25,7 @@ public interface MemberService extends UserDetailsService {
     ModifyMemberRes modify(ModifyMemberReq modifyMemberReq, MultipartFile profileFile,
                            Boolean removeProfile) throws MemberIdExistException;
 
-    DeleteMemberRes delete(DeleteMemberReq deleteMemberReq) throws MemberIdExistException;
+    DeleteMemberRes delete(DeleteMemberReq deleteMemberReq);
 
     static class MemberIdExistException extends Exception {
 

@@ -4,6 +4,8 @@ import com.anpetna.item.domain.ItemEntity;
 import com.anpetna.member.domain.MemberEntity;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
 
 @Entity
 @Table(
@@ -31,6 +33,7 @@ public class CartEntity {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "member_id", nullable = false, referencedColumnName = "member_id")
+    @OnDelete(action = OnDeleteAction.CASCADE)  // 회원 삭제 시 장바구니 자동 삭제
     private MemberEntity member;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
