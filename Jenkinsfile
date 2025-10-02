@@ -79,36 +79,38 @@ pipeline {
 
    stage('Build (Gradle)') {
      steps {
-       sh '''
-         set -euxo pipefail
+       sh '''#!/bin/sh
+   set -euxo pipefail
 
-         export JAVA_HOME=/opt/java/openjdk
-         export PATH="$JAVA_HOME/bin:$PATH"
+   export JAVA_HOME=/opt/java/openjdk
+   export PATH="$JAVA_HOME/bin:$PATH"
 
-         # 캐시 위치를 워크스페이스로 바꿔 권한/IO 이슈 우회 (원인 분리)
-         export GRADLE_USER_HOME="$WORKSPACE/.gradle-cache"
-         mkdir -p "$GRADLE_USER_HOME"
-         cat > "$GRADLE_USER_HOME/gradle.properties" <<'EOF'
-   org.gradle.daemon=false
-   org.gradle.console=plain
-   # (선택) 네트워크 타임아웃 완화
-   systemProp.org.gradle.internal.http.connectionTimeout=60000
-   systemProp.org.gradle.internal.http.socketTimeout=60000
-   EOF
-   
-         test -f ./gradlew || { echo "gradlew not found"; exit 1; }
-         chmod +x ./gradlew
+   # 캐시를 워크스페이스로(권한/락 이슈 회피)
+   export GRADLE_USER_HOME="$WORKSPACE/.gradle-cache"
+   mkdir -p "$GRADLE_USER_HOME"
 
-         # 상세 로그/스택트레이스로 진행상황을 보이게
-         ./gradlew --no-daemon --max-workers=1 \
-           -Dorg.gradle.workers.max=1 \
-           -Dorg.gradle.jvmargs=-Xmx1024m \
-           -Dfile.encoding=UTF-8 \
-           --info --stacktrace --console=plain \
-           clean bootJar -x test
+   # gradle.properties 생성 (heredoc 대신 printf 사용)
+   printf '%s\n' \
+     'org.gradle.daemon=false' \
+     'org.gradle.console=plain' \
+     'systemProp.org.gradle.internal.http.connectionTimeout=60000' \
+     'systemProp.org.gradle.internal.http.socketTimeout=60000' \
+     > "$GRADLE_USER_HOME/gradle.properties"
 
-         ls -l build/libs/*.jar
-       '''
+   # Gradle Wrapper 실행
+   test -f ./gradlew || { echo "gradlew not found"; exit 1; }
+   chmod +x ./gradlew
+
+   ./gradlew --no-daemon --max-workers=1 \
+     -Dorg.gradle.workers.max=1 \
+     -Dorg.gradle.jvmargs=-Xmx1024m \
+     -Dfile.encoding=UTF-8 \
+     --info --stacktrace --console=plain \
+     clean bootJar -x test
+
+   # 산출물 확인
+   ls -l build/libs/*.jar
+   '''
      }
    }
 
