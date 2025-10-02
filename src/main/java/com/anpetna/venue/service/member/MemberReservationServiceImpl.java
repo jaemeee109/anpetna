@@ -3,6 +3,8 @@ package com.anpetna.venue.service.member;
 import com.anpetna.core.coreDto.PageRequestDTO;
 import com.anpetna.core.coreDto.PageResponseDTO;
 import com.anpetna.member.domain.MemberEntity;
+import com.anpetna.notification.feature.reservation.hospital.HospitalCancelNotification;
+import com.anpetna.notification.feature.reservation.hotel.HotelCancelNotification;
 import com.anpetna.venue.domain.hotel.HotelReservationEntity;
 import com.anpetna.venue.domain.hospital.HospitalReservationEntity;
 import com.anpetna.venue.dto.member.MyHospitalReservationDetail;
@@ -25,6 +27,8 @@ public class MemberReservationServiceImpl implements MemberReservationService {
 
     private final HospitalReservationRepository hospitalRepo;
     private final HotelReservationRepository hotelRepo;
+    private final HospitalCancelNotification hospitalCancelNotification;
+    private final HotelCancelNotification hotelCancelNotification;
 
     @Override
     public PageResponseDTO<MyReservationRow> listMyReservations(String memberId, PageRequestDTO req) {
@@ -138,6 +142,13 @@ public class MemberReservationServiceImpl implements MemberReservationService {
             throw new RuntimeException("NOT_YOUR_RESERVATION");
         }
         e.setStatus(com.anpetna.venue.constant.ReservationStatus.CANCELED);
+
+        hospitalCancelNotification.notifyHospitalCancel(
+                e.getMember(),
+                e.getMember().getMemberId(),
+                e.getVenue(),
+                e.getAppointmentAt()
+        );
     }
 
     @Override
@@ -147,6 +158,14 @@ public class MemberReservationServiceImpl implements MemberReservationService {
             throw new RuntimeException("NOT_YOUR_RESERVATION");
         }
         e.setStatus(com.anpetna.venue.constant.ReservationStatus.CANCELED);
+
+        hotelCancelNotification.notifyHospitalCancel(
+                e.getMember(),
+                e.getMember().getMemberId(),
+                e.getVenue(),
+                e.getCheckIn(),
+                e.getCheckOut()
+        );
     }
 
 }

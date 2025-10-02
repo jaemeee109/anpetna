@@ -107,17 +107,7 @@ public class OrdersServiceImpl implements OrdersService {
             totalQty += qty;
             totalAmt += item.getItemPrice() * qty;
 
-            // ================== "즉시 재고 차감(ITEM)"==================
-            int cur = Math.max(0, item.getItemStock());
-            int next = cur - qty;
-            if (next < 0) {
-                throw new ResponseStatusException(HttpStatus.CONFLICT,
-                        "재고가 부족합니다. itemId=" + itemId + ", 요청수량=" + qty + ", 현재고=" + cur);
-            }
-            item.setItemStock(next);
-            item.setItemSellStatus(next <= 0 ? ItemSellStatus.SOLD_OUT : ItemSellStatus.SELL);
-            itemRepository.save(item);
-            // =======================================================================
+
 
         } else if (req.getMode() == CreateOrderReq.Mode.CART) {
             if (req.getItemIds() == null || req.getItemIds().isEmpty()) {
@@ -141,21 +131,7 @@ public class OrdersServiceImpl implements OrdersService {
                 totalQty += qty;
                 totalAmt += item.getItemPrice() * qty;
 
-                // 장바구니 비우기
-                cartRepository.delete(c);
 
-                // ================== [B] 여기서 "즉시 재고 차감(CART)"을 수행 ==================
-                int cur = Math.max(0, item.getItemStock());
-                int next = cur - qty;
-                if (next < 0) {
-                    throw new ResponseStatusException(HttpStatus.CONFLICT,
-                            "재고가 부족합니다. itemId=" + item.getItemId() + ", 요청수량=" + qty + ", 현재고=" + cur);
-                }
-                item.setItemStock(next);
-                item.setItemSellStatus(next <= 0 ? ItemSellStatus.SOLD_OUT : ItemSellStatus.SELL);
-                itemRepository.save(item);
-                // =======================================================================
-                stockLowNotificationService.notifyStockLow(item, next);
 
             }
         } else {
@@ -193,9 +169,67 @@ public class OrdersServiceImpl implements OrdersService {
             throw new IllegalStateException("잘못된 상태 전이: " + current + " -> " + nextStatus);
         }
 
+
         // 상태 변경
         orders.setStatus(nextStatus);
+
+        /*  결제 성공 시 해당 회원 장바구니에서 이 주문 품목들만 제거  */
+        if (nextStatus == OrdersStatus.PAID) {
+            String mId = (orders.getMemberId() != null) ? orders.getMemberId().getMemberId() : null;
+            if (mId != null && orders.getOrderItems() != null) {
+                for (OrderEntity line : orders.getOrderItems()) {
+                    ItemEntity item = line.getItem();
+                    if (item == null) continue;
+                    var opt = cartRepository.findByMember_MemberIdAndItem_ItemId(mId, item.getItemId());
+                    opt.ifPresent(cartRepository::delete);
+                }
+            }
+            // 결제 확정 시점에만 재고 차감
+            if (orders.getOrderItems() != null) {
+                for (OrderEntity line : orders.getOrderItems()) {
+                    ItemEntity item = line.getItem();
+                    if (item == null) continue;
+
+                    int qty = Math.max(1, line.getQuantity());
+                    int cur = Math.max(0, item.getItemStock());
+                    int next = cur - qty;
+                    if (next < 0) {
+                        // 결제 도중 재고가 부족해진 희귀 케이스 → 결제 승인 직후라도 충돌로 처리
+                        throw new ResponseStatusException(HttpStatus.CONFLICT,
+                                "결제 중 재고가 부족해졌습니다. itemId=" + (item.getItemId()) + ", 요청수량=" + qty + ", 현재고=" + cur);
+                    }
+
+                    item.setItemStock(next);
+                    item.setItemSellStatus(next <= 0 ? ItemSellStatus.SOLD_OUT : ItemSellStatus.SELL);
+                    itemRepository.save(item);
+
+                    // (선택) 재고 임계 알림
+                    try { stockLowNotificationService.notifyStockLow(item, next); } catch (Exception ignore) {}
+                }
+            }
+
+        }
+        // 취소 환불 시 재고 복원
+        if ((nextStatus == OrdersStatus.CANCELLED || nextStatus == OrdersStatus.REFUNDED)
+                && current == OrdersStatus.PAID) {
+            if (orders.getOrderItems() != null) {
+                for (OrderEntity line : orders.getOrderItems()) {
+                    ItemEntity item = line.getItem();
+                    if (item == null) continue;
+
+                    int qty = Math.max(1, line.getQuantity());
+                    int cur = Math.max(0, item.getItemStock());
+                    int restored = cur + qty;
+
+                    item.setItemStock(restored);
+                    item.setItemSellStatus(restored <= 0 ? ItemSellStatus.SOLD_OUT : ItemSellStatus.SELL);
+                    itemRepository.save(item);
+                }
+            }
+        }
+
         return toReadOneOrdersRes(orders);
+
     }
 
     //상태(관리자)
@@ -532,5 +566,10 @@ public class OrdersServiceImpl implements OrdersService {
                 .phone(dto.getPhone())
                 .build();
     }
+
+
+
+
+
 
 }

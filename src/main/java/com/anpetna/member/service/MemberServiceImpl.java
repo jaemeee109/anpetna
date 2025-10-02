@@ -109,7 +109,6 @@ public class MemberServiceImpl implements MemberService {
     }
 
 
-
     @Override
     public JoinMemberRes join(JoinMemberReq joinMemberReq, MultipartFile profileFile)
             throws MemberIdExistException {
@@ -167,7 +166,7 @@ public class MemberServiceImpl implements MemberService {
     @Override
     @PreAuthorize("hasRole('ADMIN')")
     @Transactional(readOnly = true)
-     public List<ReadMemberAllRes> memberReadAll() {
+    public List<ReadMemberAllRes> memberReadAll() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()
                 || authentication instanceof org.springframework.security.authentication.AnonymousAuthenticationToken) {
@@ -194,7 +193,10 @@ public class MemberServiceImpl implements MemberService {
         }
 //        ResponseStatusException(HttpStatus.)
 
-        member.setMemberPw(passwordEncoder.encode(modifyMemberReq.getMemberPw()));
+        String rawPw = modifyMemberReq.getMemberPw();
+        if (StringUtils.hasText(rawPw)) {
+            member.setMemberPw(passwordEncoder.encode(rawPw));
+        }
         member.setMemberPhone(modifyMemberReq.getMemberPhone());
         member.setMemberEmail(modifyMemberReq.getMemberEmail());
         member.setMemberDetailAddress(modifyMemberReq.getMemberDetailAddress());
@@ -224,24 +226,45 @@ public class MemberServiceImpl implements MemberService {
     }
 
     @Override
+    @Transactional
     public DeleteMemberRes delete(DeleteMemberReq deleteMemberReq) {
 
         String memberId = deleteMemberReq.getMemberId();
+        String currentPw = deleteMemberReq.getCurrentPw();
 
-        MemberEntity member = memberRepository.findById(memberId).orElse(null);
+        // 회원 확인
+        MemberEntity member = memberRepository.findById(memberId).orElseThrow(() ->
+                new ResponseStatusException(HttpStatus.NOT_FOUND, "회원을 찾을 수 없습니다."));
 
-        Instant now = Instant.now();
-        tokenRepository.revokeAllActiveByMemberId(memberId, now);
-        tokenRepository.deleteByMemberId(memberId);
+        // 비밀번호 검증
+        if (currentPw == null || currentPw.isBlank()
+                || !passwordEncoder.matches(currentPw, member.getMemberPw())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "비밀번호가 일치하지 않습니다.");
+        }
 
-        memberRepository.delete(member);
+        try {
+            Instant now = Instant.now();
+            tokenRepository.revokeAllActiveByMemberId(memberId, now);
+            tokenRepository.deleteByMemberId(memberId);
 
-        return DeleteMemberRes.builder()
-                .memberId(memberId)
-                .build();
+
+            if (member.getImages() != null && !member.getImages().isEmpty()) {
+                member.getImages().forEach(img -> deletePhysicalIfLocal(img.getUrl()));
+                member.getImages().clear();
+            }
+
+            // 회원 삭제
+            memberRepository.delete(member);
+            return DeleteMemberRes.builder()
+                    .memberId(memberId)
+                    .build();
+
+        } catch (org.springframework.dao.DataIntegrityViolationException ex) {
+            // ✅ FK 제약 등 무결성 오류 → 409로 변환해서 프론트 알럿만 뜨게
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "탈퇴가 불가합니다. 작성한 게시글/댓글, 진행 중 주문 등 연결된 데이터가 남아 있습니다."
+            );
+        }
     }
-
-
-
-
 }

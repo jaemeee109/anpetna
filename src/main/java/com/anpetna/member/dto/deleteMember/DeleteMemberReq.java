@@ -10,5 +10,5 @@ import lombok.*;
 public class DeleteMemberReq {
 
     private String memberId;
-
+    private String currentPw; // 탈퇴확인용 비밀번호
 }

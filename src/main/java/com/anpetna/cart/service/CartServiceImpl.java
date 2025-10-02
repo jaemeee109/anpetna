@@ -29,6 +29,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Objects;
 
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 @Service
 public class CartServiceImpl implements CartService{
 
@@ -73,6 +75,21 @@ public class CartServiceImpl implements CartService{
                     c.setQuantity(0);
                     return c;
                 });
+
+        // 재고 검증 추가
+        int reqQty  = Math.max(1, request.getQuantity());      // 최소 1
+        int curQty  = Math.max(0, cart.getQuantity());         // 장바구니에 이미 담긴 수량
+        int wantQty = curQty + reqQty;                         // 담은 후 총 수량
+        int stock   = Math.max(0, item.getItemStock());        // 상품 현재 재고
+
+        if (wantQty > stock) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "재고 수량을 초과하여 담을 수 없습니다. (itemId=" + item.getItemId() + ", 요청수량=" + wantQty + ", 현재고=" + stock + ")"
+            );
+        }
+
+        
 
         // 장바구니에 담길 수량을 업데이트.
         cart.setQuantity(cart.getQuantity() + Math.max(1, request.getQuantity()));  // 요청 수량이 0 이하일 경우를 방지. 최소 1이상만 받는다.
@@ -141,8 +158,20 @@ public class CartServiceImpl implements CartService{
         CartEntity cart = cartRepository.findByMember_MemberIdAndItem_ItemId(memberId, itemId)
                 .orElseThrow(() -> new IllegalArgumentException("장바구니에 해당 상품이 없습니다. (itemId=" + itemIdStr + ")"));
 
+        // 재고 검증 추가
+        ItemEntity item = cart.getItem();
+        int nextQty = Math.max(1, request.getQuantity());  // 최소 1
+        int stock   = Math.max(0, item.getItemStock());
+
+        if (nextQty > stock) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "재고 수량을 초과하여 변경할 수 없습니다. (itemId=" + item.getItemId() + ", 요청수량=" + nextQty + ", 현재고=" + stock + ")"
+            );
+        }
+
         // 요청으로 들어온 수량으로 장바구니 수량을 변경. 최솟값을 1로 강제.
-        cart.setQuantity(Math.max(1, request.getQuantity()));
+        cart.setQuantity(nextQty);
         cartRepository.save(cart);
 
         // ItemEntity 를 DTO로 변환

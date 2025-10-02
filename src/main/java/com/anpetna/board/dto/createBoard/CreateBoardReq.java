@@ -25,10 +25,12 @@ public class CreateBoardReq {
 
     @NotBlank
     @JsonProperty("bTitle")
+    @Size(max = 200, message = "제목은 최대 200자까지 입력 가능합니다.")
     private String bTitle;           // 제목
 
     @NotBlank
     @JsonProperty("bContent")
+    @Size(max = 4000, message = "내용은 최대 4000자까지 입력 가능합니다.")
     private String bContent;         // 내용
 
     @JsonProperty("boardType")

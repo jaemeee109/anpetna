@@ -111,17 +111,18 @@ public class MemberController {
 
 
     //삭제
-    @GetMapping("/delete")
-    @ResponseBody
+    @PostMapping(value = "/delete",
+            consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE)
     @Transactional
-    public ApiResult<DeleteMemberRes> delete(Authentication authentication)
-            throws MemberService.MemberIdExistException {
-
-        DeleteMemberReq deleteMemberReq = new DeleteMemberReq();
-        deleteMemberReq.setMemberId(authentication.getName());
-
-        var delete = memberService.delete(deleteMemberReq);
-        return new ApiResult<>(delete);
+    public ApiResult<DeleteMemberRes> deleteJson(
+            @RequestBody @Valid DeleteMemberReq body,
+            Authentication authentication
+    ) {
+        // ✅ 서버가 신뢰하는 로그인 계정만 대상으로
+        body.setMemberId(authentication.getName());
+        var res = memberService.delete(body);
+        return new ApiResult<>(res);
     }
     //    ============================================
 //    프론트에서 계정주/관리자가 삭제버튼을 누름

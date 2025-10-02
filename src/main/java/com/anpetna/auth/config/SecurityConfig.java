@@ -23,6 +23,8 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.util.List;
+
 // CRUD 개발시 @Configuration, @RequiredArgsConstructor 만 활성화
 @Configuration
 @RequiredArgsConstructor
@@ -198,18 +200,18 @@ public class SecurityConfig {
         // === Origin 허용 목록 ===
         // CorsConfiguration을 직접 써서 리스트로 지정하는 방식
         // setAllowedOrigins는 여러 개 origin을 한 번에 넣을 수 있으니 다 허용
-        cfg.setAllowedOrigins(java.util.List.of(
+        cfg.setAllowedOrigins(List.of(
                 "http://localhost:3000",
                 "http://192.168.0.160:3000"
         ));
         // === 허용 메서드 ===
-        cfg.setAllowedMethods(java.util.List.of(
+        cfg.setAllowedMethods(List.of(
                 "GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"
         ));
 
         // === 허용 헤더 ===
         // 기존처럼 전체(*) 허용 (Authorization 포함)
-        cfg.setAllowedHeaders(java.util.List.of("*"));
+        cfg.setAllowedHeaders(List.of("*"));
 
         // === 자격 증명 허용 ===
         // 쿠키/Authorization 헤더를 프론트에서 보낼 수 있게 함 (axios withCredentials 등)
@@ -217,7 +219,7 @@ public class SecurityConfig {
 
         // === 노출(Exposed) 헤더 ===
         // 브라우저에서 읽을 수 있게 허용할 응답 헤더들
-        cfg.setExposedHeaders(java.util.List.of(
+        cfg.setExposedHeaders(List.of(
                 "Authorization"                                           // 토큰을 응답헤더로 내려줄 때 프론트에서 읽기 가능
         ));
 
