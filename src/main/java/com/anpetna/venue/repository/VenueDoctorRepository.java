@@ -1,6 +1,6 @@
 package com.anpetna.venue.repository;
 
-import com.anpetna.venue.domain.VenueDoctorEntity;
+import com.anpetna.venue.domain.hospital.VenueDoctorEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;

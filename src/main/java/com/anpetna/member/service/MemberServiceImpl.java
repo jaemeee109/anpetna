@@ -153,7 +153,7 @@ public class MemberServiceImpl implements MemberService {
 
 
     @Override
-    @PreAuthorize("hasRole('ADMIN') or (#p0 != null and #p0.memberId == authentication.name)")
+    @PreAuthorize("isAuthenticated() and (hasRole('ADMIN') or #p0.memberId == authentication.name)")
     @Transactional(readOnly = true)
     public ReadMemberOneRes readOne(ReadMemberOneReq readMemberOneReq) {
 

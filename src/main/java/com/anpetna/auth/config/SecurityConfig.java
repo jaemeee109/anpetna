@@ -103,7 +103,7 @@ public class SecurityConfig {
                         // --- Member (join/login 먼저 열기!) ---
                         .requestMatchers("/member/login", "/member/join").permitAll()
                         .requestMatchers("/member/readOne", "/member/readAll").hasRole("ADMIN")
-                        .requestMatchers("/member/my_page/**", "/member/modify").hasAnyRole("USER")  // ✅ 슬래시 대신 /**
+                        .requestMatchers("/member/my_page/**", "/member/modify").hasAnyRole("ADMIN","USER")  // ✅ 슬래시 대신 /**
 
 
                         // --- Board ---

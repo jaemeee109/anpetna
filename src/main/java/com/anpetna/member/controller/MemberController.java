@@ -144,16 +144,19 @@ public class MemberController {
     @Transactional(readOnly = true)
     public ApiResult<ReadMemberOneRes> readOne(
             @PathVariable(value = "memberId", required = false) String memberId,
-            @AuthenticationPrincipal String me // 👈 문자열 principal 그대로 주입
+            @AuthenticationPrincipal(expression = "username") String me
     ) {
-        String target = (memberId == null || memberId.isBlank()) ? me : memberId;
-
+        final String target = (memberId == null || memberId.isBlank()) ? me : memberId;
+        if (target == null || target.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "memberId가 없습니다.");
+        }
         ReadMemberOneReq req = new ReadMemberOneReq();
-        req.setMemberId(target);
+        req.setMemberId(target.trim());
 
-        var readOne = memberService.readOne(req); // Service에서 @PreAuthorize
+        final var readOne = memberService.readOne(req);
         return new ApiResult<>(readOne);
     }
+
 
 
 //===========================================
