@@ -44,9 +44,11 @@ function getAccessToken(): string {
   } catch { return ''; }
 }
 function authHeaders(): HeadersInit {
-  const t = getAccessToken();
+  const cookieAuth = getCookie('Authorization');   // 서버가 세팅한 쿠키 우선
+  const t = cookieAuth || getAccessToken();
   return t ? { Authorization: t.startsWith('Bearer ') ? t : `Bearer ${t}` } : {};
 }
+
 
 /** API 베이스 후보 (백엔드 우선, 프론트는 맨 마지막) */
 function bases(): string[] {

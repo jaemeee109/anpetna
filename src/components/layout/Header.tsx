@@ -105,6 +105,8 @@ function payloadHasAdmin(p: JwtPayload | null) {
   return bag.map(s => String(s).toUpperCase()).some(s => s.includes('ROLE_ADMIN') || s === 'ADMIN');
 }
 
+
+
 /* -------------------- 본 컴포넌트 -------------------- */
 function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
   const pathname = usePathname();
@@ -114,7 +116,10 @@ function NavLink({ href, children }: { href: string; children: React.ReactNode }
       {children}
     </Link>
   );
+
 }
+
+
 
 export default function Header() {
   const router = useRouter();
@@ -122,6 +127,9 @@ export default function Header() {
 
   const [authed, setAuthed] = useState(false);
   const [admin, setAdmin] = useState(false);
+
+    const roleCheckInFlight = useRef(false);
+  const lastRoleCheckAt = useRef<number>(0);
 
   // 드롭다운
   const [myOpen, setMyOpen] = useState(false);
@@ -166,54 +174,64 @@ export default function Header() {
     setAdmin(!!(isAdminByJwt || isAdminStored));
   }
 
-  // 2차: 서버에서 역할 확정 (ADMIN/BLACKLIST/USER 중 하나)
-  async function verifyRoleFromServerIfNeeded() {
-    if (!hasAnyLocalAuth()) return;
+async function verifyRoleFromServerIfNeeded() {
+  // 로그인 흔적 없으면 스킵
+  if (!hasAnyLocalAuth()) return;
 
+  // 10초 내 중복 호출 방지
+  const now = Date.now();
+  if (roleCheckInFlight.current || now - lastRoleCheckAt.current < 10_000) return;
+  roleCheckInFlight.current = true;
+  lastRoleCheckAt.current = now;
+
+  try {
     const token = getTokenFromStorage();
 
-    //  이미 ADMIN이면 서버 확인 생략
+    // JWT/로컬이 이미 ADMIN이면 서버 확인 생략
     const isAdminByJwt = token ? payloadHasAdmin(decodeJwt(token)) : false;
     const stored = (typeof window !== 'undefined' && localStorage.getItem('memberRole')) || '';
-    const up = stored.toUpperCase();
-    const isAdminStored = up === 'ADMIN' || up === 'ROLE_ADMIN';
+    const isAdminStored = (stored.toUpperCase() === 'ADMIN' || stored.toUpperCase() === 'ROLE_ADMIN');
     if (isAdminByJwt || isAdminStored) {
       setAuthed(true);
       setAdmin(true);
       return;
     }
 
-    if (!token) {
-      if (stored) {
-        setAuthed(true);
-        setAdmin(isAdminStored);
-      } else {
-        setAuthed(false);
-        setAdmin(false);
-      }
-      return;
-    }
-
+    // 서버 조회 시도 (loginId or memberId가 문자열인 환경 고려)
     const id =
       (typeof window !== 'undefined' && (localStorage.getItem('memberId') || localStorage.getItem('loginId'))) || '';
-    if (!id) return;
+    if (!id) {
+      // 로컬 흔적만으로 표시
+      setAuthed(!!token);
+      setAdmin(false);
+      return;
+    }
 
     const base =
       process.env.NEXT_PUBLIC_API_BASE ||
       (typeof window !== 'undefined' ? window.location.origin.replace(':3000', ':8000') : '');
 
+    // 1순위 → my_page/{id}, 실패 시 readOne/{id}
     const candidates = [
       `/member/my_page/${encodeURIComponent(id)}`,
       `/member/readOne/${encodeURIComponent(id)}`,
     ];
 
     for (const p of candidates) {
+      const url = new URL(p, base);
       try {
-        const r = await fetch(new URL(p, base), { credentials: 'include', headers: authHeaders() });
-        if (r.status === 401 || r.status === 403) {
-          return;
+        const r = await fetch(url.toString(), { credentials: 'include', headers: authHeaders() });
+
+        // 401/403은 조용히 종료(다시 로그인 필요할 때만 UI가 자연히 유도됨)
+        if (r.status === 401 || r.status === 403) return;
+
+        // ❗ 500 계열이면 더 이상 다음 후보 호출하지 말고 종료
+        if (r.status >= 500) return;
+
+        if (!r.ok) {
+          // 4xx지만 401/403이 아닌 경우 → 다음 후보로
+          continue;
         }
-        if (!r.ok) continue;
 
         const data = await r.json().catch(() => ({} as any));
         const rawRole =
@@ -221,6 +239,7 @@ export default function Header() {
           data?.data?.memberRole ??
           data?.member?.memberRole ??
           data?.memberRole ?? '';
+
         const roleStr = (Array.isArray(rawRole) ? rawRole.join(',') : String(rawRole)).toUpperCase();
 
         let norm: 'ADMIN' | 'BLACKLIST' | 'USER' = 'USER';
@@ -228,13 +247,22 @@ export default function Header() {
         if (roleStr.includes('ADMIN') || roleStr.includes('ROLE_ADMIN')) norm = 'ADMIN';
 
         try { localStorage.setItem('memberRole', norm); } catch {}
-        setAdmin(norm === 'ADMIN'); setAuthed(true);
-        return;
+        setAdmin(norm === 'ADMIN');
+        setAuthed(true);
+        return; // 성공했으면 종료
       } catch {
         // 네트워크 오류면 다음 후보
       }
     }
+
+    // 모든 후보 실패 시: 토큰이 있으면 로그인 상태만 유지, 역할은 로컬 추정
+    setAuthed(!!token);
+    setAdmin(false);
+  } finally {
+    roleCheckInFlight.current = false;
   }
+}
+
 
   // 공용 동기화 헬퍼
   const syncAuth = () => {

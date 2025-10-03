@@ -84,7 +84,7 @@ export default function NotificationPage() {
 
   return (
     <RequireLogin>
-      <main className="container" style={{ padding: '20px 0' }}>
+     <main className="container apn-noti">
         <h1 className="apn-title">알림</h1>
 
         <div className="apn-toolbar" role="toolbar" aria-label="알림 도구">
@@ -94,7 +94,7 @@ export default function NotificationPage() {
               checked={onlyUnread}
               onChange={(e) => { setPage(1); setOnlyUnread(e.currentTarget.checked); }}
             />
-            <span>미읽음만 보기</span>
+            <span>안읽음</span>
           </label>
           <div className="spacer" />
           <button type="button" onClick={handleMarkAll} className="btn-link">전체 읽음</button>
@@ -153,6 +153,14 @@ export default function NotificationPage() {
         )}
 
         <style jsx>{`
+          /* === 본문 폭 & 가운데 정렬 === */
+          .apn-noti {
+            --apn-noti-max: 500px;         /* ← 여기 숫자만 바꾸면 즉시 폭 조절(px) */
+            max-width: var(--apn-noti-max);
+            margin: 0 auto;                 /* 가운데 정렬 */
+            padding: 20px 16px;             /* 기존 padding 유지 (양옆 살짝 여백) */
+          }
+
           .apn-title { font-size: 20px; margin: 0 0 12px; }
           .apn-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
           .apn-toggle { display: inline-flex; align-items: center; gap: 6px; }

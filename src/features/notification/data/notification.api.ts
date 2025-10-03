@@ -1,14 +1,7 @@
 // src/features/notification/data/notification.api.ts
-// 백엔드 엔드포인트: /notification/* 
-// - GET /notification (unreadOnly, page/size)
-// - GET /notification/unread-count
-// - PATCH /notification/{id}/mark-read
-// - POST /notification/mark-all-read
-// - DELETE /notification/{id}
-// - GET /notification/stream (SSE)
+import { withPrefix } from '@/lib/api';
+import { EventSourcePolyfill } from 'event-source-polyfill';
 
-import { withPrefix } from '@/lib/api'; // prefix 유틸은 lib/api.ts에 존재합니다.
-import { EventSourcePolyfill } from 'event-source-polyfill';  
 type PageRes<T> = {
   dtoList: T[];
   total: number;
@@ -18,7 +11,6 @@ type PageRes<T> = {
   end?: number;
 };
 
-// 서버 DTO 최소 필드 매핑 (백 기준 필드명 그대로 사용)
 export type NotificationDTO = {
   nId: number;
   title: string;
@@ -55,7 +47,6 @@ function authHeaders(): Record<string, string> {
 }
 
 /* ========= API 베이스 ========= */
-/** 페이지들에서 사용 중인 것과 동일한 방식으로 베이스 URL을 해석합니다. */
 function resolveApiBase(): string {
   const envBase =
     (process.env.NEXT_PUBLIC_API_BASE as string | undefined) ||
@@ -67,7 +58,6 @@ function resolveApiBase(): string {
   const guessPort = port ? (port === '3000' ? '8000' : port) : '';
   return `${protocol}//${hostname}${guessPort ? `:${guessPort}` : ''}`.replace(/\/+$/, '');
 }
-/** 절대 URL 생성(helper) */
 function abs(path: string, q?: URLSearchParams): string {
   const base = resolveApiBase();
   const p = withPrefix(path);
@@ -91,7 +81,7 @@ export const notificationApi = {
   async list(params: { unreadOnly?: boolean; page?: number; size?: number }): Promise<PageRes<NotificationDTO>> {
     const q = new URLSearchParams();
     if (params.unreadOnly != null) q.set('unreadOnly', String(params.unreadOnly));
-   if (params.page != null) q.set('page', String(params.page as number));
+    if (params.page != null) q.set('page', String(params.page as number));
     if (params.size != null) q.set('size', String(params.size));
     const res = await fetch(abs('/notification', q), {
       method: 'GET',
@@ -132,30 +122,39 @@ export const notificationApi = {
     return res.json();
   },
 
+  openStream(onEvent: (type: string, data: any) => void): EventSource {
+    const token = getToken();
+    const es: EventSource = new EventSourcePolyfill(abs('/notification/stream'), {
+      headers: {
+        Authorization: token.startsWith('Bearer ') ? token : `Bearer ${token}`,
+      },
+      withCredentials: true,
+      heartbeatTimeout: 600_000,
+    } as any);
 
+    es.addEventListener('keepalive', () => { /* 연결 직후 1회 수신 */ });
+    es.addEventListener('notification.created', (e: MessageEvent) => {
+      try { onEvent('notification.created', JSON.parse(e.data)); } catch {}
+    });
+    es.addEventListener('notification.deleted', (e: MessageEvent) => {
+      try { onEvent('notification.deleted', JSON.parse(e.data)); } catch {}
+    });
+    es.onmessage = (e) => {
+      try { onEvent('message', JSON.parse(e.data)); } catch {}
+    };
 
-openStream(onEvent: (type: string, data: any) => void): EventSource {
-  const token = getToken();
-  const es: EventSource = new EventSourcePolyfill(abs('/notification/stream'), {
-    headers: {
-      Authorization: token.startsWith('Bearer ') ? token : `Bearer ${token}`,
-    },
-    withCredentials: true,
-  });
+    // 폴리필 유휴 타임아웃 메시지("No activity within ...")만 조용히 무시
+    es.onerror = (err: any) => {
+      try {
+        const msg = String((err && (err.message ?? (err as any)?.data)) || '');
+        if (msg.includes('No activity within')) {
+          return; // 자동 재연결은 폴리필이 수행
+        }
+      } catch {}
+      // (선택) 실제 네트워크 오류에 대해 후속 처리
+      // notificationApi.unreadCount().catch(() => {});
+    };
 
-  es.addEventListener('keepalive', () => { /* 연결 직후 1회 수신 */ });
-  es.addEventListener('notification.created', (e: MessageEvent) => {
-    try { onEvent('notification.created', JSON.parse(e.data)); } catch {}
-  });
-  es.addEventListener('notification.deleted', (e: MessageEvent) => {
-    try { onEvent('notification.deleted', JSON.parse(e.data)); } catch {}
-  });
-  es.onmessage = (e) => {
-    try { onEvent('message', JSON.parse(e.data)); } catch {}
-  };
-  es.onerror = () => { /* 네트워크 끊김 시 → 목록/배지 재조회 */ };
-
-  return es;
-}
-
+    return es;
+  },
 };
