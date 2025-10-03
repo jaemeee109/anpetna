@@ -13,14 +13,30 @@ type PageRes<T> = {
 
 export type NotificationDTO = {
   nId: number;
-  title: string;
-  message?: string;
-  linkUrl?: string;
+  nTitle: string;
+  nMessage?: string | null;
+  linkUrl?: string | null;
   isRead: boolean;
-  createdAt: string; // ISO
+  createdAt: string;
+  eventId?: string;
+  targetType?: string | null;
+  targetId?: string | null;
   readAt?: string | null;
-  variant?: string | null;
-  notificationType?: string | null;
+};
+
+/* ===== 키워드 알림 타입 ===== */
+export type KeywordSubscriptionDTO = {
+  kId: number;
+  keyword: string;
+  scopeBoardType?: string | null;
+  createDate?: string;
+  latestDate?: string;
+  subscriberMemberId?: string;
+};
+export type ListKeywordRes = { items: KeywordSubscriptionDTO[] };
+export type CreateKeywordReq = {
+  keyword: string;
+  scopeBoardType?: string | null;
 };
 
 /* ========= 공통: 토큰/헤더 ========= */
@@ -119,6 +135,8 @@ export const notificationApi = {
       credentials: 'include',
     });
     if (!res.ok) throw new Error('삭제 실패');
+    // 일부 백엔드는 204를 반환할 수 있음
+    if (res.status === 204) return { ok: true };
     return res.json();
   },
 
@@ -132,7 +150,7 @@ export const notificationApi = {
       heartbeatTimeout: 600_000,
     } as any);
 
-    es.addEventListener('keepalive', () => { /* 연결 직후 1회 수신 */ });
+    es.addEventListener('keepalive', () => {});
     es.addEventListener('notification.created', (e: MessageEvent) => {
       try { onEvent('notification.created', JSON.parse(e.data)); } catch {}
     });
@@ -142,19 +160,71 @@ export const notificationApi = {
     es.onmessage = (e) => {
       try { onEvent('message', JSON.parse(e.data)); } catch {}
     };
-
-    // 폴리필 유휴 타임아웃 메시지("No activity within ...")만 조용히 무시
     es.onerror = (err: any) => {
       try {
         const msg = String((err && (err.message ?? (err as any)?.data)) || '');
-        if (msg.includes('No activity within')) {
-          return; // 자동 재연결은 폴리필이 수행
-        }
+        if (msg.includes('No activity within')) return;
       } catch {}
-      // (선택) 실제 네트워크 오류에 대해 후속 처리
-      // notificationApi.unreadCount().catch(() => {});
     };
-
     return es;
+  },
+
+  // 단건 조회
+  async readOne(nId: number): Promise<NotificationDTO> {
+    const res = await fetch(abs(`/notification/${nId}`), {
+      method: 'GET',
+      headers: { ...authHeaders() },
+      credentials: 'include',
+    });
+    if (!res.ok) throw new Error('알림 단건 조회 실패');
+    return res.json();
+  },
+
+  /* ===== [키워드 구독] ===== */
+  keywords: {
+    async list(): Promise<ListKeywordRes> {
+      const res = await fetch(abs('/notification/keywords'), {
+        method: 'GET',
+        headers: { ...authHeaders() },
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error(`키워드 목록 조회 실패 (HTTP ${res.status})`);
+      return res.json();
+    },
+
+    async create(req: CreateKeywordReq): Promise<KeywordSubscriptionDTO> {
+      const res = await fetch(abs('/notification/keywords'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        credentials: 'include',
+        body: JSON.stringify(req),
+      });
+      if (!res.ok) throw new Error(`키워드 구독 생성 실패 (HTTP ${res.status})`);
+      return res.json();
+    },
+
+    async remove(kId: number): Promise<{ kId: number; deleted: boolean }> {
+      if (!Number.isFinite(kId)) throw new Error('유효하지 않은 kId');
+      const res = await fetch(abs(`/notification/keywords/${encodeURIComponent(String(kId))}`), {
+        method: 'DELETE',
+        headers: { ...authHeaders() },
+        credentials: 'include',
+      });
+      if (res.status === 204) return { kId, deleted: true };
+      if (!res.ok) {
+        const msg = await res.text().catch(() => '');
+        throw new Error(`키워드 구독 삭제 실패 (HTTP ${res.status}) ${msg}`.trim());
+      }
+      return res.json();
+    },
+
+    // UPDATE 엔드포인트가 없으므로: 삭제 후 재생성
+    async replace(kId: number, keyword: string, scopeBoardType?: string | null) {
+      try { await notificationApi.keywords.remove(kId); } catch {}
+      return notificationApi.keywords.create({
+        keyword,
+        scopeBoardType: scopeBoardType ?? null,
+      });
+    },
   },
 };
