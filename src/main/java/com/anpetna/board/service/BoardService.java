@@ -41,6 +41,10 @@ public interface BoardService {
 
     DeleteBoardRes deleteBoard(DeleteBoardReq deleteBoardReq, String memberId);
 
+    // likeBoard는 "토글" 의미로 동작하게 구현합니다.
+    // 처음 누르면 → 좋아요 ON (+1)
+    // 이미 눌린 상태에서 다시 누르면 → 좋아요 OFF (-1)
+    // 멱등/동시성은 DB 유니크 제약 + 원자적 UPDATE로 보장
     UpdateBoardRes likeBoard(Long bno, String memberId);
 
     // NOTICE 중에서 최신순 5개

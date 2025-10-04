@@ -24,6 +24,8 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.util.List;
+
 // CRUD 개발시 @Configuration, @RequiredArgsConstructor 만 활성화
 @Configuration
 @RequiredArgsConstructor
@@ -86,9 +88,10 @@ public class SecurityConfig {
                         //브라우저에서 실제 요청 전에 보내는 프리플라이트 요청 -> 인증 없이 허용해주어야 브라우저에서 정상적으로 POST/PUT/DELETE 요청이 가능
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                        // ✅ 정적 리소스 전체 허용 (classpath:/static, /public, /resources, /META-INF/resources)
+                        //  정적 리소스 전체 허용 (classpath:/static, /public, /resources, /META-INF/resources)
                         .requestMatchers(PathRequest.toStaticResources().atCommonLocations()).permitAll()
 
+                        .requestMatchers("/notification/stream").authenticated()
                         // --- Auth/JWT ---
                         .requestMatchers("/jwt/**").permitAll()
 
@@ -108,7 +111,7 @@ public class SecurityConfig {
                         // --- Member (join/login 먼저 열기!) ---
                         .requestMatchers("/member/login", "/member/join").permitAll()
                         .requestMatchers("/member/readOne", "/member/readAll").hasRole("ADMIN")
-                        .requestMatchers("/member/my_page/**", "/member/modify").hasAnyRole("USER")  // ✅ 슬래시 대신 /**
+                        .requestMatchers("/member/my_page/**", "/member/modify").hasAnyRole("ADMIN","USER")  // ✅ 슬래시 대신 /**
 
 
                         // --- Board ---
@@ -169,6 +172,22 @@ public class SecurityConfig {
                         .requestMatchers("/care/admin/**").hasRole("ADMIN")  // 관리자 전용
 
 
+                        // --- Notification (회원/관리자만) ---
+                        .requestMatchers(HttpMethod.GET,
+                                "/notification",
+                                "/notification/unread-count",
+                                "/notification/stream"
+                        ).hasAnyRole("ADMIN","USER")
+                        .requestMatchers(HttpMethod.PATCH,
+                                "/notification/*/mark-read"
+                        ).hasAnyRole("ADMIN","USER")
+                        .requestMatchers(HttpMethod.POST,
+                                "/notification/mark-all-read"
+                        ).hasAnyRole("ADMIN","USER")
+                        .requestMatchers(HttpMethod.DELETE,
+                                "/notification/*"
+                        ).hasAnyRole("ADMIN","USER")
+
                         .anyRequest().authenticated()
                 )
 
@@ -188,6 +207,7 @@ public class SecurityConfig {
                         new JwtAuthenticationFilter(jwtProvider, blacklistService, memberRepository, adminBlacklistJpaRepository), // 커스텀 JWT 인증 필터
                         UsernamePasswordAuthenticationFilter.class                                   // 위치 지정만, 폼 로그인은 사용 안함
                 );
+
         return http.build();
     }
 
@@ -208,13 +228,13 @@ public class SecurityConfig {
         // setAllowedOrigins는 여러 개 origin을 한 번에 넣을 수 있으니 다 허용
         cfg.setAllowedOrigins(java.util.List.of(frontUrl));
         // === 허용 메서드 ===
-        cfg.setAllowedMethods(java.util.List.of(
+        cfg.setAllowedMethods(List.of(
                 "GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"
         ));
 
         // === 허용 헤더 ===
         // 기존처럼 전체(*) 허용 (Authorization 포함)
-        cfg.setAllowedHeaders(java.util.List.of("*"));
+        cfg.setAllowedHeaders(List.of("*"));
 
         // === 자격 증명 허용 ===
         // 쿠키/Authorization 헤더를 프론트에서 보낼 수 있게 함 (axios withCredentials 등)
@@ -222,7 +242,7 @@ public class SecurityConfig {
 
         // === 노출(Exposed) 헤더 ===
         // 브라우저에서 읽을 수 있게 허용할 응답 헤더들
-        cfg.setExposedHeaders(java.util.List.of(
+        cfg.setExposedHeaders(List.of(
                 "Authorization"                                           // 토큰을 응답헤더로 내려줄 때 프론트에서 읽기 가능
         ));
 

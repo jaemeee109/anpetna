@@ -4,6 +4,10 @@ package com.anpetna.venue.service.hotel;
 import com.anpetna.member.domain.MemberEntity;
 import com.anpetna.member.repository.MemberRepository;
 
+import com.anpetna.notification.feature.reservation.service.ReservationReminderService;
+import com.anpetna.notification.feature.reservation.service.hotel.HotelNoShowNotificationService;
+import com.anpetna.notification.feature.reservation.service.hotel.HotelReservationConfirmNotificationService;
+import com.anpetna.notification.feature.reservation.service.hotel.HotelReservationService;
 import com.anpetna.venue.constant.ReservationStatus;
 import com.anpetna.venue.domain.hotel.HotelReservationEntity;
 import com.anpetna.venue.domain.VenueEntity;
@@ -19,10 +23,10 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+
 import com.anpetna.venue.dto.member.MyHotelReservationDetail;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
 
 @Service
 @RequiredArgsConstructor
@@ -35,6 +39,13 @@ public class HotelServiceImpl implements HotelService {
     private final MemberRepository memberRepository;
     private final HotelReservationRepository hotelReservationRepository;
     private final HospitalReservationRepository hospitalReservationRepository;
+    private final HotelReservationConfirmNotificationService hotelReservationNotificationService;
+    private final HotelNoShowNotificationService hotelNoShowNotification;
+    private final HotelReservationService hotelReservationService;
+    private final ReservationReminderService reservationReminderService;
+
+    private static final LocalTime DEFAULT_CHECKIN_TIME = LocalTime.of(15, 0);
+    private static final DateTimeFormatter HOTEL_FMT = DateTimeFormatter.ofPattern("MM월 dd일 HH:mm");
 
     // 회원의 노쇼 누적 회수(호텔+병원 합산)
     private long getNoShowCountAllServices(String memberId) {
@@ -108,6 +119,8 @@ public class HotelServiceImpl implements HotelService {
                         .build()
         );
 
+        hotelReservationService.notifyHotelReservation(member, memberId, venue, checkIn, checkOut);
+
         return CreateHotelReservationRes.builder()
                 .reservationId(saved.getReservationId())
                 .build();
@@ -121,6 +134,35 @@ public class HotelServiceImpl implements HotelService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "예약을 찾을 수 없습니다."));
         found.setStatus(ReservationStatus.CONFIRMED);
         // JPA dirty checking
+
+        hotelReservationNotificationService.notifyHotelReservationConfirm(
+                found.getMember(),
+                found.getMember().getMemberId(),
+                found.getVenue(),
+                found.getCheckIn(),
+                found.getCheckOut()
+        );
+
+        // ⬇️ [추가] 리마인드 알림 스케줄 등록 (24h/3h)
+        // checkIn(LocalDate) + 기본 체크인 시각(LocalTime) → LocalDateTime 환산은 내부 서비스에서 수행
+        String title24h = "[호텔 체크인 D-1] 내일 " +
+                (found.getVenue() != null ? found.getVenue().getVenueName() : "") + " " +
+                found.getCheckIn().atTime(DEFAULT_CHECKIN_TIME).format(HOTEL_FMT) +
+                " 체크인 예정입니다. 필요 시 일정 변경을 진행해 주세요.";
+
+        String title3h = "[호텔 체크인 임박] " +
+                found.getCheckIn().atTime(DEFAULT_CHECKIN_TIME).format(DateTimeFormatter.ofPattern("HH:mm")) +
+                " 체크인 3시간 전입니다. 안전하게 방문해 주세요.";
+
+        reservationReminderService.handleHotelStatusChange(
+                String.valueOf(found.getReservationId()),
+                found.getMember().getMemberId(),
+                found.getCheckIn(),                // LocalDate
+                DEFAULT_CHECKIN_TIME,             // LocalTime (기본 15:00)
+                ReservationStatus.CONFIRMED,
+                title24h, title3h
+        );
+
     }
 
     //  관리자: 노쇼 처리 API
@@ -130,6 +172,25 @@ public class HotelServiceImpl implements HotelService {
         HotelReservationEntity found = hotelReservationRepository.findById(reservationId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "예약을 찾을 수 없습니다."));
         found.setStatus(ReservationStatus.NOSHOW);
+
+        hotelNoShowNotification.notifyHotelNoShow(
+                found.getMember(),
+                found.getMember().getMemberId(),
+                found.getVenue(),
+                found.getCheckIn(),
+                found.getCheckOut()
+        );
+
+        // ⬇️ [추가] 리마인드 잡 전부 취소
+        reservationReminderService.handleHotelStatusChange(
+                String.valueOf(found.getReservationId()),
+                found.getMember().getMemberId(),
+                found.getCheckIn(),
+                DEFAULT_CHECKIN_TIME,
+                ReservationStatus.NOSHOW,
+                null, null
+        );
+
     }
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
     @Override
@@ -189,6 +250,40 @@ public class HotelServiceImpl implements HotelService {
         if (opt.isEmpty()) return false;
         var r = opt.get();
         r.setStatus(next); // JPA dirty checking
+
+        // ⬇️ [추가] 상태 전이 후 리마인드 스케줄 조정
+        if (next == ReservationStatus.CONFIRMED) {
+            String title24h = "[호텔 체크인 D-1] 내일 " +
+                    (r.getVenue() != null ? r.getVenue().getVenueName() : "") + " " +
+                    r.getCheckIn().atTime(DEFAULT_CHECKIN_TIME).format(HOTEL_FMT) +
+                    " 체크인 예정입니다. 필요 시 일정 변경을 진행해 주세요.";
+
+            String title3h = "[호텔 체크인 임박] " +
+                    r.getCheckIn().atTime(DEFAULT_CHECKIN_TIME).format(DateTimeFormatter.ofPattern("HH:mm")) +
+                    " 체크인 3시간 전입니다. 안전하게 방문해 주세요.";
+
+            reservationReminderService.handleHotelStatusChange(
+                    String.valueOf(r.getReservationId()),
+                    r.getMember() != null ? r.getMember().getMemberId() : null,
+                    r.getCheckIn(),
+                    DEFAULT_CHECKIN_TIME,
+                    ReservationStatus.CONFIRMED,
+                    title24h, title3h
+            );
+        } else if (next == ReservationStatus.CANCELED
+                || next == ReservationStatus.NOSHOW
+                || next == ReservationStatus.REJECTED) {
+
+            reservationReminderService.handleHotelStatusChange(
+                    String.valueOf(r.getReservationId()),
+                    r.getMember() != null ? r.getMember().getMemberId() : null,
+                    r.getCheckIn(),
+                    DEFAULT_CHECKIN_TIME,
+                    next,
+                    null, null
+            );
+        }
+
         return true;
     }
 

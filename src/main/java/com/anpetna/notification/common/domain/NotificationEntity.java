@@ -6,6 +6,8 @@ import com.anpetna.notification.common.constant.TargetType;
 import com.anpetna.notification.common.constant.NotificationVariant;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
@@ -36,11 +38,13 @@ public class NotificationEntity {
     /** 알림 받는 사람 */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "receiver_id", nullable = false)
+    @OnDelete(action = OnDeleteAction.CASCADE)
     private MemberEntity receiver;
 
     /** 알림 유발자(없을 수 있음) */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "actor_id")
+    @OnDelete(action = OnDeleteAction.CASCADE)
     private MemberEntity actor;
 
     @Enumerated(EnumType.STRING)

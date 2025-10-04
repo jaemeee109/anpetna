@@ -44,6 +44,9 @@ import org.springframework.security.core.context.SecurityContextHolder; // <- AD
 import java.util.*;
 import java.util.stream.Collectors;
 
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -76,6 +79,8 @@ public class BoardServiceImpl implements BoardService {
             throw new AccessDeniedException("권한 없음: " + actionName + " 은/는 본인만 가능합니다.");
         }
     }
+
+    private final ConcurrentMap<Long, Set<String>> boardLikeGuard = new ConcurrentHashMap<>();
 
     /* ======================= 파일 저장 유틸 ======================= */
     @Value("${app.upload.dir}")
@@ -406,13 +411,29 @@ public class BoardServiceImpl implements BoardService {
         BoardEntity e = boardJpaRepository.findById(bno)
                 .orElseThrow(() -> new RuntimeException("존재하지 않는 게시글입니다."));
 
-        int currentLike = (e.getBLikeCount() == null ? 0 : e.getBLikeCount());
-        e.setBLikeCount(currentLike + 1);
+        //  본인 글 금지: 403이 아니라 400으로 내려서 프론트 인터셉터 리다이렉트 방지
+        if (memberId.equals(e.getBWriter())) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST,
+                    "본인 글에는 좋아요를 누를 수 없습니다."
+            );
+        }
 
-        try {
-            likeNotificationService.notifyBoardLike(e, memberId);
-        } catch (Exception ex) {
-            log.warn("notifyBoardLike failed: bno={}, actor={}", bno, memberId, ex);
+        // 중복 방지 + 토글 유지
+        Set<String> users = boardLikeGuard.computeIfAbsent(bno, k -> java.util.concurrent.ConcurrentHashMap.newKeySet());
+        boolean firstTime = users.add(memberId);
+
+        int current = (e.getBLikeCount() == null ? 0 : e.getBLikeCount());
+        if (!firstTime) {
+            users.remove(memberId);
+            e.setBLikeCount(Math.max(0, current - 1));
+        } else {
+            e.setBLikeCount(current + 1);
+            try {
+                likeNotificationService.notifyBoardLike(e, memberId);
+            } catch (Exception ex) {
+                log.warn("notifyBoardLike failed: bno={}, actor={}", bno, memberId, ex);
+            }
         }
 
         return UpdateBoardRes.builder()
@@ -420,6 +441,7 @@ public class BoardServiceImpl implements BoardService {
                 .bLikeCount(e.getBLikeCount())
                 .build();
     }
+
 
     /* ============================ 공지글 최신순 5개 ============================ */
     @Override
@@ -466,4 +488,3 @@ catch (Exception ignore)는 클린업 실패가 원래 수정 흐름을 덮어�
 추가: 개수 제한 확인 후 파일 저장 → 엔티티 생성/연결, 예외 시 보상 삭제.
 마지막에 저장하고 정렬된 상태로 DTO 반환.
 */
-

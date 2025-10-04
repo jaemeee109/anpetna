@@ -7,6 +7,8 @@ import com.anpetna.member.domain.MemberEntity;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
 import org.hibernate.type.SqlTypes;
 
 import java.util.UUID;
@@ -53,6 +55,7 @@ public class ImageEntity {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = true)
     @JoinColumn(name = "member_id", foreignKey = @ForeignKey(name = "fk_image_member"))
+    @OnDelete(action = OnDeleteAction.CASCADE)
     private MemberEntity member;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = true)
