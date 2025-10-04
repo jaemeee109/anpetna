@@ -135,39 +135,51 @@ export const notificationApi = {
       credentials: 'include',
     });
     if (!res.ok) throw new Error('삭제 실패');
-    // 일부 백엔드는 204를 반환할 수 있음
-    if (res.status === 204) return { ok: true };
+    if (res.status === 204) return { ok: true }; // 일부 백엔드는 204 반환
     return res.json();
   },
 
-  openStream(onEvent: (type: string, data: any) => void): EventSource {
-    const token = getToken();
-    const es: EventSource = new EventSourcePolyfill(abs('/notification/stream'), {
-      headers: {
-        Authorization: token.startsWith('Bearer ') ? token : `Bearer ${token}`,
-      },
-      withCredentials: true,
-      heartbeatTimeout: 600_000,
-    } as any);
 
-    es.addEventListener('keepalive', () => {});
-    es.addEventListener('notification.created', (e: MessageEvent) => {
-      try { onEvent('notification.created', JSON.parse(e.data)); } catch {}
-    });
-    es.addEventListener('notification.deleted', (e: MessageEvent) => {
-      try { onEvent('notification.deleted', JSON.parse(e.data)); } catch {}
-    });
-    es.onmessage = (e) => {
-      try { onEvent('message', JSON.parse(e.data)); } catch {}
-    };
-    es.onerror = (err: any) => {
-      try {
-        const msg = String((err && (err.message ?? (err as any)?.data)) || '');
-        if (msg.includes('No activity within')) return;
-      } catch {}
-    };
-    return es;
-  },
+openStream(onEvent: (type: string, data: any) => void): EventSource {
+  const token = getToken();
+  const es: EventSource = new EventSourcePolyfill(abs('/notification/stream'), {
+    headers: {
+      Authorization: token.startsWith('Bearer ') ? token : `Bearer ${token}`,
+    },
+    withCredentials: true,
+    heartbeatTimeout: 600_000,
+  } as any);
+
+  // 서버가 주기적으로 보낼 수 있는 keepalive
+  es.addEventListener('keepalive', () => {});
+
+  // ✅ 서버 실제 이벤트명: "notification"
+  es.addEventListener('notification', (e: MessageEvent) => {
+    try { onEvent('notification', JSON.parse(e.data)); } catch {}
+  });
+
+  // 필요 시 유지(서버가 현재 사용하진 않음)
+  es.addEventListener('notification.created', (e: MessageEvent) => {
+    try { onEvent('notification.created', JSON.parse(e.data)); } catch {}
+  });
+  es.addEventListener('notification.deleted', (e: MessageEvent) => {
+    try { onEvent('notification.deleted', JSON.parse(e.data)); } catch {}
+  });
+
+  // 이름 없는(default) 이벤트용
+  es.onmessage = (e) => {
+    try { onEvent('message', JSON.parse(e.data)); } catch {}
+  };
+
+  es.onerror = (err: any) => {
+    try {
+      const msg = String((err && (err.message ?? (err as any)?.data)) || '');
+      if (msg.includes('No activity within')) return;
+    } catch {}
+  };
+  return es;
+},
+
 
   // 단건 조회
   async readOne(nId: number): Promise<NotificationDTO> {
@@ -217,14 +229,14 @@ export const notificationApi = {
       }
       return res.json();
     },
+  },
 
-    // UPDATE 엔드포인트가 없으므로: 삭제 후 재생성
-    async replace(kId: number, keyword: string, scopeBoardType?: string | null) {
-      try { await notificationApi.keywords.remove(kId); } catch {}
-      return notificationApi.keywords.create({
-        keyword,
-        scopeBoardType: scopeBoardType ?? null,
-      });
-    },
+  // UPDATE 엔드포인트가 없으므로: 삭제 후 재생성
+  async replace(kId: number, keyword: string, scopeBoardType?: string | null) {
+    try { await (this as any).keywords.remove(kId); } catch {}
+    return (this as any).keywords.create({
+      keyword,
+      scopeBoardType: scopeBoardType ?? null,
+    });
   },
 };

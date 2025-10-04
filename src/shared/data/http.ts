@@ -191,7 +191,8 @@ instance.interceptors.response.use(
   (error) => {
     const status = error?.response?.status ?? 0;
 
-    if (status === 401 || status === 403) {
+    // 🔒 자동 로그아웃/리다이렉트는 "401"에만 적용 (403은 세션 유지)
+    if (status === 401) {
       // 현재 보유한 인증 흔적이 있는지로 "미로그인" vs "만료" 추정
       const hasToken = !!getAccessToken();
       const hasSession = !!getCookie('JSESSIONID');
@@ -205,6 +206,8 @@ instance.interceptors.response.use(
         redirectToLoginWithNext('로그인 후 이용해주세요');
       }
     }
+    // ✅ 403(권한없음)은 여기서 세션 정리나 리다이렉트를 하지 않습니다.
+    //    호출부에서 normalizedMessage만 보고 처리하도록 그대로 throw
 
     // 서버 메시지를 표준화해 에러 객체에 붙여줍니다.
     const msg =
