@@ -80,9 +80,10 @@ public class SecurityConfig {
                         //브라우저에서 실제 요청 전에 보내는 프리플라이트 요청 -> 인증 없이 허용해주어야 브라우저에서 정상적으로 POST/PUT/DELETE 요청이 가능
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                        // ✅ 정적 리소스 전체 허용 (classpath:/static, /public, /resources, /META-INF/resources)
+                        //  정적 리소스 전체 허용 (classpath:/static, /public, /resources, /META-INF/resources)
                         .requestMatchers(PathRequest.toStaticResources().atCommonLocations()).permitAll()
 
+                        .requestMatchers("/notification/stream").authenticated()
                         // --- Auth/JWT ---
                         .requestMatchers("/jwt/**").permitAll()
 
@@ -102,7 +103,7 @@ public class SecurityConfig {
                         // --- Member (join/login 먼저 열기!) ---
                         .requestMatchers("/member/login", "/member/join").permitAll()
                         .requestMatchers("/member/readOne", "/member/readAll").hasRole("ADMIN")
-                        .requestMatchers("/member/my_page/**", "/member/modify").hasAnyRole("USER")  // ✅ 슬래시 대신 /**
+                        .requestMatchers("/member/my_page/**", "/member/modify").hasAnyRole("ADMIN","USER")  // ✅ 슬래시 대신 /**
 
 
                         // --- Board ---
@@ -163,6 +164,22 @@ public class SecurityConfig {
                         .requestMatchers("/care/admin/**").hasRole("ADMIN")  // 관리자 전용
 
 
+                        // --- Notification (회원/관리자만) ---
+                        .requestMatchers(HttpMethod.GET,
+                                "/notification",
+                                "/notification/unread-count",
+                                "/notification/stream"
+                        ).hasAnyRole("ADMIN","USER")
+                        .requestMatchers(HttpMethod.PATCH,
+                                "/notification/*/mark-read"
+                        ).hasAnyRole("ADMIN","USER")
+                        .requestMatchers(HttpMethod.POST,
+                                "/notification/mark-all-read"
+                        ).hasAnyRole("ADMIN","USER")
+                        .requestMatchers(HttpMethod.DELETE,
+                                "/notification/*"
+                        ).hasAnyRole("ADMIN","USER")
+
                         .anyRequest().authenticated()
                 )
 
@@ -182,6 +199,7 @@ public class SecurityConfig {
                         new JwtAuthenticationFilter(jwtProvider, blacklistService, memberRepository, adminBlacklistJpaRepository), // 커스텀 JWT 인증 필터
                         UsernamePasswordAuthenticationFilter.class                                   // 위치 지정만, 폼 로그인은 사용 안함
                 );
+
         return http.build();
     }
 

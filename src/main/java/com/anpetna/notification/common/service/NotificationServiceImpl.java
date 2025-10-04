@@ -22,9 +22,13 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.time.LocalDateTime;
 import java.util.Map;
 
+//★
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true) // 기본적으로 읽기 전용 트랜잭션(성능 최적화, 쓰기 메서드는 개별 @Transactional로 오버라이드)
 public class NotificationServiceImpl implements NotificationService {
 
     // SSE 연결 타임아웃(밀리초) – 1시간. 서버가 이 시간까지 연결을 유지하려 시도.
@@ -40,6 +44,7 @@ public class NotificationServiceImpl implements NotificationService {
     private final MemberRepository memberRepository;
 
     @Override
+    @Transactional(readOnly = true)
     public PageResponseDTO<NotificationDTO> list(String receiverMemberId, PageRequestDTO pageRequestDTO, Boolean unreadOnly) {
         // 프런트에서 온 PageRequestDTO로 Pageable 생성(정렬 기준: createdAt)
         var pageable = pageRequestDTO.getPageable("createdAt");
@@ -54,6 +59,7 @@ public class NotificationServiceImpl implements NotificationService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public UnreadCountRes countUnread(String receiverMemberId) {
         // 미읽음 카운트만 빠르게 조회 (뱃지 숫자용)
         return new UnreadCountRes(repo.countByReceiver_MemberIdAndIsReadFalse(receiverMemberId));
@@ -113,10 +119,17 @@ public class NotificationServiceImpl implements NotificationService {
         return new DeleteNotificationRes(nId, true);
     }
 
-    @Transactional // 연결 등록/해제 등 상태 변화가 있다면 트랜잭션으로 묶는 것도 안전
     public SseEmitter connect(String receiverMemberId, String lastEventId) {
         // 1) 사용자별 SSE Emitter 등록(타임아웃 지정)
         SseEmitter emitter = sse.register(receiverMemberId, 60L * 60 * 1000);
+
+
+        // 주기적 keepalive를 위한 전용 스케줄러(연결별) ★
+        final ScheduledExecutorService ping = Executors.newSingleThreadScheduledExecutor();
+
+        // 연결 종료/타임아웃 시 자원 정리 ★
+        emitter.onCompletion(() -> { ping.shutdownNow(); sse.remove(receiverMemberId, emitter); });
+        emitter.onTimeout(() -> { ping.shutdownNow(); sse.remove(receiverMemberId, emitter); });
 
         try {
             // 2) 재연결 간격 힌트(클라이언트 EventSource의 재시도 간격)
@@ -129,6 +142,19 @@ public class NotificationServiceImpl implements NotificationService {
             //  - 서버가 이벤트에 고유 eventId(여기선 saved.getEventId())를 부여하고
             //  - repo에서 lastEventId 이후의 이벤트를 찾아 bulk로 send 하는 방식.
             //  - 현재 코드는 lastEventId를 받지만 사용은 안 하고 있음.
+
+            // 4) 주기적 keepalive(25초 간격) - 프록시/폴리필 타임아웃(기본 120s)보다 충분히 짧게 ★
+            ping.scheduleAtFixedRate(() -> {
+                try {
+                    emitter.send(SseEmitter.event().name("keepalive").data("ok"));
+                } catch (Exception e) {
+                    try { emitter.completeWithError(e); } catch (Exception ignore) {}
+                    sse.remove(receiverMemberId, emitter);
+                    ping.shutdownNow();
+                }
+            }, 25, 25, TimeUnit.SECONDS);
+
+
         } catch (Exception e) {
             // 전송 중 에러 시 emitter를 닫고 레지스트리에서 제거
             try { emitter.completeWithError(e); } catch (Exception ignored) {}

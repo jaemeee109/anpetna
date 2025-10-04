@@ -9,7 +9,7 @@ import com.anpetna.notification.feature.reservation.service.hospital.HospitalRes
 import com.anpetna.notification.feature.reservation.service.hospital.HospitalReservationService;
 import com.anpetna.venue.constant.ReservationStatus;
 import com.anpetna.venue.domain.hospital.HospitalReservationEntity;
-import com.anpetna.venue.domain.VenueDoctorEntity;
+import com.anpetna.venue.domain.hospital.VenueDoctorEntity;
 import com.anpetna.venue.domain.VenueEntity;
 import com.anpetna.venue.dto.hospital.CreateHospitalReservationReq;
 import com.anpetna.venue.dto.hospital.CreateHospitalReservationRes;
