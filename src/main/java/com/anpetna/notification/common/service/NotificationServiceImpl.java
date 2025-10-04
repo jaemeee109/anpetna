@@ -14,6 +14,7 @@ import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -21,11 +22,6 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.time.LocalDateTime;
 import java.util.Map;
-
-//★
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 
 @Service
 @RequiredArgsConstructor
@@ -123,14 +119,6 @@ public class NotificationServiceImpl implements NotificationService {
         // 1) 사용자별 SSE Emitter 등록(타임아웃 지정)
         SseEmitter emitter = sse.register(receiverMemberId, 60L * 60 * 1000);
 
-
-        // 주기적 keepalive를 위한 전용 스케줄러(연결별) ★
-        final ScheduledExecutorService ping = Executors.newSingleThreadScheduledExecutor();
-
-        // 연결 종료/타임아웃 시 자원 정리 ★
-        emitter.onCompletion(() -> { ping.shutdownNow(); sse.remove(receiverMemberId, emitter); });
-        emitter.onTimeout(() -> { ping.shutdownNow(); sse.remove(receiverMemberId, emitter); });
-
         try {
             // 2) 재연결 간격 힌트(클라이언트 EventSource의 재시도 간격)
             emitter.send(SseEmitter.event().reconnectTime(3000));
@@ -142,19 +130,6 @@ public class NotificationServiceImpl implements NotificationService {
             //  - 서버가 이벤트에 고유 eventId(여기선 saved.getEventId())를 부여하고
             //  - repo에서 lastEventId 이후의 이벤트를 찾아 bulk로 send 하는 방식.
             //  - 현재 코드는 lastEventId를 받지만 사용은 안 하고 있음.
-
-            // 4) 주기적 keepalive(25초 간격) - 프록시/폴리필 타임아웃(기본 120s)보다 충분히 짧게 ★
-            ping.scheduleAtFixedRate(() -> {
-                try {
-                    emitter.send(SseEmitter.event().name("keepalive").data("ok"));
-                } catch (Exception e) {
-                    try { emitter.completeWithError(e); } catch (Exception ignore) {}
-                    sse.remove(receiverMemberId, emitter);
-                    ping.shutdownNow();
-                }
-            }, 25, 25, TimeUnit.SECONDS);
-
-
         } catch (Exception e) {
             // 전송 중 에러 시 emitter를 닫고 레지스트리에서 제거
             try { emitter.completeWithError(e); } catch (Exception ignored) {}
@@ -172,7 +147,7 @@ public class NotificationServiceImpl implements NotificationService {
     }
 
     @Override
-    @Transactional // 쓰기 작업
+    @Transactional(propagation = Propagation.REQUIRES_NEW) // 쓰기 작업
     public NotificationDTO createAndPush(CreateNotificationCmd cmd) {
 
         // 1) 수신자/행위자 엔티티 조회
