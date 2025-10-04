@@ -69,7 +69,7 @@ dependencies {
 
     // ---배포 / 운영---
     implementation 'org.springframework.boot:spring-boot-starter-actuator'    //Actuator : 애플리케이션 상태와 운영 정보를 확인할 수 있는 엔드포인트 제공
-    implementation 'io.github.cdimascio:dotenv-java:3.0.0'
+    implementation 'me.paulschwarz:spring-dotenv:4.0.0'
 }
 
 tasks.named('test') {
