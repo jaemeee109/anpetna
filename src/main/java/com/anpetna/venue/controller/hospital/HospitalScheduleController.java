@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 
+// 병원 예약 불가 시간 조회
 @RestController
 @RequestMapping("/hospital")
 @RequiredArgsConstructor
@@ -15,11 +16,7 @@ public class HospitalScheduleController {
 
     private final HospitalScheduleService hospitalScheduleService;
 
-    /**
-     * 의사/날짜별 예약 불가 시간 목록 조회
-     * 예) GET /hospital/unavailable-times?doctorId=3&date=2025-09-10
-     * 응답: { "times": ["10:00","11:30", ...] }
-     */
+    // 특정 의사의 특정 날짜에서 예약 불가 시간대 조회
     @GetMapping("/unavailable-times")
     public UnavailableTimesRes listUnavailableTimes(
             @RequestParam("doctorId") Long doctorId,
@@ -28,5 +25,5 @@ public class HospitalScheduleController {
         return UnavailableTimesRes.builder()
                 .times(hospitalScheduleService.listUnavailableTimes(doctorId, date))
                 .build();
-    }
-}
+    } // listUnavailableTimes 종료
+} // HospitalScheduleController Class 종료
