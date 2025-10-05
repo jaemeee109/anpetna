@@ -5,9 +5,11 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
 
-/** Venue 테이블 접근용 JPA 레포지토리 */
+// 매장(병원/ 호텔) 정보를 DB에서 CRUD
 public interface VenueRepository extends JpaRepository<VenueEntity, Long> {
-    /** 노출 active=true 인 지점들만 조회 (목록용) */
+
+
+    // 활성화 처리 되어있는 매장만 조회 (active=true)
     List<VenueEntity> findByActiveTrue();
 
 

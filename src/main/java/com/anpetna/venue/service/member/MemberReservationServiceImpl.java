@@ -20,6 +20,9 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
+
+// 회원용 병원 & 호텔 예약 ' 목록 / 상세 / 취소' 구현
+
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -30,9 +33,12 @@ public class MemberReservationServiceImpl implements MemberReservationService {
     private final HospitalCancelNotificationService hospitalCancelNotification;
     private final HotelCancelNotificationService hotelCancelNotification;
 
+    
+    //  예약 목록
     @Override
     public PageResponseDTO<MyReservationRow> listMyReservations(String memberId, PageRequestDTO req) {
-        // 1) 병원
+       
+        //  병원
         List<MyReservationRow> all = new ArrayList<>();
         for (HospitalReservationEntity e : hospitalRepo.findAll()) {
             MemberEntity m = e.getMember();
@@ -47,7 +53,7 @@ public class MemberReservationServiceImpl implements MemberReservationService {
             }
         }
 
-        // 2) 호텔
+        //  호텔
         for (HotelReservationEntity e : hotelRepo.findAll()) {
             MemberEntity m = e.getMember();
             if (m != null && memberId.equals(m.getMemberId())) {
@@ -63,7 +69,7 @@ public class MemberReservationServiceImpl implements MemberReservationService {
             }
         }
 
-        // 3) 정렬: 가장 최근(날짜/시간) 기준 내림차순
+        //  정렬: 가장 최근(날짜/시간) 기준 내림차순
         all.sort(Comparator.<MyReservationRow>comparingLong(r -> {
             if ("HOSPITAL".equals(r.getType()) && r.getAppointmentAt() != null) {
                 return r.getAppointmentAt().atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli();
@@ -74,7 +80,7 @@ public class MemberReservationServiceImpl implements MemberReservationService {
             return Long.MIN_VALUE;
         }).reversed());
 
-        // 4) 페이징
+        //  페이징
         int page = Math.max(1, req.getPage());
         int size = Math.max(1, req.getSize());
         int fromIdx = (page - 1) * size;
@@ -86,9 +92,10 @@ public class MemberReservationServiceImpl implements MemberReservationService {
                 .dtoList(slice)
                 .total(all.size())
                 .build();
-    }
+    } // listMyReservations 종료
 
 
+    // 병원 예약 상세
     @Override
     public MyHospitalReservationDetail readHospital(String memberId, Long reservationId) {
         var e = hospitalRepo.findById(reservationId).orElseThrow();
@@ -111,8 +118,9 @@ public class MemberReservationServiceImpl implements MemberReservationService {
                 .petGender(e.getPetGender())
                 .memo(e.getMemo())
                 .build();
-    }
+    } // readHospital 종료
 
+    // 호텔 예약 상세
     @Override
     public MyHotelReservationDetail readHotel(String memberId, Long reservationId) {
         var e = hotelRepo.findById(reservationId).orElseThrow();
@@ -133,8 +141,10 @@ public class MemberReservationServiceImpl implements MemberReservationService {
                 .petBirthYear(e.getPetBirthYear())
                 .memo(e.getMemo())
                 .build();
-    }
+    } // readHotel 종료
 
+    
+    // 병원 예약 취소
     @Override
     public void cancelHospital(String memberId, Long reservationId) {
         var e = hospitalRepo.findById(reservationId).orElseThrow();
@@ -143,14 +153,17 @@ public class MemberReservationServiceImpl implements MemberReservationService {
         }
         e.setStatus(com.anpetna.venue.constant.ReservationStatus.CANCELED);
 
+        // ============ 병원 예약 취소 알림 ============
         hospitalCancelNotification.notifyHospitalCancel(
                 e.getMember(),
                 e.getMember().getMemberId(),
                 e.getVenue(),
                 e.getAppointmentAt()
         );
-    }
+        // ===========================================
+    } // cancelHospital 종료
 
+    // 호텔 예약 취소
     @Override
     public void cancelHotel(String memberId, Long reservationId) {
         var e = hotelRepo.findById(reservationId).orElseThrow();
@@ -159,6 +172,7 @@ public class MemberReservationServiceImpl implements MemberReservationService {
         }
         e.setStatus(com.anpetna.venue.constant.ReservationStatus.CANCELED);
 
+        // ============ 호텔 예약 취소 알림 ============
         hotelCancelNotification.notifyHospitalCancel(
                 e.getMember(),
                 e.getMember().getMemberId(),
@@ -166,6 +180,7 @@ public class MemberReservationServiceImpl implements MemberReservationService {
                 e.getCheckIn(),
                 e.getCheckOut()
         );
-    }
+        // ==========================================
+    } // cancelHotel 종료
 
 }
