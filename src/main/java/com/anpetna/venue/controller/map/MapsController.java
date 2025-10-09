@@ -11,6 +11,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Collections;
 
+// 네이버 지오코딩
+
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/maps")
@@ -19,10 +21,7 @@ public class MapsController {
 
     private final NaverGeocodeClient geocodeClient;
 
-    /**
-     * 프론트 전용 프록시: 도로명/지번 주소 자동완성
-     * GET /maps/geocode?q=...&lat=...&lng=...
-     */
+    // q: 검색어 , lat/lng : 좌표를 받아 네이버 API 호출
     @GetMapping(value = "/geocode", produces = MediaType.APPLICATION_JSON_VALUE)
     public SuggestionList geocode(
             @RequestParam("q") String q,
@@ -37,15 +36,16 @@ public class MapsController {
             log.error("geocode error: {}", e.getMessage(), e);
             return new SuggestionList(Collections.emptyList());
         }
-    }
+    } // geocode 종료
 
 
-    // 진단용 엔드포인트
+    // 진단용
+    // 서버에 네이버 자격증명이 설정 되어있는지 점검 (Client ID, Secret Key)
     @GetMapping("/_diag")
     public Map<String, Object> diag() {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("cred", geocodeClient.hasCredentials() ? "OK" : "EMPTY");
         return m;
-    }
+    } // diag 종료
 
-}
+} // MapsController Class 종료

@@ -19,12 +19,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-/**
- * 관리자 전용: 예약 확정 / (선택) 마감토글
- * - 확정: 상태를 PENDING -> CONFIRMED 로 변경
- * - 마감토글은 DB 별도 테이블 없이, 정원/슬롯 검증으로도 충분히 운영 가능
- *   (필요 시 venue별 close 플래그 테이블을 별도로 추가하세요)
- */
+
+// '관리자 전용' 예약 관리
 @RestController
 @RequestMapping("/admin/venue")
 @RequiredArgsConstructor
@@ -34,40 +30,42 @@ public class AdminVenueController {
     private final HospitalService hospitalService;
     private final HospitalScheduleService hospitalScheduleService;
 
+    // [호텔] 예약 확정 (PENDING -> CONFIRMED)
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/hotel/reservations/{reservationId}/confirm")
     public void confirmHotel(@PathVariable Long reservationId) {
         hotelService.confirm(reservationId);
-    }
+    } //  confirmHotel 종료
 
+    // [병원] 예약 확정 (PENDING -> CONFIRMED)
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/hospital/reservations/{reservationId}/confirm")
     public void confirmHospital(@PathVariable Long reservationId) {
         hospitalService.confirm(reservationId);
     }
 
-    /** 호텔 예약 노쇼 처리 */
+    // [호텔]  노쇼 처리
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/hotel/reservations/{reservationId}/noshow")
     public void noShowHotel(@PathVariable Long reservationId) {
         hotelService.markNoShow(reservationId);
     }
 
-    /** 병원 예약 노쇼 처리 */
+    // [병원]  노쇼 처리
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/hospital/reservations/{reservationId}/noshow")
     public void noShowHospital(@PathVariable Long reservationId) {
         hospitalService.markNoShow(reservationId);
     }
 
-    // 관리자용
+    // [병원 & 호텔 ] 예약 목록 조회
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/reservations")
     public Map<String, Object> listReservations(
             @RequestParam Long venueId,
-            @RequestParam(required = false) String type,       // "HOSPITAL" | "HOTEL"
-            @RequestParam(required = false) String status,     // PENDING, CONFIRMED, ...
-            @RequestParam(required = false) String memberId,
+            @RequestParam(required = false) String type,       // 병원 or 호텔
+            @RequestParam(required = false) String status,     // 예약 상테
+            @RequestParam(required = false) String memberId,   // 회원 ID
             @RequestParam(required = false) Long doctorId,     //  병원: 의사 필터
             @RequestParam(required = false) String date,       //  YYYY-MM-DD (병원/호텔 공통)
             @RequestParam(defaultValue = "0") int page,
@@ -79,11 +77,11 @@ public class AdminVenueController {
 
         List<Map<String, Object>> list = new ArrayList<>();
 
-        // ===== 병원 =====
+        // ========== 병원 목록 ==========
         if (type == null || "HOSPITAL".equalsIgnoreCase(type)) {
             var rows = hospitalService.adminList(venueId, status, memberId);
 
-            // (옵션) 날짜/의사 필터
+            // 날짜 / 의사 필터
             if (filterDate != null || doctorId != null) {
                 LocalDateTime start = (filterDate != null) ? filterDate.atStartOfDay() : null;
                 LocalDateTime end   = (filterDate != null) ? filterDate.plusDays(1).atStartOfDay().minusNanos(1) : null;
@@ -113,17 +111,17 @@ public class AdminVenueController {
                 m.put("primaryPhone", r.getPrimaryPhone());
                 m.put("doctorId", r.getDoctorId());
                 m.put("doctorName", r.getDoctorName());
-                m.put("appointment_at", r.getAppointmentAt()); // ★ 추가: 프론트에서 표시용
+                m.put("appointment_at", r.getAppointmentAt());
                 m.put("createdAt", r.getCreatedAt());
                 list.add(m);
             }
         }
 
-        // ===== 호텔 =====
+        // ========== 호텔 목록 ==========
         if (type == null || "HOTEL".equalsIgnoreCase(type)) {
             var rows = hotelService.adminList(venueId, status, memberId);
 
-            // (옵션) 날짜 필터: checkIn <= date <= checkOut
+            //  날짜 필터 ( 체크인, 체크아웃 )
             if (filterDate != null) {
                 rows = rows.stream().filter(r -> {
                     var in  = r.getCheckIn();
@@ -151,33 +149,34 @@ public class AdminVenueController {
             }
         }
 
-        // 간단 페이징 (메모리)
+        // 메모리 페이징
         int from = Math.max(page, 0) * Math.max(size, 1);
         int to   = Math.min(from + Math.max(size, 1), list.size());
-        var content = (from < to) ? list.subList(from, to) : java.util.List.<java.util.Map<String, Object>>of();
+        var content = (from < to) ? list.subList(from, to) : List.<java.util.Map<String, Object>>of();
 
-        var res = new java.util.HashMap<String, Object>();
+        var res = new HashMap<String, Object>();
         res.put("content", content);
         res.put("totalElements", list.size());
         res.put("totalPages", (int) Math.ceil(list.size() / (double) Math.max(size, 1)));
         res.put("pageNumber", page);
         res.put("pageSize", size);
         return res;
-    }
+        
+    } // listReservations 종료
 
 
-    // === NEW: 상태 일괄변경 ===
-// POST /admin/venue/reservations/status { ids:[...], status:"CONFIRMED" }
+    // 예약 상태 일괄 변경
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/reservations/status")
     public Map<String, Object> bulkUpdateStatus(@RequestBody Map<String, Object> body) {
         var ids  = (java.util.List<?>) body.getOrDefault("ids", List.of());
         var next = String.valueOf(body.get("status"));
-        var type = String.valueOf(body.getOrDefault("type", "")); // "HOSPITAL" | "HOTEL" | ""
+        var type = String.valueOf(body.getOrDefault("type", "")); // 병원 or 호텔
 
         int updated = 0;
         boolean hospitalFirst = "HOSPITAL".equalsIgnoreCase(type);
 
+        // 각 ID별로 상태변경 시도
         for (var idObj : ids) {
             Long id = null;
             try { id = Long.valueOf(String.valueOf(idObj)); } catch (Exception ignore) {}
@@ -198,12 +197,11 @@ public class AdminVenueController {
             if (ok) updated++;
         }
         return Map.of("updated", updated);
-    }
+
+    } //  bulkUpdateStatus 종료
 
 
-    // === NEW: (병원) 특정 의사의 특정 날짜 시간 마감 저장 ===
-    // POST /admin/venue/hospital/closed-times
-    // { "doctorId": 3, "date": "2025-09-10", "close": ["09:00","09:30", ...] }
+    // [병원] 특정 의사 , 특정 날짜 예약 슬롯 마감 설정
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/hospital/closed-times")
     public void setClosedTimes(@RequestBody Map<String, Object> body) {
@@ -218,22 +216,27 @@ public class AdminVenueController {
         }
         LocalDate date = LocalDate.parse(dateStr, DateTimeFormatter.ISO_LOCAL_DATE);
 
+        // 서비스에서 검증 후 저장
         hospitalScheduleService.setClosedTimes(doctorId, date, close);
-    }
+        
+    } // setClosedTimes 종료
 
 
+    // [병원] 예약 상세 조회
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/reservations/hospital/{id}")
     public ResponseEntity<MyHospitalReservationDetail> adminReadHospital(@PathVariable("id") Long id) {
         return ResponseEntity.ok(hospitalService.adminReadDetail(id));
-    }
+    } // adminReadHospital 종료
 
+    
+    // [호텔] 예약 상세 조회
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/reservations/hotel/{id}")
     public ResponseEntity<MyHotelReservationDetail> adminReadHotel(@PathVariable("id") Long id) {
         return ResponseEntity.ok(hotelService.adminReadDetail(id));
-    }
+    } // adminReadHotel 종료
 
 
 
-}
+} // AdminVenueController Class 종료
