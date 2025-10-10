@@ -80,6 +80,18 @@ public class SecurityConfig {
                         //브라우저에서 실제 요청 전에 보내는 프리플라이트 요청 -> 인증 없이 허용해주어야 브라우저에서 정상적으로 POST/PUT/DELETE 요청이 가능
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
+                        // --- Api Document ---
+                        .requestMatchers(
+                                "/v3/api-docs",
+                                "/v3/api-docs/**",
+                                "/swagger-ui.html",
+                                "/swagger-ui/**",
+                                "/swagger-resources/**",
+                                "/webjars/**",
+                                "/favicon.ico"
+
+                        ).permitAll()
+
                         //  정적 리소스 전체 허용 (classpath:/static, /public, /resources, /META-INF/resources)
                         .requestMatchers(PathRequest.toStaticResources().atCommonLocations()).permitAll()
 
