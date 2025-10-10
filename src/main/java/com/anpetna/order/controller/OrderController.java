@@ -1,7 +1,6 @@
 package com.anpetna.order.controller;
 
 import com.anpetna.ApiResult;
-import com.anpetna.member.domain.MemberEntity;
 import com.anpetna.member.repository.MemberRepository;   // ★ 추가
 import com.anpetna.order.constant.OrdersStatus;
 import com.anpetna.order.dto.AddressDTO;
@@ -9,7 +8,7 @@ import com.anpetna.order.dto.createOrderDTO.CreateOrderReq;
 import com.anpetna.order.dto.createOrderDTO.CreateOrderRes;
 import com.anpetna.order.dto.readAllOrderDTO.ReadAllOrdersRes;
 import com.anpetna.order.dto.readOneOrderDTO.ReadOneOrdersRes;
-import com.anpetna.order.service.OrdersService;
+import com.anpetna.core.service.OrdersService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;

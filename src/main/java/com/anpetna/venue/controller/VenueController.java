@@ -2,19 +2,14 @@ package com.anpetna.venue.controller;
 
 import com.anpetna.venue.dto.ListNearbyVenuesRes;
 
-import com.anpetna.venue.service.VenueService;
-import jakarta.validation.Valid;
+import com.anpetna.core.service.VenueService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.bind.annotation.RequestBody;
 
 import java.util.*;
 

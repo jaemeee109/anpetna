@@ -1,6 +1,6 @@
 package com.anpetna.adminPage.dto.readBlacklist;
 
-import com.anpetna.core.coreDomain.BaseEntity;
+import com.anpetna.core.domain.BaseEntity;
 import lombok.*;
 
 import java.time.LocalDateTime;

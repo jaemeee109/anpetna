@@ -1,6 +1,7 @@
 package com.anpetna.venue.service;
 
 
+import com.anpetna.core.service.VenueService;
 import com.anpetna.venue.domain.VenueEntity;
 import com.anpetna.venue.dto.ListNearbyVenuesRes;
 import com.anpetna.venue.dto.NearbyVenueDTO;

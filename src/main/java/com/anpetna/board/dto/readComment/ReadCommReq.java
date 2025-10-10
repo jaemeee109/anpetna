@@ -1,6 +1,6 @@
 package com.anpetna.board.dto.readComment;
 
-import com.anpetna.core.coreDto.PageRequestDTO;
+import com.anpetna.core.dto.PageRequestDTO;
 import lombok.*;
 
 @Getter

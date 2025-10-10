@@ -11,6 +11,7 @@ import com.anpetna.cart.dto.deleteCartItem.DeleteCartItemRes;
 import com.anpetna.cart.dto.updateCartItemQuantity.UpdateCartItemQuantityReq;
 import com.anpetna.cart.dto.updateCartItemQuantity.UpdateCartItemQuantityRes;
 import com.anpetna.cart.repository.CartRepository;
+import com.anpetna.core.service.CartService;
 import com.anpetna.item.domain.ItemEntity;
 import com.anpetna.item.dto.ItemDTO;
 import com.anpetna.item.repository.ItemRepository;
@@ -32,7 +33,7 @@ import java.util.Objects;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 @Service
-public class CartServiceImpl implements CartService{
+public class CartServiceImpl implements CartService {
 
     private final CartRepository cartRepository;
 

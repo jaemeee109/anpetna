@@ -1,14 +1,13 @@
 package com.anpetna;
 
 import com.anpetna.banner.dto.HomeBannerDTO;
-import com.anpetna.banner.service.BannerService;
-import com.anpetna.board.dto.BoardDTO;
+import com.anpetna.core.service.BannerService;
 import com.anpetna.board.dto.likeCountTop5.LikeCountTop5Res;
 import com.anpetna.board.dto.noticeTop5.NoticeTop5Res;
-import com.anpetna.board.service.BoardService;
+import com.anpetna.core.service.BoardService;
 import com.anpetna.item.dto.popularItem.PopularItemReq;
 import com.anpetna.item.dto.popularItem.PopularItemRes;
-import com.anpetna.item.service.ItemService;
+import com.anpetna.core.service.ItemService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.web.bind.annotation.GetMapping;

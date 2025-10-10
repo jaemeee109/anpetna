@@ -1,7 +1,7 @@
 package com.anpetna.notification.common.controller;
 
-import com.anpetna.core.coreDto.PageRequestDTO;
-import com.anpetna.core.coreDto.PageResponseDTO;
+import com.anpetna.core.dto.PageRequestDTO;
+import com.anpetna.core.dto.PageResponseDTO;
 import com.anpetna.notification.common.dto.MarkReadRes;
 import com.anpetna.notification.common.dto.NotificationDTO;
 import com.anpetna.notification.common.dto.UnreadCountRes;

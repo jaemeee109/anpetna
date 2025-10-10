@@ -1,0 +1,34 @@
+package com.anpetna.core.service;
+
+import com.anpetna.member.dto.deleteMember.DeleteMemberReq;
+import com.anpetna.member.dto.deleteMember.DeleteMemberRes;
+import com.anpetna.member.dto.joinMember.JoinMemberReq;
+import com.anpetna.member.dto.joinMember.JoinMemberRes;
+import com.anpetna.member.dto.modifyMember.ModifyMemberReq;
+import com.anpetna.member.dto.modifyMember.ModifyMemberRes;
+import com.anpetna.member.dto.readMemberAll.ReadMemberAllRes;
+import com.anpetna.member.dto.readMemberOne.ReadMemberOneReq;
+import com.anpetna.member.dto.readMemberOne.ReadMemberOneRes;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.util.List;
+
+public interface MemberService extends UserDetailsService {
+
+    JoinMemberRes join(JoinMemberReq joinMemberReq, MultipartFile multipartFile) throws MemberIdExistException;
+
+    ReadMemberOneRes readOne(ReadMemberOneReq readMemberOneReq);
+
+    List<ReadMemberAllRes> memberReadAll();
+
+    ModifyMemberRes modify(ModifyMemberReq modifyMemberReq, MultipartFile profileFile,
+                           Boolean removeProfile) throws MemberIdExistException;
+
+    DeleteMemberRes delete(DeleteMemberReq deleteMemberReq);
+
+    static class MemberIdExistException extends Exception {
+
+    }
+
+}

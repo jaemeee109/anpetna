@@ -1,6 +1,6 @@
 package com.anpetna.pay.domain;
 
-import com.anpetna.core.coreDomain.BaseEntity;
+import com.anpetna.core.domain.BaseEntity;
 import com.anpetna.order.domain.OrdersEntity;
 import com.anpetna.pay.constant.TossPaymentMethod;
 import com.anpetna.pay.constant.TossPaymentStatus;

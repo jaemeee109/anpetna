@@ -1,6 +1,6 @@
 package com.anpetna.order.domain;
 
-import com.anpetna.core.coreDomain.BaseEntity;
+import com.anpetna.core.domain.BaseEntity;
 import com.anpetna.member.domain.MemberEntity;
 import com.anpetna.order.constant.OrdersStatus;
 import jakarta.persistence.*;

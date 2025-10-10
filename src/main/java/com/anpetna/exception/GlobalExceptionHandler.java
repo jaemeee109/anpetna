@@ -6,18 +6,14 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
-import org.springframework.web.ErrorResponseException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-import com.anpetna.member.service.MemberService;
+import com.anpetna.core.service.MemberService;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.validation.BindException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.server.ResponseStatusException;
-
-
-
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -39,8 +35,6 @@ public class GlobalExceptionHandler {
 
 
     }
-
-
 
     /** @Valid 검증 실패 시(입력값 공백 등) 400 에러로 처리 */
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -106,8 +100,6 @@ public class GlobalExceptionHandler {
                 .status(HttpStatus.CONFLICT)
                 .body(new ApiError(HttpStatus.CONFLICT.value(), "요청을 처리할 수 없습니다."));
     }
-
-
 
 
     /** 그 외 예외 → 500 */

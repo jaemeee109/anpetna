@@ -1,7 +1,7 @@
 package com.anpetna.notification.feature.keyword.domain;
 
 import com.anpetna.board.constant.BoardType;
-import com.anpetna.core.coreDomain.BaseEntity;
+import com.anpetna.core.domain.BaseEntity;
 import com.anpetna.member.domain.MemberEntity;
 import jakarta.persistence.*;
 import lombok.*;

@@ -1,6 +1,6 @@
 package com.anpetna.member.domain;
 
-import com.anpetna.core.coreDomain.BaseEntity;
+import com.anpetna.core.domain.BaseEntity;
 import com.anpetna.image.domain.ImageEntity;
 import com.anpetna.member.constant.MemberRole;
 import jakarta.persistence.*;

@@ -1,7 +1,6 @@
 package com.anpetna.item.repository;
 
 import com.anpetna.item.constant.ItemCategory;
-import com.anpetna.item.constant.ItemSellStatus;
 import com.anpetna.item.domain.ItemEntity;
 import com.anpetna.item.domain.QItemEntity;
 import com.anpetna.item.dto.searchAllItem.SearchAllItemsReq;
@@ -26,8 +25,6 @@ import com.anpetna.order.domain.QOrdersEntity;
 import com.querydsl.jpa.JPAExpressions;
 
 import java.util.List;
-
-import static com.querydsl.core.types.dsl.Expressions.asNumber;
 
 @Repository
 public class ItemRepositoryCustomImpl implements ItemRepositoryCustom {

@@ -9,6 +9,7 @@ import com.anpetna.auth.dto.TokenResponse;
 import com.anpetna.auth.repository.TokenRepository;
 import com.anpetna.auth.util.TokenHash;
 
+import com.anpetna.core.service.JwtService;
 import com.anpetna.member.domain.MemberEntity;
 import com.anpetna.member.repository.MemberRepository;
 import io.jsonwebtoken.Claims;

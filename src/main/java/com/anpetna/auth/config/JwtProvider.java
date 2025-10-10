@@ -1,7 +1,5 @@
 package com.anpetna.auth.config;
 
-import com.anpetna.member.constant.MemberRole;
-import com.anpetna.member.repository.MemberRepository;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;

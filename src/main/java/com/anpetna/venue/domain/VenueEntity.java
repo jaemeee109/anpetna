@@ -1,6 +1,6 @@
 package com.anpetna.venue.domain;
 
-import com.anpetna.core.coreDomain.BaseEntity; 
+import com.anpetna.core.domain.BaseEntity;
 import jakarta.persistence.*;
 import lombok.*;
 

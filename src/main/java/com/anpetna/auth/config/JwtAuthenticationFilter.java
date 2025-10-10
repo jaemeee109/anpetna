@@ -52,20 +52,26 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain) throws IOException, ServletException {
 
-
-        //요청마다 Authorization 헤더 확인
-        String authHeader = request.getHeader("Authorization");
-        log.info("[JwtAuthenticationFilter] 요청 URL: {} {}", request.getMethod(), request.getRequestURI());
-        log.info("[JwtAuthenticationFilter] Authorization 헤더: {}", authHeader);
-
-
         // 1) Authorization 헤더 확인=======================================================
-        String header = request.getHeader("Authorization");
-        if (header == null || !header.startsWith("Bearer ")) {
-            log.info("No Authorization header or missing Bearer: uri={}", request.getRequestURI());
-            chain.doFilter(request, response);// 🔴➡️
+
+
+        // Swagger UI, API docs, favicon은 JWT 없이 통과
+        if (request.getRequestURI().startsWith("/v3/api-docs") ||
+                request.getRequestURI().startsWith("/swagger-ui") ||
+                request.getRequestURI().equals("/favicon.ico")) {
+            log.info("JwtAuthenticationFilter.java request.getRequestURI(): " + request.getRequestURI());
+            chain.doFilter(request, response);
             return;
         }
+
+
+        // JWT 검사
+        String header = request.getHeader("Authorization");
+        if (header == null || !header.startsWith("Bearer ")) {
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED); // JWT 없으면 401
+            return;
+        }
+
 
         // 토큰의 기본 구조 : Authorization: Bearer <JWT 토큰>
         //Bearer → 토큰 타입을 지정 (Bearer 토큰 = OAuth 2.0 권장 방식)
@@ -182,6 +188,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         // 2) JWT 필터에서 제외할 경로들
         return uri.startsWith("/jwt/") ||
+                uri.startsWith("/item") ||
                 uri.startsWith("/api/pay/toss/prepare") ||
                 uri.startsWith("/api/pay/toss/confirm") ||
                 uri.startsWith("/api/pay/toss/client-key") ||

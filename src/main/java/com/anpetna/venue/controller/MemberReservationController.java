@@ -1,10 +1,10 @@
 package com.anpetna.venue.controller;
 
 import com.anpetna.ApiResult;
-import com.anpetna.core.coreDto.PageRequestDTO;
-import com.anpetna.core.coreDto.PageResponseDTO;
+import com.anpetna.core.dto.PageRequestDTO;
+import com.anpetna.core.dto.PageResponseDTO;
 import com.anpetna.venue.dto.member.MyReservationRow;
-import com.anpetna.venue.service.member.MemberReservationService;
+import com.anpetna.core.service.MemberReservationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;

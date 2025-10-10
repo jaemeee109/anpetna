@@ -8,6 +8,7 @@ import com.anpetna.adminPage.dto.readBlacklist.ReadBlacklistRes;
 import com.anpetna.adminPage.dto.updateBlacklist.UpdateBlacklistReq;
 import com.anpetna.adminPage.dto.updateBlacklist.UpdateBlacklistRes;
 import com.anpetna.adminPage.repository.AdminBlacklistJpaRepository;
+import com.anpetna.core.service.AdminBlacklistService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.data.domain.Page;

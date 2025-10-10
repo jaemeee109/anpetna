@@ -10,13 +10,13 @@ import com.anpetna.member.dto.modifyMember.ModifyMemberRes;
 import com.anpetna.member.dto.readMemberAll.ReadMemberAllRes;
 import com.anpetna.member.dto.readMemberOne.ReadMemberOneReq;
 import com.anpetna.member.dto.readMemberOne.ReadMemberOneRes;
-import com.anpetna.member.service.MemberService;
+import com.anpetna.core.service.MemberService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.transaction.annotation.Transactional;
@@ -139,11 +139,11 @@ public class MemberController {
 
 
     // 상세 조회: 관리자 또는 로그인한 본인만 접근
+    @Operation(summary = "회원 단건 조회", description = "회원 ID로 회원 정보를 조회합니다.")
     @GetMapping({"/readOne", "/my_page/{memberId}"})
-    @ResponseBody
     @Transactional(readOnly = true)
     public ApiResult<ReadMemberOneRes> readOne(
-            @PathVariable(value = "memberId", required = false) String memberId,
+            @Parameter(description = "회원 ID", example = "101") @PathVariable(value = "memberId", required = false) String memberId,
             @AuthenticationPrincipal(expression = "username") String me
     ) {
         final String target = (memberId == null || memberId.isBlank()) ? me : memberId;

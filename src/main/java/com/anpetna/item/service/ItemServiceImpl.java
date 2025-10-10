@@ -1,6 +1,7 @@
 package com.anpetna.item.service;
 
-import com.anpetna.core.coreDto.PageResponseDTO;
+import com.anpetna.core.dto.PageResponseDTO;
+import com.anpetna.core.service.ItemService;
 import com.anpetna.image.domain.ImageEntity;
 import com.anpetna.image.dto.ExistingImageDTO;
 import com.anpetna.image.dto.ImageDTO;
@@ -35,8 +36,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
-import com.anpetna.item.constant.ItemSellStatus;
-
 
 @Service
 @RequiredArgsConstructor
@@ -49,7 +48,6 @@ public class ItemServiceImpl implements ItemService {
     private final ItemMapper itemMapper;
     private final ItemRepository itemRepository;
     private final ImageRepository imageRepository;
-
 
     @Override
     @Transactional

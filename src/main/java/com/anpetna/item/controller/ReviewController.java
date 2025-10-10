@@ -1,8 +1,8 @@
 package com.anpetna.item.controller;
 
 import com.anpetna.ApiResult;
-import com.anpetna.core.coreDto.PageRequestDTO;
-import com.anpetna.core.coreDto.PageResponseDTO;
+import com.anpetna.core.dto.PageRequestDTO;
+import com.anpetna.core.dto.PageResponseDTO;
 import com.anpetna.item.dto.ReviewDTO;
 import com.anpetna.item.dto.deleteReview.DeleteReviewReq;
 import com.anpetna.item.dto.deleteReview.DeleteReviewRes;
@@ -13,19 +13,15 @@ import com.anpetna.item.dto.registerReview.RegisterReviewRes;
 import com.anpetna.item.dto.searchAllReview.SearchAllReviewsReq;
 import com.anpetna.item.dto.searchOneReview.SearchOneReviewReq;
 import com.anpetna.item.dto.searchOneReview.SearchOneReviewRes;
-import com.anpetna.item.service.ReviewService;
+import com.anpetna.core.service.ReviewService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.hibernate.query.SortDirection;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/item/{itemId}/review")

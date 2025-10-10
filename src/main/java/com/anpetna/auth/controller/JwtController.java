@@ -3,7 +3,7 @@ package com.anpetna.auth.controller;
 import com.anpetna.auth.dto.LoginMemberReq;
 import com.anpetna.auth.dto.TokenRequest;
 import com.anpetna.auth.dto.TokenResponse;
-import com.anpetna.auth.service.JwtService;
+import com.anpetna.core.service.JwtService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

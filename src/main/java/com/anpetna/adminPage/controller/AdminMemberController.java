@@ -2,8 +2,8 @@ package com.anpetna.adminPage.controller;
 
 import com.anpetna.ApiResult;
 import com.anpetna.adminPage.dto.AdminPageDTO;
-import com.anpetna.adminPage.service.AdminMemberService;
-import com.anpetna.core.coreDto.PageResponseDTO;
+import com.anpetna.core.service.AdminMemberService;
+import com.anpetna.core.dto.PageResponseDTO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;

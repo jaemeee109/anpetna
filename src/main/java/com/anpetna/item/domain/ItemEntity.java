@@ -1,7 +1,7 @@
 package com.anpetna.item.domain;
 
 import com.anpetna.image.domain.ImageEntity;
-import com.anpetna.core.coreDomain.BaseEntity;
+import com.anpetna.core.domain.BaseEntity;
 import com.anpetna.item.constant.ItemCategory;
 import com.anpetna.item.constant.ItemSellStatus;
 import jakarta.persistence.*;

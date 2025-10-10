@@ -9,7 +9,7 @@ import com.anpetna.board.dto.readComment.ReadCommReq;
 import com.anpetna.board.dto.readComment.ReadCommRes;
 import com.anpetna.board.dto.updateComment.UpdateCommReq;
 import com.anpetna.board.dto.updateComment.UpdateCommRes;
-import com.anpetna.board.service.CommentService;
+import com.anpetna.core.service.CommentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;

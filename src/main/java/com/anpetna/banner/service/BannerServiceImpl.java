@@ -9,6 +9,7 @@ import com.anpetna.banner.dto.updateBanner.UpdateBannerReq;
 import com.anpetna.banner.dto.updateBanner.UpdateBannerRes;
 import com.anpetna.banner.infra.BannerImageStorage;
 import com.anpetna.banner.repository.BannerJpaRepository;
+import com.anpetna.core.service.BannerService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.dao.DataIntegrityViolationException;

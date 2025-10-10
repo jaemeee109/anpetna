@@ -1,7 +1,7 @@
 package com.anpetna.notification.common.service;
 
-import com.anpetna.core.coreDto.PageRequestDTO;
-import com.anpetna.core.coreDto.PageResponseDTO;
+import com.anpetna.core.dto.PageRequestDTO;
+import com.anpetna.core.dto.PageResponseDTO;
 import com.anpetna.member.domain.MemberEntity;
 import com.anpetna.member.repository.MemberRepository;
 import com.anpetna.notification.common.constant.NotificationType;

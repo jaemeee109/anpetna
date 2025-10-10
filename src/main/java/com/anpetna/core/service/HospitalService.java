@@ -1,0 +1,21 @@
+package com.anpetna.core.service;
+
+import com.anpetna.venue.dto.hospital.CreateHospitalReservationReq;
+import com.anpetna.venue.dto.hospital.CreateHospitalReservationRes;
+import com.anpetna.venue.dto.doctor.ListDoctorsRes;
+import java.util.List;
+import com.anpetna.venue.dto.member.MyHospitalReservationDetail;
+import com.anpetna.venue.service.AdminHospitalReservationRow;
+
+public interface HospitalService {
+    ListDoctorsRes listDoctors(Long venueId);
+    CreateHospitalReservationRes reserve(String memberId, Long venueId, CreateHospitalReservationReq req);
+    void confirm(Long reservationId); // 관리자 확정
+    void markNoShow(Long reservationId);
+
+    List<AdminHospitalReservationRow> adminList(Long venueId, String status, String memberId);
+    boolean tryUpdateStatus(Long reservationId, String nextStatus);
+
+    MyHospitalReservationDetail adminReadDetail(Long reservationId);
+
+}

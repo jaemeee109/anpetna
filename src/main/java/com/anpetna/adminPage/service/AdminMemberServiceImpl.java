@@ -1,7 +1,8 @@
 package com.anpetna.adminPage.service;
 
 import com.anpetna.adminPage.dto.AdminPageDTO;
-import com.anpetna.core.coreDto.PageResponseDTO;
+import com.anpetna.core.dto.PageResponseDTO;
+import com.anpetna.core.service.AdminMemberService;
 import com.anpetna.member.constant.MemberRole;
 import com.anpetna.member.domain.MemberEntity;
 import com.anpetna.member.repository.MemberRepository;

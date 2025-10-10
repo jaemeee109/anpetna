@@ -1,17 +1,11 @@
-buildscript {
-    ext {
-        queryDslVersion = "5.0.0"
-    }
-}
-
 plugins {
     id 'java'
     id 'org.springframework.boot' version '3.4.8'
     id 'io.spring.dependency-management' version '1.1.7'
 }
 
-group = 'com'
-version = '0.0.1-SNAPSHOT'
+group = 'com.anpetna'
+version = '2.0.0'
 
 java {
     toolchain {
@@ -45,8 +39,6 @@ dependencies {
     // ---lombok---
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
-    testCompileOnly 'org.projectlombok:lombok'
-    testAnnotationProcessor 'org.projectlombok:lombok'
 
 
     // ---security---
@@ -68,21 +60,21 @@ dependencies {
             "com.querydsl:querydsl-apt:${queryDslVersion}:jakarta"
     )
 
+    // ---advancement---
+    implementation 'org.springframework.kafka:spring-kafka:3.3.3'
+    implementation 'org.apache.kafka:kafka-clients:3.9.1'
 
     // ---배포 / 운영---
     implementation 'org.springframework.boot:spring-boot-starter-actuator'    //Actuator : 애플리케이션 상태와 운영 정보를 확인할 수 있는 엔드포인트 제공
+    implementation 'me.paulschwarz:spring-dotenv:4.0.0'
 
+    // ---Document---
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.13'
+    implementation 'org.apache.commons:commons-lang3:3.18.0'
 
-    // ---test---
-    testImplementation 'org.springframework.boot:spring-boot-starter-test'
-    testImplementation 'org.springframework.security:spring-security-test'
-    testImplementation 'com.h2database:h2'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-    testCompileOnly 'org.jetbrains:annotations:24.1.0'
 }
-
-tasks.named('test') {
-    useJUnitPlatform()
+tasks.withType(JavaCompile) {
+    options.encoding = 'UTF-8'
 }
 
 sourceSets {

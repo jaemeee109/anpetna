@@ -1,9 +1,8 @@
 package com.anpetna.item.controller;
 
 import com.anpetna.ApiResult;
-import com.anpetna.core.coreDto.PageResponseDTO;
+import com.anpetna.core.dto.PageResponseDTO;
 import com.anpetna.image.dto.NewImageDTO;
-import com.anpetna.item.dto.ItemDTO;
 import com.anpetna.item.dto.deleteItem.DeleteItemReq;
 import com.anpetna.item.dto.deleteItem.DeleteItemRes;
 import com.anpetna.item.dto.modifyItem.ModifyItemReq;
@@ -16,26 +15,25 @@ import com.anpetna.item.dto.searchAllItem.SearchAllItemsReq;
 import com.anpetna.item.dto.searchAllItem.SearchAllItemsRes;
 import com.anpetna.item.dto.searchOneItem.SearchOneItemReq;
 import com.anpetna.item.dto.searchOneItem.SearchOneItemRes;
-import com.anpetna.item.service.ItemService;
-import jakarta.annotation.Nullable;
+import com.anpetna.core.service.ItemService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
-import org.springframework.data.domain.Page;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/item")
 @Log4j2
 @RequiredArgsConstructor
+@Tag(name = "Member API", description = "회원 관련 API")
 public class ItemController {
     //=============================점검 요소================================
     // 불필요한 어노테이션 정리
@@ -93,6 +91,7 @@ public class ItemController {
         return new ApiResult<>(deleteRes);
     }
 
+    @Operation(summary = "회원 조회", description = "ID로 회원 조회")
     @GetMapping({"/{itemId}", "/{itemId}/edit"}) //상품 수정 화면용 데이터 조회시 필요 (기존 정보 채우기)
     public ApiResult<SearchOneItemRes> searchOneItem(@PathVariable Long itemId) {
         SearchOneItemReq getOneReq = SearchOneItemReq.builder().itemId(itemId).build();

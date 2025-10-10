@@ -5,6 +5,7 @@ import com.anpetna.auth.repository.BlacklistedRepository;
 import com.anpetna.auth.util.TokenHash;
 import com.anpetna.auth.config.JwtProvider;
 import com.anpetna.auth.domain.BlackListedEntity;
+import com.anpetna.core.service.BlacklistService;
 import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;

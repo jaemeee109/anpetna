@@ -1,9 +1,9 @@
 package com.anpetna.item.service;
 
-import com.anpetna.core.coreDto.PageRequestDTO;
-import com.anpetna.core.coreDto.PageResponseDTO;
+import com.anpetna.core.dto.PageRequestDTO;
+import com.anpetna.core.dto.PageResponseDTO;
+import com.anpetna.core.service.ReviewService;
 import com.anpetna.image.domain.ImageEntity;
-import com.anpetna.image.service.FileService;
 import com.anpetna.image.service.LocalStorage;
 import com.anpetna.item.config.ReviewMapper;
 import com.anpetna.item.domain.ItemEntity;
