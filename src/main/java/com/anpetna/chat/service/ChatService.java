@@ -54,7 +54,7 @@ public class ChatService {
         }
 
         // 이미 참여하고 있는 채팅방인지 검사
-        if (memberChatroomMappingRepository.existsByMemberIdAndChatroomId(member.getMemberId(), newChatroomId)) {
+        if (memberChatroomMappingRepository.existsByMember_MemberIdAndChatroomId(member.getMemberId(), newChatroomId)) {
             log.info("이미 참여 중인 채팅방입니다.");
             return false;
         }
@@ -73,7 +73,7 @@ public class ChatService {
 
     private void updateLastCheckedAt(MemberEntity member, Long currentChatroomId) {
 
-        MemberChatroomMapping memberChatroomMapping = memberChatroomMappingRepository.findByMemberIdAndChatroomId(member.getMemberId(), currentChatroomId).get();
+        MemberChatroomMapping memberChatroomMapping = memberChatroomMappingRepository.findByMember_MemberIdAndChatroomId(member.getMemberId(), currentChatroomId).get();
 
         memberChatroomMapping.updateLastCheckedAt();
 
@@ -85,12 +85,12 @@ public class ChatService {
     public Boolean leaveChatroom(MemberEntity member, Long chatroomId) {
 
         // 이미 참여하고 있는 채팅방인지 검사
-        if (!memberChatroomMappingRepository.existsByMemberIdAndChatroomId(member.getMemberId(), chatroomId)) {
+        if (!memberChatroomMappingRepository.existsByMember_MemberIdAndChatroomId(member.getMemberId(), chatroomId)) {
             log.info("참여 중인 채팅방이 아닙니다.");
             return false;
         }
 
-        memberChatroomMappingRepository.deleteByMemberIdAndChatroomId(member.getMemberId(), chatroomId);
+        memberChatroomMappingRepository.deleteByMember_MemberIdAndChatroomId(member.getMemberId(), chatroomId);
 
         return true;
     }
@@ -98,7 +98,7 @@ public class ChatService {
     // 채팅방에 참여한 사용자들의 목록을 가져오는 로직
     public List<ChatroomEntity> getChatroomList(MemberEntity member) {
 
-        List<MemberChatroomMapping> memberChatroomMappingList = memberChatroomMappingRepository.findAllByMemberId(member.getMemberId());
+        List<MemberChatroomMapping> memberChatroomMappingList = memberChatroomMappingRepository.findAllByMember_MemberId(member.getMemberId());
 
         return memberChatroomMappingList.stream()
                 .map(memberChatroomMapping -> {

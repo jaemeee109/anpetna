@@ -8,11 +8,11 @@ import java.util.Optional;
 
 public interface MemberChatroomMappingRepository extends JpaRepository<MemberChatroomMapping, Long> {
 
-    Boolean existsByMemberIdAndChatroomId(String memberId, Long chatroomId);
+    Boolean existsByMember_MemberIdAndChatroomId(String memberId, Long chatroomId);
 
-    void deleteByMemberIdAndChatroomId(String memberId, Long chatroomId);
+    void deleteByMember_MemberIdAndChatroomId(String memberId, Long chatroomId);
 
-    List<MemberChatroomMapping> findAllByMemberId(String memberId);
+    List<MemberChatroomMapping> findAllByMember_MemberId(String memberId);
 
-    Optional<MemberChatroomMapping> findByMemberIdAndChatroomId(String memberId, Long chatroomId);
+    Optional<MemberChatroomMapping> findByMember_MemberIdAndChatroomId(String memberId, Long chatroomId);
 }
