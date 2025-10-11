@@ -1,6 +1,7 @@
 package com.anpetna.member.dto;
 
 import com.anpetna.member.constant.MemberRole;
+import com.anpetna.member.domain.MemberEntity;
 import lombok.Builder;
 import lombok.Data;
 import lombok.Getter;
@@ -36,4 +37,53 @@ public class MemberDTO {
 
     private String etc;
 
+    public static MemberEntity to(MemberDTO dto) {
+
+        return MemberEntity.builder()
+                .memberId(dto.getMemberId())
+                .memberPw(dto.getMemberPw())
+                .memberName(dto.getMemberName())
+                .memberBirthY(dto.getMemberBirthY())
+                .memberBirthM(dto.getMemberBirthM())
+                .memberBirthD(dto.getMemberBirthD())
+                .memberBirthGM(dto.getMemberBirthGM())
+                .memberGender(dto.getMemberGender())
+                .memberHasPet(dto.getMemberHasPet())
+                .memberPhone(dto.getMemberPhone())
+                // DTO에는 개별 수신동의/이메일인증 여부 필드가 없으므로 기본값 부여
+                .smsStsYn("N")
+                .memberEmail(dto.getMemberEmail())
+                .emailStsYn("N")
+                .memberRoadAddress(dto.getMemberRoadAddress())
+                .memberDetailAddress(dto.getMemberDetailAddress())
+                .memberZipCode(dto.getMemberZipCode())
+                .memberRole(dto.getMemberRole() != null ? dto.getMemberRole() : MemberRole.USER)
+                .memberSocial(dto.isSocial())
+                .memberEtc(dto.getEtc())
+                .build();
+    }
+
+    public static MemberDTO from(MemberEntity memberEntity) {
+
+        return MemberDTO.builder()
+                .status("success")
+                .memberId(memberEntity.getMemberId())
+                .memberName(memberEntity.getMemberName())
+                .memberBirthY(memberEntity.getMemberBirthY())
+                .memberBirthM(memberEntity.getMemberBirthM())
+                .memberBirthD(memberEntity.getMemberBirthD())
+                .memberBirthGM(memberEntity.getMemberBirthGM())
+                .memberGender(memberEntity.getMemberGender())
+                .memberEmail(memberEntity.getMemberEmail())
+                .memberPhone(memberEntity.getMemberPhone())
+                .memberRoadAddress(memberEntity.getMemberRoadAddress())
+                .memberDetailAddress(memberEntity.getMemberDetailAddress())
+                .memberZipCode(memberEntity.getMemberZipCode())
+                .social(memberEntity.isMemberSocial())
+                .memberHasPet(memberEntity.getMemberHasPet())
+                .memberRole(memberEntity.getMemberRole())
+                .memberFileImage(memberEntity.getImages())
+                .etc(memberEntity.getMemberEtc())
+                .build();
+    }
 }
