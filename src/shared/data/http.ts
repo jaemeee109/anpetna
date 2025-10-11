@@ -1,9 +1,9 @@
 // src/shared/data/http.ts
 /**   - Axios 전역 인스턴스(`http`) 생성 및 요청/응답 인터셉터 설정
- *   - AccessToken 자동 주입 및 만료 처리
- *   - 401(인증 만료) 시 자동 로그아웃 및 로그인 페이지로 이동
+ *   - AccessToken 자동 주입 및 만료 처리 + 401시 1회 자동 재발급
+ *   - 401(인증 만료) 시 refresh 실패한 경우에만 자동 로그아웃/로그인 페이지로 이동
  *   - 환경변수(.env.local) 기반 baseURL 설정 */
-import axios, { AxiosInstance, InternalAxiosRequestConfig } from "axios";
+import axios, { AxiosInstance, InternalAxiosRequestConfig, AxiosError } from "axios";
 import { purgeAuthArtifacts } from '@/features/member/data/session';
 
 /** ============== 환경변수 보조 함수 ============== */
@@ -21,7 +21,6 @@ const PREFIX = env("NEXT_PUBLIC_API_PREFIX", "");
 // [개발중] baseURL과  prefix를 콘솔로 확인
 console.log("[HTTP] baseURL =", BASE || "(empty)", "prefix =", PREFIX || "(none)");
 
-
 /** ============== JWT 유틸 함수 ============== */
 
 // base64 -> utf8 문자열 반환
@@ -34,7 +33,7 @@ function b64ToUtf8(b64: string): string {
       } catch {
         return ascii;
       }
-    } else {      
+    } else {
       return Buffer.from(b64, "base64").toString("utf8");
     }
   } catch {
@@ -88,8 +87,8 @@ function clearCookie(name: string) {
 
 /** ============== 저장소(Local/Session/Cookie)에서 토큰 탐색 ============== */
 
-// localStorage
-function pickRawTokenFromStores(): string | null {
+// local/session/cookie에서 access token 후보 찾기
+function pickRawAccessFromStores(): string | null {
   try {
     const l1 = localStorage.getItem("accessToken");
     const l2 = localStorage.getItem("Authorization");
@@ -97,7 +96,6 @@ function pickRawTokenFromStores(): string | null {
     if (l2) return l2;
   } catch {}
 
-  // sessionStorage
   try {
     const s1 = sessionStorage.getItem("accessToken");
     const s2 = sessionStorage.getItem("Authorization");
@@ -105,11 +103,9 @@ function pickRawTokenFromStores(): string | null {
     if (s2) return s2;
   } catch {}
 
-  //cookie (accessToken 쿠키)
   const c1 = getCookie("accessToken");
   if (c1) return c1;
 
-  // 기타 관용 키
   try {
     const l3 = localStorage.getItem("access_token");
     if (l3) return l3;
@@ -120,13 +116,31 @@ function pickRawTokenFromStores(): string | null {
   return null;
 }
 
+// refresh token 읽기/쓰기
+function getRefreshToken(): string | null {
+  try {
+    return localStorage.getItem("refreshToken") || sessionStorage.getItem("refreshToken");
+  } catch {
+    return null;
+  }
+}
+function setRefreshToken(token: string | null) {
+  try {
+    if (token) localStorage.setItem("refreshToken", token);
+    else {
+      localStorage.removeItem("refreshToken");
+      sessionStorage.removeItem("refreshToken");
+    }
+  } catch {}
+}
+
 /** ============== 토큰 획득/ 저장/ 삭제 로직 ============== */
 
-// AccessToken을 얻고, 만료 시 자동 삭제 
+// AccessToken을 얻고, 만료 시 자동 삭제
 export function getAccessToken(): string | null {
   if (typeof window === "undefined") return null;
 
-  const raw0 = pickRawTokenFromStores();
+  const raw0 = pickRawAccessFromStores();
   if (!raw0) return null;
 
   // 'Bearer xxx' 형태로 저장된 경우 "xxx"만 추출
@@ -183,8 +197,7 @@ const instance: AxiosInstance = axios.create({
   withCredentials: true, // 쿠키 포함
 });
 
-
-// 로그인 만료 알림 중복 방지 
+// 로그인 만료 알림 중복 방지
 let __apnAuthAlertShown = false;
 
 // 401 발생 시 로그인 페이지로 이동
@@ -201,34 +214,88 @@ function redirectToLoginWithNext(message: string) {
   window.location.href = `/member/login?next=${next}`;
 }
 
+/** ============== 내부 Refresh 호출 유틸 ============== */
+
+// 동시 다발 401에 대한 중복 호출 방지
+let refreshPromise: Promise<void> | null = null;
+
+async function tryRefreshTokens(): Promise<void> {
+  const refresh = getRefreshToken();
+  const access = getAccessToken(); // 만료일 수 있음(서버에서 참고 가능)
+
+  if (!refresh) {
+    throw new Error("NO_REFRESH_TOKEN");
+  }
+
+  // POST /jwt/refresh  (TokenRequest { refreshToken, accessToken })
+  // 백엔드: JwtController.refresh(TokenRequest) → TokenResponse { accessToken, refreshToken, memberRole }
+  // ref: JwtController, TokenRequest, TokenResponse
+  // (withCredentials 허용: SecurityConfig에서 /jwt/** 허용 및 CORS allowCredentials) 
+  try {
+    const url = `${BASE}${PREFIX}/jwt/refresh`;
+    const res = await axios.post(url, { refreshToken: refresh, accessToken: access }, { withCredentials: true });
+    const r: any = (res.data?.result ?? res.data) || {};
+
+    const newAccess: string | undefined = r.accessToken;
+    const newRefresh: string | undefined = r.refreshToken;
+
+    if (!newAccess) {
+      throw new Error("REFRESH_NO_ACCESS");
+    }
+
+    setAccessToken(newAccess);
+    if (newRefresh) setRefreshToken(newRefresh);
+  } catch (e) {
+    throw e instanceof Error ? e : new Error("REFRESH_FAILED");
+  }
+}
 
 /** ============== 응답 인터셉터 ============== */
 
 instance.interceptors.response.use(
   (res) => res,
-  (error) => {
-    const status = error?.response?.status ?? 0;
+  async (error: AxiosError) => {
+    const status = (error?.response?.status ?? 0) as number;
 
-    // 401 -> 로그인 만료 처리
+    // 401 -> 재발급 시도 후 1회 재시도
     if (status === 401) {
-      const hasToken = !!getAccessToken();
-      const hasSession = !!getCookie('JSESSIONID');
+      const original = error.config as InternalAxiosRequestConfig & { __retried?: boolean };
 
-      if (hasToken || hasSession) {
-        // 세션 만료 : 모든 인증 흔적 제거 후 알림
-        try { purgeAuthArtifacts(); } catch {}
-        redirectToLoginWithNext('로그인 기간이 만료되었습니다. 다시 로그인 해주세요');
-      } else {
-        // 로그인이 안 된 상태
-        redirectToLoginWithNext('로그인 후 이용해주세요');
+      // 재시도 무한루프 방지
+      if (!original.__retried) {
+        original.__retried = true;
+
+        try {
+          // 중복 호출 방지: 진행 중이면 해당 Promise 공유
+          if (!refreshPromise) refreshPromise = tryRefreshTokens();
+          await refreshPromise;
+          refreshPromise = null;
+
+          // 새 토큰으로 Authorization 갱신 후 원요청 재시도
+          const t = getAccessToken();
+          if (t) {
+            original.headers = (original.headers ?? {}) as any;
+            (original.headers as any).Authorization = toBearer(t);
+          }
+          return instance.request(original);
+        } catch {
+          refreshPromise = null;
+          // 실패 시 아래 “로그아웃 처리”로 떨어져서 안내/리다이렉트
+        }
       }
+
+      // 여기로 오면: (a) refresh 토큰 없음, (b) refresh 실패, (c) 재시도도 401
+      try { purgeAuthArtifacts(); } catch {}
+      redirectToLoginWithNext('로그인 기간이 만료되었습니다. 다시 로그인 해주세요');
+      return Promise.reject(error);
     }
+
     // 403은 세션 유지 (리다이렉트 X)
 
     // 에러 메시지를 표준화(normalizedMessage)로 추가
     const msg =
-      error?.response?.data?.resMessage ||
-      error?.response?.data?.message ||
+      (error?.response?.data as any)?.resMessage ||
+      (error?.response?.data as any)?.message ||
       error?.message ||
       '오류가 발생했습니다.';
     (error as any).normalizedMessage = msg;
@@ -236,7 +303,6 @@ instance.interceptors.response.use(
     return Promise.reject(error);
   }
 );
-
 
 /** ============== 요청 인터셉터 ============== */
 instance.interceptors.request.use((config: InternalAxiosRequestConfig) => {
@@ -274,4 +340,3 @@ export function pickHttpErrorMessage(e: any): string {
       || e?.message
       || '오류가 발생했습니다.';
 }
-
