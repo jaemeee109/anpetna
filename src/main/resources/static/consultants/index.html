@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Consultants</title>
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css"
+        integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+  <link href="/main.css" rel="stylesheet">
+  <script src="https://code.jquery.com/jquery-3.1.1.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@stomp/stompjs@7.0.0/bundles/stomp.umd.min.js"></script>
+<!--  <script src="/websocket.js"></script>-->
+  <script src="/consultants/stomp.js"></script>
+</head>
+<body>
+<noscript><h2 style="color: #ff0000">Seems your browser doesn't support Javascript! Websocket relies on Javascript being
+  enabled. Please enable
+  Javascript and reload this page!</h2></noscript>
+<div id="main-content" class="container">
+  <div class="row">
+    <div class="col-md-6">
+      <form class="form-inline">
+        <div class="form-group">
+          <label for="connect">WebSocket connection:</label>
+          <button id="connect" class="btn btn-default" type="button">Connect</button>
+          <button id="disconnect" class="btn btn-default" disabled="disabled" type="button">Disconnect
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <div class="row">
+    <div class="col-md-12">
+      <form class="form-inline">
+        <div class="form-group">
+          <label for="create">Chatroom</label>
+          <input type="text" id="chatroom-id" class="form-control" disabled="disabled" placeholder="chatroom id">
+          <input type="text" id="chatroom-title" class="form-control" placeholder="chatroom title">
+        </div>
+        <button id="create" class="btn btn-default" disabled="disabled" type="button">Create</button>
+        <button id="leave" class="btn btn-default" disabled="disabled" type="button">Leave</button>
+      </form>
+    </div>
+  </div>
+  <div class="row">
+    <div class="col-md-12">
+      <table id="chatrooms" class="table table-striped">
+        <thead>
+        <tr>
+          <th>Chatroomss</th>
+        </tr>
+        </thead>
+        <tbody id="chatroom-list">
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="row">
+    <div class="col-md-12">
+      <form class="form-inline">
+        <div class="form-group">
+          <label for="send">Message</label>
+          <input type="text" id="message" class="form-control" placeholder="message to send">
+        </div>
+        <button id="send" class="btn btn-default" disabled="disabled" type="button">Send</button>
+      </form>
+    </div>
+  </div>
+  <div class="row">
+    <div class="col-md-12">
+      <table id="conversation" class="table table-striped">
+        <thead>
+        <tr>
+          <th>Messages</th>
+        </tr>
+        </thead>
+        <tbody id="messages">
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+</body>
+</html>

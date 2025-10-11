@@ -95,6 +95,9 @@ public class SecurityConfig {
                         //  정적 리소스 전체 허용 (classpath:/static, /public, /resources, /META-INF/resources)
                         .requestMatchers(PathRequest.toStaticResources().atCommonLocations()).permitAll()
 
+                        // WebSocket/STOMP 핸드셰이크 엔드포인트(예: /ws/**)
+                        .requestMatchers("/ws/**", "/stomp/**").permitAll()
+
                         .requestMatchers("/notification/stream").authenticated()
                         // --- Auth/JWT ---
                         .requestMatchers("/jwt/**").permitAll()
@@ -131,21 +134,16 @@ public class SecurityConfig {
                         // --- Comment ---
                         .requestMatchers("/comment/**").hasAnyRole("ADMIN", "USER")
 
-
                         // --- Review ---
                         .requestMatchers(HttpMethod.POST,   "/item/*/review", "/item/*/review/**").authenticated()
                         .requestMatchers(HttpMethod.PUT,    "/item/*/review/**").authenticated()
                         .requestMatchers(HttpMethod.DELETE, "/item/*/review/**").authenticated()
 
-
                         // --- Item ---
-
                         .requestMatchers(HttpMethod.GET, "/item", "/item/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/item", "/item/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/item", "/item/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/item", "/item/**").hasRole("ADMIN")
-
-
 
                         // --- Cart ---
                         .requestMatchers(HttpMethod.POST, "/cart").hasRole("USER")
@@ -157,6 +155,12 @@ public class SecurityConfig {
                         .requestMatchers("/order/admin/**").hasRole("ADMIN")   // 관리자 전용
                         .requestMatchers("/order/**").permitAll()
                         .requestMatchers("/admin/**").hasRole("ADMIN")
+
+                        // --- Consultant Chat ---
+                        .requestMatchers("/consultants/**").hasRole("ADMIN")   // 관리자(상담) 전용
+
+                        // --- Chat ---
+                        .requestMatchers("/chats/**").permitAll()
 
                         // --- Home ---
                         .requestMatchers("/home/**").permitAll()
@@ -174,7 +178,6 @@ public class SecurityConfig {
 
                         // --- Reservation ---
                         .requestMatchers("/care/admin/**").hasRole("ADMIN")  // 관리자 전용
-
 
                         // --- Notification (회원/관리자만) ---
                         .requestMatchers(HttpMethod.GET,
@@ -232,7 +235,8 @@ public class SecurityConfig {
         // setAllowedOrigins는 여러 개 origin을 한 번에 넣을 수 있으니 다 허용
         cfg.setAllowedOrigins(List.of(
                 "http://localhost:3000",
-                "http://192.168.0.160:3000"
+                "http://192.168.0.160:3000",
+                "https://*.anpetna.com"   // 운영 도메인(예시) - 필요에 맞게 수정
         ));
         // === 허용 메서드 ===
         cfg.setAllowedMethods(List.of(
