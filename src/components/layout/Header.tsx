@@ -499,7 +499,7 @@ function handleLogout() {
                 role="menuitem"
                 onClick={() => { if (admin) { try { localStorage.setItem('memberRole', 'ADMIN'); } catch {} } }}
               >
-                1 : 1
+                CHAT
               </Link>
 
           </div>

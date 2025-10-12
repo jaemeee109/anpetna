@@ -31,12 +31,12 @@ function isAdminClient(): boolean {
 
 /** (관리자) 채팅방 목록: Page → content 배열만 추출 */
 async function adminList(): Promise<ChatroomDTO[]> {
-  const resp = await http.get('/consultants/chats', { params: { page: 0, size: 50 } });
-  const page: any = resp.data ?? {};
-  const arr: ChatroomDTO[] =
-    Array.isArray(page?.content) ? page.content : Array.isArray(page?.dtoList) ? page.dtoList : [];
-  return arr;
+  // 관리자도 본인 기준(hasNewMessage 계산 포함) 목록을 받도록 /chats 사용
+  const resp = await http.get('/chats');
+  const data = resp.data ?? [];
+  return Array.isArray(data) ? (data as ChatroomDTO[]) : [];
 }
+
 
 /** (회원) 내 채팅방 목록 */
 async function list(): Promise<ChatroomDTO[]> {
