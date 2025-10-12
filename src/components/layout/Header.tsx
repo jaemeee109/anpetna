@@ -493,7 +493,15 @@ function handleLogout() {
           <div className="dropdown-menu" role="menu" aria-label="Help submenu">
             <Link href="/board/FAQ" className="dropdown-item" role="menuitem">FAQ</Link>
             <Link href="/board/QNA" className="dropdown-item" role="menuitem">Q&amp;A</Link>
-            <Link href="/chat" className="dropdown-item" role="menuitem">1 : 1</Link>
+            <Link
+                href={admin ? "/chat?forceAdmin=1" : "/chat"}
+                className="dropdown-item"
+                role="menuitem"
+                onClick={() => { if (admin) { try { localStorage.setItem('memberRole', 'ADMIN'); } catch {} } }}
+              >
+                1 : 1
+              </Link>
+
           </div>
         </div>
       </nav>

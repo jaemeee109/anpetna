@@ -4,7 +4,7 @@
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import RequireLogin from '@/components/auth/RequireLogin';
-import { chatApi, type ChatMessageDTO } from '@/features/chat/data/chat.api';
+import chatApi, { type ChatMessageDTO } from '@/features/chat/data/chat.api';
 
 function isAdminClient(): boolean {
   try {
@@ -23,6 +23,19 @@ function isAdminClient(): boolean {
   } catch { return false; }
 }
 
+/** API 베이스(포트 보정) — app/page.tsx 와 동일 패턴 */
+function resolveApiBase(): string {
+  const envBase =
+    (process.env.NEXT_PUBLIC_API_BASE as string | undefined) ||
+    (process.env.NEXT_PUBLIC_API_BASE_URL as string | undefined) ||
+    '';
+  if (envBase) return envBase.replace(/\/+$/, '');
+  if (typeof window === 'undefined') return '';
+  const { protocol, hostname, port } = window.location;
+  const guessPort = port ? (port === '3000' ? '8000' : port) : '8000';
+  return `${protocol}//${hostname}${guessPort ? `:${guessPort}` : ''}`.replace(/\/+$/, '');
+}
+
 /** 최소 STOMP 클라이언트 */
 class MiniStomp {
   private ws: WebSocket | null = null;
@@ -32,6 +45,7 @@ class MiniStomp {
     this.url = url; this.onMessage = onMessage;
   }
   connect(onOpen?: () => void) {
+    // http/https -> ws/wss 치환
     this.ws = new WebSocket(this.url.replace(/^http/i, 'ws'));
     this.ws.onopen = () => {
       this.sendFrame('CONNECT', { 'accept-version': '1.2', host: '' }, '');
@@ -43,6 +57,8 @@ class MiniStomp {
       const body = split.length > 1 ? split.slice(1).join('\n\n').replace(/\u0000+$/, '') : '';
       this.onMessage(body);
     };
+    this.ws.onerror = () => { /* STOMP 실패해도 REST 전송은 가능해야 함 */ };
+    this.ws.onclose = () => { /* noop */ };
   }
   subscribe(dest: string, id = 'sub-1') {
     this.sendFrame('SUBSCRIBE', { destination: dest, id }, '');
@@ -72,7 +88,21 @@ export default function ChatRoomPage() {
   const stompRef = useRef<MiniStomp | null>(null);
   const admin = isAdminClient();
 
-  // 1) 과거 대화 로드 (GET /chats/{id}/messages)
+  // 1-a) (추가) 방 진입 시 참여 등록 (관리자 제외)
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      if (!id || admin) return;
+      try {
+        await chatApi.join(id);  // 서버의 @PostMapping("/{chatroomId}") 호출
+      } catch {
+        // 조인은 실패해도 화면은 계속 동작(목록/권한 보정 목적)
+      }
+    })();
+    return () => { alive = false; };
+  }, [id, admin]);
+
+  // 1-b) 과거 대화 로드 (GET /chats/{id}/messages)
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -87,13 +117,14 @@ export default function ChatRoomPage() {
     return () => { alive = false; };
   }, [id]);
 
-  // 2) STOMP 연결 + 구독 (/sub/chats 로 수신)
+  // 2) STOMP 연결 + 구독 (백엔드 8000으로 붙이기)
   useEffect(() => {
     if (!id) return;
-    const base = typeof window !== 'undefined'
-      ? `${window.location.protocol}//${window.location.host}`
-      : '';
-    const url = `${base}/stomp/chats`;
+
+    // STOMP 성공 여부와 무관하게 전송 버튼 사용 가능
+    setReady(true);
+
+    const url = `${resolveApiBase()}/stomp/chats`;
     const s = new MiniStomp(url, (body) => {
       try {
         const obj = JSON.parse(body);
@@ -106,9 +137,7 @@ export default function ChatRoomPage() {
     });
     stompRef.current = s;
     s.connect(() => {
-    
-      s.subscribe('/sub/chats');
-      setReady(true);
+      s.subscribe('/sub/chats'); // 서버에서 convertAndSend("/sub/chats", ...)로 발행
     });
     return () => { s.disconnect(); stompRef.current = null; };
   }, [id]);
@@ -117,9 +146,8 @@ export default function ChatRoomPage() {
     const msg = text.trim();
     if (!msg) return;
     try {
-     
       const sent = await chatApi.send(id, msg);
-      // 내 화면에 즉시 반영 
+      // 내 화면에 즉시 반영
       setHistory(prev => [...prev, sent]);
       setText('');
     } catch (e: any) {
@@ -132,7 +160,7 @@ export default function ChatRoomPage() {
     if (!window.confirm('이 채팅방에서 퇴장하시겠습니까?')) return;
     try {
       const ok = await chatApi.leave(id);
-      if (ok) router.replace('/chat'); 
+      if (ok) router.replace('/chat');
     } catch (e: any) {
       alert(e?.message || '퇴장 실패');
     }
