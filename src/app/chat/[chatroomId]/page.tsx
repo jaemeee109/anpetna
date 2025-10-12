@@ -6,6 +6,13 @@ import { useEffect, useRef, useState } from 'react';
 import RequireLogin from '@/components/auth/RequireLogin';
 import chatApi, { type ChatMessageDTO } from '@/features/chat/data/chat.api';
 
+
+function isChatMessageDTO(v: any): v is ChatMessageDTO {
+  return v && typeof v === 'object'
+    && typeof (v as any).sender === 'string'
+    && typeof (v as any).message === 'string';
+}
+
 function isAdminClient(): boolean {
   try {
     const raw =
@@ -52,11 +59,23 @@ class MiniStomp {
       onOpen?.();
     };
     this.ws.onmessage = (ev) => {
-      const text = String(ev.data || '');
-      const split = text.split('\n\n');
-      const body = split.length > 1 ? split.slice(1).join('\n\n').replace(/\u0000+$/, '') : '';
-      this.onMessage(body);
-    };
+        const text = String(ev.data || '');
+        const idx = text.indexOf('\n\n');
+        let body = (idx >= 0 ? text.slice(idx + 2) : text).replace(/\u0000+$/, '');
+        body = body.trim();
+
+     
+        if (!body) return;
+        try {
+          const obj = JSON.parse(body);
+          if (obj && typeof obj === 'object' && 'sender' in obj && 'message' in obj) {
+            this.onMessage(body); 
+          }
+        } catch {
+         
+        }
+      };
+
     this.ws.onerror = () => { /* STOMP 실패해도 REST 전송은 가능해야 함 */ };
     this.ws.onclose = () => { /* noop */ };
   }
@@ -126,18 +145,21 @@ export default function ChatRoomPage() {
 
     const url = `${resolveApiBase()}/stomp/chats`;
     const s = new MiniStomp(url, (body) => {
-      try {
-        const obj = JSON.parse(body);
-        if (obj && typeof obj === 'object' && 'sender' in obj && 'message' in obj) {
-          setHistory(prev => [...prev, { sender: (obj as any).sender, message: (obj as any).message }]);
-          return;
-        }
-      } catch {}
-      setHistory(prev => [...prev, { sender: 'SYSTEM', message: body }]);
-    });
+  try {
+    const obj = JSON.parse(body);
+    if (isChatMessageDTO(obj)) {
+      setHistory((prev) => [...prev, obj]); // ✅ 타입 확정: 빨간줄 사라짐
+    }
+  } catch {
+    // 비-JSON 프레임은 무시
+  }
+});
+
+
+
     stompRef.current = s;
     s.connect(() => {
-      s.subscribe('/sub/chats'); // 서버에서 convertAndSend("/sub/chats", ...)로 발행
+      s.subscribe(`/sub/chats/${id}`);
     });
     return () => { s.disconnect(); stompRef.current = null; };
   }, [id]);
@@ -146,10 +168,10 @@ export default function ChatRoomPage() {
     const msg = text.trim();
     if (!msg) return;
     try {
-      const sent = await chatApi.send(id, msg);
-      // 내 화면에 즉시 반영
-      setHistory(prev => [...prev, sent]);
+     await chatApi.send(id, msg);
+      // STOMP 브로드캐스트로만 반영(중복 방지)
       setText('');
+
     } catch (e: any) {
       alert(e?.message || '전송 실패');
     }
