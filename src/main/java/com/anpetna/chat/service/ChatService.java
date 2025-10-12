@@ -101,9 +101,22 @@ public class ChatService {
         List<MemberChatroomMapping> memberChatroomMappingList = memberChatroomMappingRepository.findAllByMemberId(member.getMemberId());
 
         return memberChatroomMappingList.stream()
-                .map(memberChatroomMapping -> {
-                    ChatroomEntity chatroom = memberChatroomMapping.getChatroom();
-                    chatroom.setHasNewMessage(messageRepository.existsByChatroomIdAndCreatedAtAfter(chatroom.getId(), memberChatroomMapping.getLastCheckedAt()));
+                .filter(m -> m != null && m.getChatroom() != null)
+                .map(m -> {
+                    ChatroomEntity chatroom = m.getChatroom();
+
+                    boolean hasNew = false;
+                    LocalDateTime checkedAt = m.getLastCheckedAt();
+
+                    if (checkedAt != null) {
+                        hasNew = Boolean.TRUE.equals(
+                                messageRepository.existsByChatroomIdAndCreatedAtAfter(
+                                        chatroom.getId(),
+                                        checkedAt
+                                )
+                        );
+                    }
+                    chatroom.setHasNewMessage(hasNew);
                     return chatroom;
                 })
                 .toList();

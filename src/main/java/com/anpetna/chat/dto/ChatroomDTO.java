@@ -13,7 +13,13 @@ public record ChatroomDTO(
 ) {
 
     public static ChatroomDTO from(ChatroomEntity chatroom) {
-        return new ChatroomDTO(chatroom.getId(), chatroom.getTitle(), chatroom.getHasNewMessage(), chatroom.getMemberChatroomMappingSet().size(), chatroom.getCreatedAt());
+
+        boolean hasNew = Boolean.TRUE.equals(chatroom.getHasNewMessage());
+        int memberCount = (chatroom.getMemberChatroomMappingSet() == null)
+                ? 0
+                : chatroom.getMemberChatroomMappingSet().size();
+
+        return new ChatroomDTO(chatroom.getId(), chatroom.getTitle(), hasNew, memberCount, chatroom.getCreatedAt());
     }
 
 }
