@@ -72,9 +72,18 @@ public class StompChatController {
         MemberEntity member = memberService.findById(memberId);
         chatService.saveMessage(member, chatroomId, text);
 
+        /* 기존 코드
         // 2) 실시간 알림(웹소켓 구독자에게 push) - STOMP 구독 채널은 기존 그대로 사용 가능
         messagingTemplate.convertAndSend("/sub/chats", new ChatMessageDTO(member.getMemberId(), text)); // 메인 피드
         messagingTemplate.convertAndSend("/sub/chats/updates", chatService.getChatroom(chatroomId)); // 보조 업데이트
+        */
+        //================== 추가 ========================
+        // 채팅방에서 새로고침 해야만 새 메세지가 보여서 수정
+        messagingTemplate.convertAndSend("/sub/chats/" + chatroomId,
+                new ChatMessageDTO(member.getMemberId(), text));
+        messagingTemplate.convertAndSend("/sub/chats/" + chatroomId + "/updates",
+                chatService.getChatroom(chatroomId));
+        //================== 추가 끝 ========================
 
         // 3) HTTP 응답(JSON)
         return new ChatMessageDTO(member.getMemberId(), text);
