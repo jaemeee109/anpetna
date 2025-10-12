@@ -26,7 +26,7 @@ public class StompChatController {
     private final MemberService memberService;
 
     // 메시지 전송(저장) REST 엔드포인트
-    @PostMapping("/chats/{chatroomId}/messages") // ⬅️ 변경 포인트 2: HTTP POST
+    @PostMapping("/{chatroomId}/messages") // ⬅️ 변경 포인트 2: HTTP POST
     public ChatMessageDTO postMessage(Authentication authentication,
                                       @PathVariable Long chatroomId,
                                       @RequestBody Map<String, String> payload) {
@@ -51,7 +51,7 @@ public class StompChatController {
     }
 
     // 메시지 조회 REST 엔드포인트
-    @GetMapping("/chats/{chatroomId}/messages")
+    @GetMapping("/{chatroomId}/messages")
     public List<ChatMessageDTO> getMessages(@PathVariable Long chatroomId) {
         return chatService.getMessageList(chatroomId).stream()
                 .map(m -> new ChatMessageDTO(
