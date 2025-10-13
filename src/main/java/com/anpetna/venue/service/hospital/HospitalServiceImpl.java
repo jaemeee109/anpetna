@@ -4,6 +4,7 @@ package com.anpetna.venue.service.hospital;
 import com.anpetna.member.domain.MemberEntity;
 import com.anpetna.member.repository.MemberRepository;
 import com.anpetna.notification.feature.reservation.service.ReservationReminderService;
+import com.anpetna.notification.feature.reservation.service.hospital.HospitalCancelNotificationService;
 import com.anpetna.notification.feature.reservation.service.hospital.HospitalNoShowNotificationService;
 import com.anpetna.notification.feature.reservation.service.hospital.HospitalReservationConfirmNotificationService;
 import com.anpetna.notification.feature.reservation.service.hospital.HospitalReservationService;
@@ -53,6 +54,7 @@ public class HospitalServiceImpl implements HospitalService {
     private final HospitalReservationService hospitalReservationService;
     private final ReservationReminderService reservationReminderService;
     private static final DateTimeFormatter H_FMT = DateTimeFormatter.ofPattern("MM월 dd일 HH:mm");
+    private final HospitalCancelNotificationService hospitalCancelNotificationService;
     // ================================
 
     // 회원의 노쇼 누적 회수 (호텔 + 병원 합산)
@@ -76,7 +78,7 @@ public class HospitalServiceImpl implements HospitalService {
     @Override
     @Transactional
     public CreateHospitalReservationRes reserve(String memberId, Long venueId, CreateHospitalReservationReq req) {
-        
+
         // 로그인, 노쇼 누적 제한 체크
         if (memberId == null || memberId.isBlank()) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "로그인이 필요합니다.");
@@ -116,7 +118,7 @@ public class HospitalServiceImpl implements HospitalService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "예약 가능 시간은 10~18시(13~14 제외) 30분 단위입니다.");
         }
 
-        
+
         // 중복 예약 방지
         if (hospitalReservationRepository.existsByDoctor_DoctorIdAndAppointmentAt(doctor.getDoctorId(), at)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "해당 시간은 이미 예약되었습니다.");
@@ -144,7 +146,7 @@ public class HospitalServiceImpl implements HospitalService {
         //============ 예약 생성 알림 (예약 생성 시 사용자에게 안내) ============
         hospitalReservationService.notifyHospitalReservation(member, memberId, venue, at);
         //=================================================================
-        
+
         // 예약 번호 반환
         return CreateHospitalReservationRes.builder().reservationId(saved.getReservationId()).build();
     } // reserve 종료
@@ -153,7 +155,7 @@ public class HospitalServiceImpl implements HospitalService {
     // 예약 확정
     @Override
     public void confirm(Long reservationId) {
-        
+
         // 예약 확인
         HospitalReservationEntity found = hospitalReservationRepository.findById(reservationId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "예약을 찾을 수 없습니다."));
@@ -242,7 +244,7 @@ public class HospitalServiceImpl implements HospitalService {
             }
             // 예약 상태 필터
             if (statusEnum != null && r.getStatus() != statusEnum) continue;
-            
+
             // 회원id 필터
             if (memberId != null) {
                 if (r.getMember() == null || r.getMember().getMemberId() == null || !r.getMember().getMemberId().equals(memberId)) {
@@ -287,6 +289,26 @@ public class HospitalServiceImpl implements HospitalService {
         r.setStatus(next); // JPA dirty checking
 
         // ===================== 상태 변경 알림 ==========================
+
+        var member = r.getMember();
+        var venue  = r.getVenue();
+        var at     = r.getAppointmentAt();
+        String memberId = (member != null ? member.getMemberId() : null);
+
+        if (member != null && memberId != null && venue != null && at != null) {
+            switch (next) {
+                case CONFIRMED -> hospitalReservationNotificationService.notifyHospitalReservationConfirm(
+                        member, memberId, venue, at
+                );
+                case NOSHOW -> hospitalNoShowNotification.notifyHospitalNoShow(
+                        member, memberId, venue, at
+                );
+                case CANCELED -> hospitalCancelNotificationService.notifyHospitalCancel(
+                        member, memberId, venue, at
+                );
+                default -> { /* PENDING 등은 알림 없음 */ }
+            }
+        }
 
         // 상태 전이 후 리마인드 스케줄 조정
         if (next == ReservationStatus.CONFIRMED) {
