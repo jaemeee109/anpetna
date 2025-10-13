@@ -160,7 +160,9 @@ public class SecurityConfig {
                         .requestMatchers("/consultants/**").hasRole("ADMIN")   // 관리자(상담) 전용
 
                         // --- Chat ---
-                        .requestMatchers("/chats/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/chats/**").hasAnyRole("ADMIN","USER")
+                        .requestMatchers(HttpMethod.POST, "/chats/**").hasAnyRole("ADMIN","USER")
+                        .requestMatchers(HttpMethod.DELETE, "/chats/**").hasAnyRole("ADMIN","USER")
 
                         // --- Home ---
                         .requestMatchers("/home/**").permitAll()

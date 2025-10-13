@@ -21,5 +21,8 @@ public interface MessageRepository extends JpaRepository<MessageEntity, Long> {
 
     Boolean existsByChatroomIdAndCreatedAtAfter(Long chatroomId, LocalDateTime createdAt);
 
+    //================== 추가 ========================
+    //  lastCheckedAt == null일 때 사용: 채팅방에 메세지가 1개라도 있는지
+    Boolean existsByChatroomId(Long chatroomId);
 
 }

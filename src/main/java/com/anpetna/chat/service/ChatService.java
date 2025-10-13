@@ -15,10 +15,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
+
 
 @Slf4j
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
 @Service
 public class ChatService {
 
@@ -29,6 +30,7 @@ public class ChatService {
     private final MessageRepository messageRepository;
 
     // 채팅방 개설 사용자와 채팅방 제목을 인자로 받는 채팅방 생성 서비스 로직
+    @Transactional // 추가
     public ChatroomEntity createChatroom(MemberEntity member, String title) {
         ChatroomEntity chatroom = ChatroomEntity.builder()
                 .title(title)
@@ -46,6 +48,7 @@ public class ChatService {
     }
 
     // 생성된 채팅방에 사용자가 참여하는 로직 - 참여가 올바르게 완료되었는지 boolean으로 반환.
+    @Transactional // 추가
     public Boolean joinChatroom(MemberEntity member, Long newChatroomId, Long currentChatroomId) {
 
         // A라는 채팅방에서 B라는 채팅방으로 옮겨가는 상황
@@ -121,7 +124,7 @@ public class ChatService {
                 })
                 .toList();
     }
-
+    @Transactional // 추가
     public MessageEntity saveMessage(MemberEntity member, Long chatroomId, String text) {
 
         // 채팅방이 존재하는지 확인
@@ -148,5 +151,46 @@ public class ChatService {
         ChatroomEntity chatroom = chatroomRepository.findById(chatroomId).get();
 
         return ChatroomDTO.from(chatroom);
+    }
+
+
+    //================== 추가 ========================
+    // 참여자 확인 메서드 (본인, 관리자 외에 다른 회원 채팅방 참여 불가능)
+    @Transactional(readOnly = true)
+    public boolean isParticipant(String memberId, Long chatroomId) {
+        return memberChatroomMappingRepository
+                .existsByMember_MemberIdAndChatroom_Id(memberId, chatroomId);
+    }
+
+
+
+    @Transactional(readOnly = true)
+    public List<ChatroomDTO> getChatroomListDTO(MemberEntity member) {
+        var mappingList = memberChatroomMappingRepository.findAllByMember_MemberId(member.getMemberId());
+
+        return mappingList.stream().map(mapping -> {
+            var chatroom = mapping.getChatroom();
+            if (chatroom == null) return null; // 혹시라도 무결성 깨진 경우 방어
+
+            var lastChecked = mapping.getLastCheckedAt();
+
+            boolean hasNew = (lastChecked == null)
+                    ? messageRepository.existsByChatroomId(chatroom.getId())
+                    : messageRepository.existsByChatroomIdAndCreatedAtAfter(chatroom.getId(), lastChecked);
+
+            int memberCount = 0;
+            try {
+                memberCount = memberChatroomMappingRepository.countByChatroomId(chatroom.getId());
+            } catch (Exception ignore) { /* 0 유지 */ }
+
+            chatroom.setHasNewMessage(hasNew);
+            return new com.anpetna.chat.dto.ChatroomDTO(
+                    chatroom.getId(),
+                    chatroom.getTitle(),
+                    hasNew,
+                    memberCount,
+                    chatroom.getCreatedAt()
+            );
+        }).filter(Objects::nonNull).toList();
     }
 }
