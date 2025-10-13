@@ -186,39 +186,52 @@ pipeline {
     IMAGE="${DOCKERHUB_REPO}:${IMAGE_TAG_BASE}-${NEXT_COLOR}"
     OVERRIDE_FILE="${WORKSPACE}/override-${TARGET}.yml"
 
-    cat > "${OVERRIDE_FILE}" <<EOF
+    # 1) 오버라이드 파일 생성
+    cat > "${OVERRIDE_FILE}" <<'EOF'
     services:
-      ${TARGET}:
-        image: ${IMAGE}
+      __TARGET__:
+        image: __IMAGE__
         environment:
-          SPRING_DATASOURCE_URL: "${DB_URL}"
-          SPRING_DATASOURCE_USERNAME: "${DB_USER}"
-          SPRING_DATASOURCE_PASSWORD: "${DB_PASS}"
+          SPRING_DATASOURCE_URL: "__DB_URL__"
+          SPRING_DATASOURCE_USERNAME: "__DB_USER__"
+          SPRING_DATASOURCE_PASSWORD: "__DB_PASS__"
           SPRING_PROFILES_ACTIVE: "prod"
-          TOSS_SECRET_KEY: "${TOSS_SECRET}"
-          NAVER_MAP_CLIENT_ID: "${NAVER_ID}"
-          NAVER_MAP_CLIENT_SECRET: "${NAVER_SECRET}"
+          TOSS_SECRET_KEY: "__TOSS_SECRET__"
+          NAVER_MAP_CLIENT_ID: "__NAVER_ID__"
+          NAVER_MAP_CLIENT_SECRET: "__NAVER_SECRET__"
         networks:
-          - ${DOCKER_NETWORK}
+          - __DOCKER_NETWORK__
     networks:
-      ${DOCKER_NETWORK}:
+      __DOCKER_NETWORK__:
         external: true
     EOF
 
-    # (디버그) 실제 머지 결과 확인
+    # 변수 치환
+    sed -i "s#__TARGET__#${TARGET}#g"           "${OVERRIDE_FILE}"
+    sed -i "s#__IMAGE__#${IMAGE}#g"             "${OVERRIDE_FILE}"
+    sed -i "s#__DB_URL__#${DB_URL}#g"           "${OVERRIDE_FILE}"
+    sed -i "s#__DB_USER__#${DB_USER}#g"         "${OVERRIDE_FILE}"
+    sed -i "s#__DB_PASS__#${DB_PASS}#g"         "${OVERRIDE_FILE}"
+    sed -i "s#__TOSS_SECRET__#${TOSS_SECRET}#g" "${OVERRIDE_FILE}"
+    sed -i "s#__NAVER_ID__#${NAVER_ID}#g"       "${OVERRIDE_FILE}"
+    sed -i "s#__NAVER_SECRET__#${NAVER_SECRET}#g" "${OVERRIDE_FILE}"
+    sed -i "s#__DOCKER_NETWORK__#${DOCKER_NETWORK}#g" "${OVERRIDE_FILE}"
+
+    # 2) 최종 머지 결과(디버그)
     docker compose -f ${APP_DIR}/docker-compose.yml -f "${OVERRIDE_FILE}" config | awk "/${TARGET}:/,/^$/" || true
 
-    # 실제 배포! ← 이 두 줄이 로그에 반드시 찍혀야 함
+    # 3) 실제 배포 (이 출력이 반드시 로그에 보여야 함)
     docker compose -f ${APP_DIR}/docker-compose.yml -f "${OVERRIDE_FILE}" pull ${TARGET} || true
     docker compose -f ${APP_DIR}/docker-compose.yml -f "${OVERRIDE_FILE}" up -d ${TARGET}
 
-    # 상태 확인
+    # 4) 상태 확인 + 컨테이너 없으면 즉시 실패
     docker compose -f ${APP_DIR}/docker-compose.yml -f "${OVERRIDE_FILE}" ps
-
-    # 컨테이너가 없으면 즉시 실패 처리(헬스체크로 넘어가지 않게)
     docker ps --format '{{.Names}}' | grep -w "${TARGET}"
 
-    # 민감 파일 삭제
+    # (선택) 로그 한 줄
+    docker logs --tail=50 ${TARGET} || true
+
+    # 5) 민감 파일 정리
     shred -u "${OVERRIDE_FILE}" 2>/dev/null || rm -f "${OVERRIDE_FILE}"
     '''
         }
