@@ -18,7 +18,7 @@ public class HotelCancelNotificationService {
 
     private final NotificationService notificationService;
 
-    public void notifyHospitalCancel(MemberEntity member, String memberId, VenueEntity venue, LocalDate in, LocalDate out) {
+    public void notifyHotelCancel(MemberEntity member, String memberId, VenueEntity venue, LocalDate in, LocalDate out) {
 
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MM월 dd일");
         String formattedIn = in.format(formatter);
