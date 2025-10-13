@@ -4,6 +4,7 @@ package com.anpetna.venue.service.hospital;
 import com.anpetna.member.domain.MemberEntity;
 import com.anpetna.member.repository.MemberRepository;
 import com.anpetna.notification.feature.reservation.service.ReservationReminderService;
+import com.anpetna.notification.feature.reservation.service.hospital.HospitalCancelNotificationService;
 import com.anpetna.notification.feature.reservation.service.hospital.HospitalNoShowNotificationService;
 import com.anpetna.notification.feature.reservation.service.hospital.HospitalReservationConfirmNotificationService;
 import com.anpetna.notification.feature.reservation.service.hospital.HospitalReservationService;
@@ -53,6 +54,7 @@ public class HospitalServiceImpl implements HospitalService {
     private final HospitalReservationService hospitalReservationService;
     private final ReservationReminderService reservationReminderService;
     private static final DateTimeFormatter H_FMT = DateTimeFormatter.ofPattern("MM월 dd일 HH:mm");
+    private final HospitalCancelNotificationService hospitalCancelNotificationService;
     // ================================
 
     // 회원의 노쇼 누적 회수 (호텔 + 병원 합산)
@@ -287,6 +289,26 @@ public class HospitalServiceImpl implements HospitalService {
         r.setStatus(next); // JPA dirty checking
 
         // ===================== 상태 변경 알림 ==========================
+
+        var member = r.getMember();
+        var venue  = r.getVenue();
+        var at     = r.getAppointmentAt();
+        String memberId = (member != null ? member.getMemberId() : null);
+
+        if (member != null && memberId != null && venue != null && at != null) {
+            switch (next) {
+                case CONFIRMED -> hospitalReservationNotificationService.notifyHospitalReservationConfirm(
+                        member, memberId, venue, at
+                );
+                case NOSHOW -> hospitalNoShowNotification.notifyHospitalNoShow(
+                        member, memberId, venue, at
+                );
+                case CANCELED -> hospitalCancelNotificationService.notifyHospitalCancel(
+                        member, memberId, venue, at
+                );
+                default -> { /* PENDING 등은 알림 없음 */ }
+            }
+        }
 
         // 상태 전이 후 리마인드 스케줄 조정
         if (next == ReservationStatus.CONFIRMED) {
