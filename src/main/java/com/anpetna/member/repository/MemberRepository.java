@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
@@ -20,6 +21,7 @@ public interface MemberRepository extends JpaRepository<MemberEntity, String>, J
     @Query("select m.memberId from MemberEntity m where m.memberRole = :role")
     List<String> findIdsByRole(@Param("role") MemberRole role);
 
+    Optional<MemberEntity> findAllByMemberRole(MemberRole memberRole);
 }
 
 /*JpaSpecificationExecutor : 동적 쿼리(Dynamic Query) 를 작성할 수 있게 해주는 기능.

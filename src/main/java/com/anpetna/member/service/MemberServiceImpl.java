@@ -59,7 +59,6 @@ public class MemberServiceImpl implements MemberService {
     @Value("${app.upload.url-base}")  // 접근 URL 베이스 (예: /files or https://cdn.example.com/files)
     private String uploadUrlBase;
 
-
     // 프로필 1장만 허용할 때: 기존 이미지가 있으면 지우고 새로 저장
     private void replaceProfileImage(MemberEntity member, MultipartFile file) {
         if (file == null || file.isEmpty()) return;
@@ -128,6 +127,12 @@ public class MemberServiceImpl implements MemberService {
         }
 
         return JoinMemberRes.from(saved);
+    }
+
+    // MemberId를 통한 단순 MemberEntity 조회용
+    public MemberEntity findById(String memberId) {
+        return memberRepository.findById(memberId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 회원입니다: " + memberId));
     }
 
     @Override

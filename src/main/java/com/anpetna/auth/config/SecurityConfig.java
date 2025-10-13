@@ -88,8 +88,23 @@ public class SecurityConfig {
                         //브라우저에서 실제 요청 전에 보내는 프리플라이트 요청 -> 인증 없이 허용해주어야 브라우저에서 정상적으로 POST/PUT/DELETE 요청이 가능
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
+                        // --- Api Document ---
+                        .requestMatchers(
+                                "/v3/api-docs",
+                                "/v3/api-docs/**",
+                                "/swagger-ui.html",
+                                "/swagger-ui/**",
+                                "/swagger-resources/**",
+                                "/webjars/**",
+                                "/favicon.ico"
+
+                        ).permitAll()
+
                         //  정적 리소스 전체 허용 (classpath:/static, /public, /resources, /META-INF/resources)
                         .requestMatchers(PathRequest.toStaticResources().atCommonLocations()).permitAll()
+
+                        // WebSocket/STOMP 핸드셰이크 엔드포인트(예: /ws/**)
+                        .requestMatchers("/ws/**", "/stomp/**").permitAll()
 
                         .requestMatchers("/notification/stream").authenticated()
                         // --- Auth/JWT ---
@@ -107,6 +122,12 @@ public class SecurityConfig {
                                 "/success.html",
                                 "/fail.html",
                                 "/toss-api-test.html").permitAll()
+
+
+
+
+
+
 
                         // --- Member (join/login 먼저 열기!) ---
                         .requestMatchers("/member/login", "/member/join").permitAll()
@@ -127,21 +148,17 @@ public class SecurityConfig {
                         // --- Comment ---
                         .requestMatchers("/comment/**").hasAnyRole("ADMIN", "USER")
 
+                        // --- Item & Review (순서 중요 / 수정금지 ) ---
+                        .requestMatchers(HttpMethod.GET, "/item/**").permitAll()
 
-                        // --- Review ---
-                        .requestMatchers(HttpMethod.POST,   "/item/*/review", "/item/*/review/**").authenticated()
-                        .requestMatchers(HttpMethod.PUT,    "/item/*/review/**").authenticated()
-                        .requestMatchers(HttpMethod.DELETE, "/item/*/review/**").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/item/*/review").hasAnyRole("ADMIN", "USER")
+                        .requestMatchers(HttpMethod.PUT, "/item/*/review/*").hasAnyRole("ADMIN", "USER")
+                        .requestMatchers(HttpMethod.DELETE, "/item/*/review/*").hasAnyRole("ADMIN", "USER")
 
 
-                        // --- Item ---
-
-                        .requestMatchers(HttpMethod.GET, "/item", "/item/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/item", "/item/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/item", "/item/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/item", "/item/**").hasRole("ADMIN")
-
-
 
                         // --- Cart ---
                         .requestMatchers(HttpMethod.POST, "/cart").hasRole("USER")
@@ -153,6 +170,15 @@ public class SecurityConfig {
                         .requestMatchers("/order/admin/**").hasRole("ADMIN")   // 관리자 전용
                         .requestMatchers("/order/**").permitAll()
                         .requestMatchers("/admin/**").hasRole("ADMIN")
+
+                        // --- Consultant Chat ---
+                        .requestMatchers("/consultants/**").hasRole("ADMIN")   // 관리자(상담) 전용
+
+                        // --- Chat ---
+                        .requestMatchers(HttpMethod.GET, "/chats/**").hasAnyRole("ADMIN","USER")
+                        .requestMatchers(HttpMethod.POST, "/chats/**").hasAnyRole("ADMIN","USER")
+                        .requestMatchers(HttpMethod.DELETE, "/chats/**").hasAnyRole("ADMIN","USER")
+
 
                         // --- Home ---
                         .requestMatchers("/home/**").permitAll()
@@ -170,7 +196,6 @@ public class SecurityConfig {
 
                         // --- Reservation ---
                         .requestMatchers("/care/admin/**").hasRole("ADMIN")  // 관리자 전용
-
 
                         // --- Notification (회원/관리자만) ---
                         .requestMatchers(HttpMethod.GET,

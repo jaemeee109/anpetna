@@ -27,7 +27,7 @@ import com.anpetna.order.domain.OrdersEntity;
 import com.anpetna.order.repository.OrderRepository;
 import com.anpetna.order.repository.OrdersRepository;
 import jakarta.persistence.EntityNotFoundException;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.query.SortDirection;
 import org.modelmapper.ModelMapper;
@@ -292,6 +292,7 @@ public class ReviewServiceImpl implements ReviewService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public PageResponseDTO<ReviewDTO> getAllReviews(SearchAllReviewsReq req, PageRequestDTO pageRequestDTO, String order) {
 
         if (req.getItemId() == null) {

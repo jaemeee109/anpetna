@@ -62,7 +62,7 @@ public class NotificationEntity {
     @Column(name = "event_id", nullable = false, updatable = false, length = 36)
     private String eventId;
 
-    @Column(name = "n_title", length = 120)
+    @Column(name = "n_title", length = 360)
     private String nTitle;
 
     @Lob

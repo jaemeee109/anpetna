@@ -13,6 +13,8 @@ import java.time.*;
 import java.util.*;
 import java.util.stream.Collectors;
 
+
+// 의사 스케줄 관리 구현
 @Service
 @RequiredArgsConstructor
 public class HospitalScheduleServiceImpl implements HospitalScheduleService {
@@ -28,7 +30,7 @@ public class HospitalScheduleServiceImpl implements HospitalScheduleService {
         LocalDateTime start = date.atStartOfDay();
         LocalDateTime end   = date.atTime(LocalTime.MAX);
 
-        // 1) 이미 예약된 슬롯: CONFIRMED/NOSHOW만 불가 처리
+        // (1) 이미 예약된 슬롯: CONFIRMED/NOSHOW만 불가 처리
         List<String> reserved = hospitalReservationRepository
                 .findByDoctor_DoctorIdAndAppointmentAtBetween(doctorId, start, end)
                 .stream()
@@ -39,7 +41,7 @@ public class HospitalScheduleServiceImpl implements HospitalScheduleService {
                 .map(dt -> String.format("%02d:%02d", dt.getHour(), dt.getMinute()))
                 .toList();
 
-        // 2) 관리자 마감 슬롯(해당 의사 + 공통 마감)
+        // (2) 관리자 마감 슬롯 (해당 의사 + 공통 마감)
         List<String> blocked = new ArrayList<>();
         blocked.addAll(
                 hospitalClosedTimeRepository.findByDateAndDoctorId(date, doctorId)
@@ -54,7 +56,7 @@ public class HospitalScheduleServiceImpl implements HospitalScheduleService {
                         .toList()
         );
 
-        // 3) 합집합(중복 제거 + 정렬)
+        // (3) 중복 제거 + 정렬
         LinkedHashSet<String> set = new LinkedHashSet<>();
         set.addAll(reserved);
         set.addAll(blocked);
