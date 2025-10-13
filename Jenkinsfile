@@ -42,16 +42,18 @@ pipeline {
 
           docker network ls | grep -w "${DOCKER_NETWORK}" >/dev/null || docker network create ${DOCKER_NETWORK} || true
 
-          # active-upstream.var 최초 생성 (없으면 app-blue로 시작)
+          # active-upstream.var 최초 생성 (없으면 app-blue:8080 으로 시작)
           if [ ! -f "${NGINX_ACTIVE_VAR}" ]; then
             mkdir -p "$(dirname ${NGINX_ACTIVE_VAR})"
-            printf 'set $active_upstream app-blue;\\n' > "${NGINX_ACTIVE_VAR}"
+            printf 'set $active_upstream app-blue:8080;\n' > "${NGINX_ACTIVE_VAR}"
           fi
 
           # nginx 컨테이너 확인 + 네트워크 연결 보정
           docker ps --format '{{.Names}}' | grep -w "${NGINX_CONTAINER}" >/dev/null || { echo "Nginx container ${NGINX_CONTAINER} not running"; exit 1; }
-          docker network inspect ${DOCKER_NETWORK} | grep -q '"Name": "'${NGINX_CONTAINER}'"' || \
+
+          if ! docker inspect -f '{{json .NetworkSettings.Networks}}' ${NGINX_CONTAINER} | grep -q "\"${DOCKER_NETWORK}\""; then
             docker network connect ${DOCKER_NETWORK} ${NGINX_CONTAINER} || true
+          fi
         '''
       }
     }
@@ -172,43 +174,43 @@ pipeline {
       steps {
         withCredentials([
           string(credentialsId: 'db_url',  variable: 'DB_URL'),
-          usernamePassword(credentialsId: 'db_userpass', usernameVariable: 'DB_USER', passwordVariable: 'DB_PASS')
+          usernamePassword(credentialsId: 'db_userpass', usernameVariable: 'DB_USER', passwordVariable: 'DB_PASS'),
+          string(credentialsId: 'toss_secret_key', variable: 'TOSS_SECRET'),
+          string(credentialsId: 'naver_geocode_client_id', variable: 'NAVER_ID'),
+          string(credentialsId: 'naver_geocode_client_secret', variable: 'NAVER_SECRET')
         ]) {
           sh '''
-    set -euxo pipefail
-    TARGET="app-${NEXT_COLOR}"
+        set -euxo pipefail
+        TARGET="app-${NEXT_COLOR}"
+        IMAGE="${DOCKERHUB_REPO}:${IMAGE_TAG_BASE}-${NEXT_COLOR}"
 
-    # image.tag가 없더라도 계산해서 사용 가능
-    if [ -f image.tag ]; then
-      IMAGE=$(cat image.tag)
-    else
-      IMAGE="${DOCKERHUB_REPO}:${IMAGE_TAG_BASE}-${NEXT_COLOR}"
-    fi
-
-    OVERRIDE_FILE="${WORKSPACE}/override-${TARGET}.yml"
-    cat > "${OVERRIDE_FILE}" <<EOF
-    services:
-      ${TARGET}:
-        image: ${IMAGE}
-        environment:
-          SPRING_DATASOURCE_URL: "${DB_URL}"
-          SPRING_DATASOURCE_USERNAME: "${DB_USER}"
-          SPRING_DATASOURCE_PASSWORD: "${DB_PASS}"
-          SPRING_PROFILES_ACTIVE: "prod"
+        OVERRIDE_FILE="${WORKSPACE}/override-${TARGET}.yml"
+        cat > "${OVERRIDE_FILE}" <<EOF
+        services:
+          ${TARGET}:
+            image: ${IMAGE}
+            environment:
+              SPRING_DATASOURCE_URL: "${DB_URL}"
+              SPRING_DATASOURCE_USERNAME: "${DB_USER}"
+              SPRING_DATASOURCE_PASSWORD: "${DB_PASS}"
+              SPRING_PROFILES_ACTIVE: "prod"
+              TOSS_SECRET_KEY: "${TOSS_SECRET}"
+              NAVER_MAP_CLIENT_ID: "${NAVER_ID}"
+              NAVER_MAP_CLIENT_SECRET: "${NAVER_SECRET}"
+            networks:
+              - ${DOCKER_NETWORK}
         networks:
-          - ${DOCKER_NETWORK}
-    networks:
-      ${DOCKER_NETWORK}:
-        external: true
-    EOF
+          ${DOCKER_NETWORK}:
+            external: true
+        EOF
 
-    docker compose -f ${APP_DIR}/docker-compose.yml -f "${OVERRIDE_FILE}" pull ${TARGET} || true
-    docker compose -f ${APP_DIR}/docker-compose.yml -f "${OVERRIDE_FILE}" up -d ${TARGET}
+        docker compose -f ${APP_DIR}/docker-compose.yml -f "${OVERRIDE_FILE}" pull ${TARGET} || true
+        docker compose -f ${APP_DIR}/docker-compose.yml -f "${OVERRIDE_FILE}" up -d ${TARGET}
 
-    shred -u "${OVERRIDE_FILE}" 2>/dev/null || rm -f "${OVERRIDE_FILE}"
+        shred -u "${OVERRIDE_FILE}" 2>/dev/null || rm -f "${OVERRIDE_FILE}"
 
-    docker ps --format 'table {{.Names}}\\t{{.Image}}\\t{{.Status}}' | grep -E "${TARGET}"
-    '''
+        docker ps --format 'table {{.Names}}\\t{{.Image}}\\t{{.Status}}' | grep -E "${TARGET}"
+        '''
         }
       }
     }
@@ -222,15 +224,21 @@ pipeline {
           docker pull curlimages/curl:latest || true
 
           SECONDS=0
-          until docker run --rm --network ${DOCKER_NETWORK} curlimages/curl:latest \
-                  curl -fsS "http://${TARGET}:8080/actuator/health" | grep -q '"status":"UP"'; do
+          until docker run --rm --network ${DOCKER_NETWORK} \
+              -e TARGET="${TARGET}" curlimages/curl:latest \
+              sh -c 'code=$(curl -s -o /dev/null -w "%{http_code}" http://$TARGET:8080/actuator/health); \
+                     if [ "$code" = 200 ]; then \
+                       curl -fsS http://$TARGET:8080/actuator/health | grep -q "\"status\":\"UP\""; \
+                     else \
+                       [ "$code" = 401 ]; \
+                     fi'; do
             if [ ${SECONDS} -ge ${HEALTH_TIMEOUT_SEC} ]; then
               echo "Healthcheck timeout for ${TARGET}"
               exit 1
             fi
             sleep 3
           done
-          echo "NEXT ${NEXT_COLOR} is healthy"
+          echo "NEXT ${NEXT_COLOR} is healthy (HTTP 200/UP or 401)"
         '''
       }
     }
@@ -247,8 +255,14 @@ pipeline {
 
               # 전환 검증: Nginx(게이트웨이)를 통해 백엔드 헬스가 통과해야 성공
               docker pull curlimages/curl:latest || true
-              docker run --rm --network ${DOCKER_NETWORK} curlimages/curl:latest \
-                curl -fsS "http://${NGINX_CONTAINER}/actuator/health" | grep -q '"status":"UP"'
+              docker run --rm --network ${DOCKER_NETWORK} curlimages/curl:latest sh -lc '
+                code=$(curl -s -o /dev/null -w "%{http_code}" "http://'${NGINX_CONTAINER}'/actuator/health");
+                if [ "$code" = "200" ]; then
+                  curl -fsS "http://'${NGINX_CONTAINER}'/actuator/health" | grep -q "\"status\":\"UP\"";
+                else
+                  [ "$code" = "401" ];
+                fi
+              '
             '''
           } catch (err) {
             // 즉시 롤백
