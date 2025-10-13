@@ -5,6 +5,7 @@ import com.anpetna.member.domain.MemberEntity;
 import com.anpetna.member.repository.MemberRepository;
 
 import com.anpetna.notification.feature.reservation.service.ReservationReminderService;
+import com.anpetna.notification.feature.reservation.service.hotel.HotelCancelNotificationService;
 import com.anpetna.notification.feature.reservation.service.hotel.HotelNoShowNotificationService;
 import com.anpetna.notification.feature.reservation.service.hotel.HotelReservationConfirmNotificationService;
 import com.anpetna.notification.feature.reservation.service.hotel.HotelReservationService;
@@ -53,7 +54,7 @@ public class HotelServiceImpl implements HotelService {
     
     private static final LocalTime DEFAULT_CHECKIN_TIME = LocalTime.of(14, 0);
     private static final DateTimeFormatter HOTEL_FMT = DateTimeFormatter.ofPattern("MM월 dd일 HH:mm");
-
+    private final HotelCancelNotificationService hotelCancelNotificationService;
 
 
     // 회원의 노쇼 누적 회수( 호텔+병원 합산 )
@@ -294,6 +295,28 @@ public class HotelServiceImpl implements HotelService {
         r.setStatus(next);
 
         // ================= 알림 =================
+
+        var member = r.getMember();
+        var venue = r.getVenue();
+        var checkIn = r.getCheckIn();
+        var checkOut = r.getCheckOut();
+        String memberId = (member != null ? member.getMemberId() : null);
+
+        if (member != null && memberId != null && venue != null && checkIn != null && checkOut != null) {
+            switch (next) {
+                case CONFIRMED -> hotelReservationNotificationService.notifyHotelReservationConfirm(
+                        member, memberId, venue, checkIn, checkOut
+                );
+                case NOSHOW -> hotelNoShowNotification.notifyHotelNoShow(
+                        member, memberId, venue, checkIn, checkOut
+                );
+                case CANCELED -> hotelCancelNotificationService.notifyHotelCancel(
+                        member, memberId, venue, checkIn, checkOut
+                );
+                default -> { /* PENDING 등은 알림 없음 */ }
+            }
+        }
+
         // 상태 전이 후 리마인드 스케줄 조정
         if (next == ReservationStatus.CONFIRMED) {
             String title24h = "[호텔 체크인 D-1] 내일 " +
