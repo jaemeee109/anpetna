@@ -7,7 +7,6 @@ import RequireLogin from '@/components/auth/RequireLogin';
 import chatApi, { type ChatMessageDTO, type ChatroomDTO } from '@/features/chat/data/chat.api';
 import ChevronIcon from '@/components/icons/Chevron';
 
-
 function isChatMessageDTO(v: any): v is ChatMessageDTO {
   return v && typeof v === 'object'
     && typeof (v as any).sender === 'string'
@@ -149,17 +148,18 @@ export default function ChatRoomPage() {
     return () => { alive = false; };
   }, [id, admin]);
 
-  //  방 진입 시 참여 등록 (관리자 제외)
+  //  방 진입 시 참여 등록 (관리자 제외) — 읽음 처리 트리거
   useEffect(() => {
-    let alive = true;
-    (async () => {
-      if (!id || admin) return;
-      try {
-        await chatApi.join(id);  // 서버의 @PostMapping("/{chatroomId}") 호출
-      } catch {}
-    })();
-    return () => { alive = false; };
-  }, [id, admin]);
+  let alive = true;
+  (async () => {
+    if (!id) return;
+    try {
+      await chatApi.join(id);  // 서버의 @PostMapping("/{chatroomId}") 호출
+    } catch {}
+  })();
+  return () => { alive = false; };
+}, [id]);
+
 
   //  과거 대화 로드
   useEffect(() => {
@@ -229,7 +229,6 @@ export default function ChatRoomPage() {
             const mine = isMine(m.sender, admin);
             return (
               <div key={i} className={mine ? 'row me' : 'row you'}>
-               
                 <div className={mine ? 'bubble mine' : 'bubble yours'}>
                   <div className="sender">{m.sender}</div>
                   <div className="message">{m.message}</div>
@@ -242,7 +241,6 @@ export default function ChatRoomPage() {
           )}
         </div>
 
-       
         <div className="composer">
           <input
             value={text}
@@ -261,10 +259,8 @@ export default function ChatRoomPage() {
           >
             <ChevronIcon className="icon-send" title="전송" />
           </button>
-
         </div>
 
-      
         <div className="footer-actions">
           <button type="button" onClick={goList} className="btn">목록으로</button>
           {!admin && (
@@ -358,19 +354,9 @@ export default function ChatRoomPage() {
         .bubble.yours { background: #e8f4ff; } /* ← 하늘색 */
         .bubble.mine  { background: #fff6cc; } /* ← 노란색 */
 
-
         /* ===== 조정 지점: 보낸이/메시지 텍스트 ===== */
-        .sender {
-          font-size: 12px;               /* ← 보낸이 폰트 크기 */
-          color: #111111;                /* ← 보낸이 색상 */
-          opacity: 0.75;                 /* ← 보낸이 투명도 */
-        }
-        .message {
-          font-size: 14px;               /* ← 메시지 폰트 크기 */
-          font-weight: 400;              /* ← 메시지 굵기 */
-          color: #111111;                /* ← 메시지 색상 */
-          line-height: 1.5;
-        }
+        .sender { font-size: 12px; color: #111111; opacity: 0.75; }
+        .message { font-size: 14px; font-weight: 400; color: #111111; line-height: 1.5; }
 
         /* ===== 조정 지점: 입력+전송 박스 배치/폭 ===== */
         .composer {
@@ -405,60 +391,40 @@ export default function ChatRoomPage() {
           transition: transform 0.02s ease;
           user-select: none;
         }
-        .btn:disabled {
-          opacity: 0.6;
-          cursor: not-allowed;
+        .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .btn:active { transform: translateY(1px); }
+
+        /* ===== 전송 아이콘 버튼 ===== */
+        .btn-send {
+          background: #ffd4d8ff;
+          color: #111111;
+          border: 1px solid #ecc8c8ff;
+          border-radius: 10px;
+          cursor: pointer;
+          transition: transform 0.02s ease;
+          user-select: none;
+          width: 36px;
+          height: 36px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
         }
-        .btn:active {
-          transform: translateY(1px);
+        .btn-send:disabled { opacity: 0.6; cursor: not-allowed; }
+        .btn-send:active { transform: translateY(1px); }
+        :global(.icon-send) {
+          width: 18px;
+          height: 18px;
+          display: block;
+          color: #ffffff;
+          fill: currentColor;
         }
 
-        /* ===== 전송 아이콘 버튼(아이콘 중심 정렬/크기/색) ===== */
-          .btn-send {
-            background: #ffd4d8ff;        /* 버튼 배경색 */
-            color: #111111;             /* 아이콘(=currentColor) 색 */
-            border: 1px solid #ecc8c8ff;  /* 버튼 테두리 */
-            border-radius: 10px;
-            cursor: pointer;
-            transition: transform 0.02s ease;
-            user-select: none;
-
-        
-
-            /* 크기 조정 지점 */
-            width: 36px;                /* ← 버튼 가로 */
-            height: 36px;               /* ← 버튼 세로 */
-
-            /* 아이콘 중앙 정렬 */
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-          }
-
-          .btn-send:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-          }
-          .btn-send:active {
-            transform: translateY(1px);
-          }
-
-          /* 아이콘 자체 크기/색 — fill='currentColor' 이므로 color만 바꾸면 됨 */
-         :global(.icon-send) {
-            width: 18px;         /* ← 아이콘 가로 */
-            height: 18px;        /* ← 아이콘 세로 */
-            display: block;      /* 정렬 안정화 */
-            color: #ffffff;      /* ← 원하는 아이콘 색 */
-            fill: currentColor;  /* 안전망: 혹시 상위 설정에 가려질 때 대비 */
-          }
-
-
-        /* ===== 조정 지점: 하단 버튼 영역 배치/간격 ===== */
+        /* ===== 하단 버튼 영역 ===== */
         .footer-actions {
           display: flex;
-          gap: 10px;                     /* ← 버튼 사이 간격 */
-          justify-content: center;       /* ← 가운데 정렬 */
-          margin: 20px 0 60px;           /* ← 상/중/하 여백 */
+          gap: 10px;                     
+          justify-content: center;       
+          margin: 20px 0 60px;           
         }
       `}</style>
     </RequireLogin>

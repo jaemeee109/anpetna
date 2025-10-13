@@ -27,19 +27,38 @@ export default function Footer() {
 
           <div className="apn3-copy">
             <span className="apn-sep">
-              <Link href="/company" className="apn-link text-white no-underline">회사소개</Link>
-            </span>
-            <span className="apn-sep">|</span>
-            <span className="apn-sep">
-              <Link href="/policy/terms" className="apn-link text-white no-underline">이용약관</Link>
-            </span>
-            <span className="apn-sep">|</span>
-            <span className="apn-sep">
-              <Link href="/policy/privacy" className="apn-link text-white no-underline">개인정보처리방침</Link>
-            </span>
-            <span className="apn-sep">|</span>
-            <span className="apn-sep">
-              <Link href="/guide" className="apn-link text-white no-underline">이용안내</Link>
+           <Link
+            href="/company"
+            className="apn-link"
+            prefetch={false}
+            style={{ color: '#fff', textDecoration: 'none' }} 
+          >
+            회사소개&nbsp;|&nbsp;
+          </Link>
+          <Link
+            href="/policy/terms"
+            className="apn-link"
+            prefetch={false}
+            style={{ color: '#fff', textDecoration: 'none' }}
+          >
+            이용약관&nbsp;|&nbsp;
+          </Link>
+          <Link
+            href="/policy/privacy"
+            className="apn-link"
+            prefetch={false}
+            style={{ color: '#fff', textDecoration: 'none' }}
+          >
+            개인정보처리방침&nbsp;|&nbsp;
+          </Link>
+          <Link
+            href="/guide"
+            className="apn-link"
+            prefetch={false}
+            style={{ color: '#fff', textDecoration: 'none' }}
+          >
+            이용안내
+          </Link>
             </span>
           </div>
         </section>
@@ -68,8 +87,13 @@ export default function Footer() {
 
                 <p className="apn3-note">All members are Backend Developers</p>
                 <p className="apn3-note">
-                  <Link href="/team" className="apn-link text-white no-underline">
-                     <strong>누가 무엇을 했나요?</strong>  바로가기 &raquo;&raquo;
+                   <Link
+                    href="/team"
+                    className="apn-link"
+                    prefetch={false}
+                    style={{ color: '#fff', textDecoration: 'none' }}
+                  >
+                    누가무엇을했나요? 바로가기 &raquo;&raquo;
                   </Link>
                 </p>
               </ul>
