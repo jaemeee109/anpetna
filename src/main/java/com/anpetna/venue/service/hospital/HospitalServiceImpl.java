@@ -152,7 +152,6 @@ public class HospitalServiceImpl implements HospitalService {
 
     // 예약 확정
     @Override
-    @Transactional
     public void confirm(Long reservationId) {
         
         // 예약 확인
@@ -191,7 +190,6 @@ public class HospitalServiceImpl implements HospitalService {
 
     // 관리자: 노쇼 처리 API
     @Override
-    @Transactional
     public void markNoShow(Long reservationId) {
 
         // 예약 확인

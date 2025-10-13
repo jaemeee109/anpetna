@@ -147,7 +147,6 @@ public class HotelServiceImpl implements HotelService {
 
     // 예약 확정
     @Override
-    @Transactional
     public void confirm(Long reservationId) {
         
         // 예약 검증
@@ -195,7 +194,6 @@ public class HotelServiceImpl implements HotelService {
 
     //  관리자: 노쇼 처리 API
     @Override
-    @Transactional
     public void markNoShow(Long reservationId) {
 
         // 예약 검증
