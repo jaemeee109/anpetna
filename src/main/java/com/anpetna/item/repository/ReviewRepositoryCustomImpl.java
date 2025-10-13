@@ -28,91 +28,107 @@ public class ReviewRepositoryCustomImpl implements ReviewRepositoryCustom {
 
     @Override
     public List<ReviewEntity> orderByRegDate(SearchAllReviewsReq req) {
-        var dir = req.getDirection();
-        var where = qReview.itemId.itemId.eq(req.getItemId());
+        final SortDirection dir = (req.getDirection() != null)
+                ? req.getDirection()
+                : SortDirection.DESCENDING;
 
-        if (dir == null || dir == SortDirection.DESCENDING) {
-            return queryFactory.selectFrom(qReview)
-                    .where(where)
-                    .orderBy(qReview.regDate.desc())
-                    .fetch();
-        } else {
-            return queryFactory.selectFrom(qReview)
-                    .where(where)
-                    .orderBy(qReview.regDate.asc())
-                    .fetch();
-        }
+        final var where = qReview.itemId.itemId.eq(req.getItemId());
+        final OrderSpecifier<?> orderSpec =
+                (dir == SortDirection.ASCENDING) ? qReview.regDate.asc() : qReview.regDate.desc();
+
+        return queryFactory
+                .selectFrom(qReview)
+                .leftJoin(qReview.memberId).fetchJoin()
+                .leftJoin(qReview.itemId).fetchJoin()
+                .where(where)
+                .orderBy(orderSpec)
+                .fetch();
     }
+
+
 
     @Override
     public List<ReviewEntity> orderByRating(SearchAllReviewsReq req) {
-        var dir = req.getDirection();
-        var where = qReview.itemId.itemId.eq(req.getItemId());
+        final SortDirection dir = (req.getDirection() != null)
+                ? req.getDirection()
+                : SortDirection.DESCENDING;
 
-        if (dir == null || dir == SortDirection.DESCENDING) {
-            return queryFactory.selectFrom(qReview)
-                    .where(where)
-                    .orderBy(qReview.rating.desc(), qReview.regDate.desc())
-                    .fetch();
-        } else {
-            return queryFactory.selectFrom(qReview)
-                    .where(where)
-                    .orderBy(qReview.rating.asc(), qReview.regDate.asc())
-                    .fetch();
-        }
+        final var where = qReview.itemId.itemId.eq(req.getItemId());
+        final OrderSpecifier<?>[] orderSpec = (dir == SortDirection.ASCENDING)
+                ? new OrderSpecifier<?>[]{ qReview.rating.asc(), qReview.regDate.asc() }
+                : new OrderSpecifier<?>[]{ qReview.rating.desc(), qReview.regDate.desc() };
+
+        return queryFactory
+                .selectFrom(qReview)
+                .leftJoin(qReview.memberId).fetchJoin()
+                .leftJoin(qReview.itemId).fetchJoin()
+                .where(where)
+                .orderBy(orderSpec)
+                .fetch();
     }
+
 
 
     @Override
     public Page<ReviewEntity> findByRegDate(Long itemId, SortDirection direction, Pageable pageable) {
 
-        var where = qReview.itemId.itemId.eq(itemId);
+        final SortDirection dir = (direction != null) ? direction : SortDirection.DESCENDING;
+        final var where = qReview.itemId.itemId.eq(itemId);
 
-        OrderSpecifier<?>[] order = (direction == null || direction == SortDirection.DESCENDING)
-                ? new OrderSpecifier<?>[] {qReview.regDate.desc()}
-                : new OrderSpecifier<?>[] {qReview.regDate.asc()};
+        final OrderSpecifier<?>[] orderSpec = (dir == SortDirection.ASCENDING)
+                ? new OrderSpecifier<?>[]{ qReview.regDate.asc() }
+                : new OrderSpecifier<?>[]{ qReview.regDate.desc() };
 
-        List<ReviewEntity> content = queryFactory
+        final List<ReviewEntity> content = queryFactory
                 .selectFrom(qReview)
+                .leftJoin(qReview.memberId).fetchJoin()
+                .leftJoin(qReview.itemId).fetchJoin()
                 .where(where)
-                .orderBy(order)
+                .orderBy(orderSpec)
                 .offset(pageable.getOffset())
                 .limit(pageable.getPageSize())
                 .fetch();
 
-        Long total = queryFactory
+        final Long total = queryFactory
                 .select(qReview.count())
                 .from(qReview)
                 .where(where)
                 .fetchOne();
 
-        return new PageImpl<>(content, pageable, total == null ? 0L : total);
+        return new PageImpl<>(content, pageable, (total == null) ? 0L : total);
     }
+
+
 
     @Override
     public Page<ReviewEntity> findByRating(Long itemId, SortDirection direction, Pageable pageable) {
 
-        var where = qReview.itemId.itemId.eq(itemId);
+        final SortDirection dir = (direction != null) ? direction : SortDirection.DESCENDING;
+        final var where = qReview.itemId.itemId.eq(itemId);
 
-        OrderSpecifier<?>[] order = (direction == null || direction == SortDirection.DESCENDING)
-                ? new OrderSpecifier<?>[] {qReview.rating.desc(), qReview.regDate.desc()}
-                : new OrderSpecifier<?>[] {qReview.rating.asc(), qReview.regDate.asc()};
+        final OrderSpecifier<?>[] orderSpec = (dir == SortDirection.ASCENDING)
+                ? new OrderSpecifier<?>[]{ qReview.rating.asc(), qReview.regDate.asc() }
+                : new OrderSpecifier<?>[]{ qReview.rating.desc(), qReview.regDate.desc() };
 
-        List<ReviewEntity> content = queryFactory
+        final List<ReviewEntity> content = queryFactory
                 .selectFrom(qReview)
+                .leftJoin(qReview.memberId).fetchJoin()
+                .leftJoin(qReview.itemId).fetchJoin()
                 .where(where)
-                .orderBy(order)
+                .orderBy(orderSpec)
                 .offset(pageable.getOffset())
                 .limit(pageable.getPageSize())
                 .fetch();
 
-        Long total = queryFactory
+        final Long total = queryFactory
                 .select(qReview.count())
                 .from(qReview)
                 .where(where)
                 .fetchOne();
 
-        return new PageImpl<>(content, pageable, total == null ? 0L : total);
+        return new PageImpl<>(content, pageable, (total == null) ? 0L : total);
     }
+
+
     //예외처리해야함..
 }

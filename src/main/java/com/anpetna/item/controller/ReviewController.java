@@ -76,7 +76,7 @@ public class ReviewController {
 
 
     @GetMapping("/{reviewId}")
-    public ApiResult<SearchOneReviewRes> searchOneReview(@PathVariable Long reviewId, @PathVariable String itemId) {
+    public ApiResult<SearchOneReviewRes> searchOneReview(@PathVariable String itemId, @PathVariable Long reviewId) {
         var req = new SearchOneReviewReq();
         req.setReviewId(reviewId);
         var getOneResult = reviewService.getOneReview(req);
@@ -84,16 +84,27 @@ public class ReviewController {
     }
 
     @GetMapping
-   // @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
     public ApiResult<PageResponseDTO<ReviewDTO>> searchAllReviews(
             @PathVariable Long itemId,
-            @ModelAttribute PageRequestDTO pageRequestDTO,
-            @RequestParam(name = "order", defaultValue = "date") String order,
-            @RequestParam(name = "direction", required = false)SortDirection sortDirection) {
-        var req = new SearchAllReviewsReq();
+            @RequestParam(name = "order", required = false, defaultValue = "rating") String order,
+            @RequestParam(name = "direction", required = false) SortDirection sortDirection,
+            PageRequestDTO pageRequestDTO
+    ) {
+        // "date" | "rating" 외 값이면 "rating" 고정
+        final String safeOrder = (
+                "date".equalsIgnoreCase(order) || "rating".equalsIgnoreCase(order)
+        ) ? order.toLowerCase() : "rating";
+
+        // null 이면 DESCENDING
+        final SortDirection safeDirection = (sortDirection != null)
+                ? sortDirection : SortDirection.DESCENDING;
+
+        SearchAllReviewsReq req = new SearchAllReviewsReq();
         req.setItemId(itemId);
-        req.setDirection(sortDirection);
-        var getAllResult = reviewService.getAllReviews(req, pageRequestDTO, order);
-        return new ApiResult<>(getAllResult);
+        req.setDirection(safeDirection);
+
+        PageResponseDTO<ReviewDTO> page = reviewService.getAllReviews(req, pageRequestDTO, safeOrder);
+        return new ApiResult<>(page);
     }
+
 }

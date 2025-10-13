@@ -152,6 +152,7 @@ public class MemberReservationServiceImpl implements MemberReservationService {
             throw new RuntimeException("NOT_YOUR_RESERVATION");
         }
         e.setStatus(com.anpetna.venue.constant.ReservationStatus.CANCELED);
+        hospitalRepo.saveAndFlush(e);
 
         // ============ 병원 예약 취소 알림 ============
         hospitalCancelNotification.notifyHospitalCancel(
@@ -171,9 +172,10 @@ public class MemberReservationServiceImpl implements MemberReservationService {
             throw new RuntimeException("NOT_YOUR_RESERVATION");
         }
         e.setStatus(com.anpetna.venue.constant.ReservationStatus.CANCELED);
+        hotelRepo.saveAndFlush(e);
 
         // ============ 호텔 예약 취소 알림 ============
-        hotelCancelNotification.notifyHospitalCancel(
+        hotelCancelNotification.notifyHotelCancel(
                 e.getMember(),
                 e.getMember().getMemberId(),
                 e.getVenue(),

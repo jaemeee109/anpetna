@@ -115,6 +115,12 @@ public class SecurityConfig {
                                 "/fail.html",
                                 "/toss-api-test.html").permitAll()
 
+
+
+
+
+
+
                         // --- Member (join/login 먼저 열기!) ---
                         .requestMatchers("/member/login", "/member/join").permitAll()
                         .requestMatchers("/member/readOne", "/member/readAll").hasRole("ADMIN")
@@ -134,13 +140,14 @@ public class SecurityConfig {
                         // --- Comment ---
                         .requestMatchers("/comment/**").hasAnyRole("ADMIN", "USER")
 
-                        // --- Review ---
-                        .requestMatchers(HttpMethod.POST,   "/item/*/review", "/item/*/review/**").authenticated()
-                        .requestMatchers(HttpMethod.PUT,    "/item/*/review/**").authenticated()
-                        .requestMatchers(HttpMethod.DELETE, "/item/*/review/**").authenticated()
+                        // --- Item & Review (순서 중요 / 수정금지 ) ---
+                        .requestMatchers(HttpMethod.GET, "/item/**").permitAll()
 
-                        // --- Item ---
-                        .requestMatchers(HttpMethod.GET, "/item", "/item/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/item/*/review").hasAnyRole("ADMIN", "USER")
+                        .requestMatchers(HttpMethod.PUT, "/item/*/review/*").hasAnyRole("ADMIN", "USER")
+                        .requestMatchers(HttpMethod.DELETE, "/item/*/review/*").hasAnyRole("ADMIN", "USER")
+
+
                         .requestMatchers(HttpMethod.POST, "/item", "/item/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/item", "/item/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/item", "/item/**").hasRole("ADMIN")

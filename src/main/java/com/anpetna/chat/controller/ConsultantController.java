@@ -6,12 +6,9 @@ import com.anpetna.member.dto.MemberDTO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -29,10 +26,6 @@ public class ConsultantController {
     // 관리자가 상담 채팅 목록을 볼 수 있도록 페이징
     @GetMapping("/chats")
     public Page<ChatroomDTO> getChatroomPage(Pageable pageable) {
-
-
-        return consultantService.getChatroomPage(pageable); //기존코드
-
-
+        return consultantService.getChatroomPage(pageable);
     }
 }
