@@ -7,9 +7,13 @@ import com.anpetna.chat.dto.ChatroomDTO;
 import com.anpetna.chat.repository.ChatroomRepository;
 import com.anpetna.chat.repository.MemberChatroomMappingRepository;
 import com.anpetna.chat.repository.MessageRepository;
+import com.anpetna.member.constant.MemberRole;
 import com.anpetna.member.domain.MemberEntity;
+import com.anpetna.member.repository.MemberRepository;
+import jakarta.persistence.PrePersist;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +33,8 @@ public class ChatService {
 
     private final MessageRepository messageRepository;
 
+    private final MemberRepository memberRepository;
+
     // 채팅방 개설 사용자와 채팅방 제목을 인자로 받는 채팅방 생성 서비스 로직
     @Transactional // 추가
     public ChatroomEntity createChatroom(MemberEntity member, String title) {
@@ -41,8 +47,11 @@ public class ChatService {
 
         // 채팅방 생성 사용자는 생성된 채팅방에 기본적으로 참여하도록 한다.
         MemberChatroomMapping memberChatroomMapping = chatroom.addMember(member);
+        memberChatroomMappingRepository.save(memberChatroomMapping);
 
-        memberChatroomMapping = memberChatroomMappingRepository.save(memberChatroomMapping);
+        //관리자 자동 참여
+        List<MemberEntity> admin = memberRepository.findAllByMemberRole(MemberRole.ADMIN).stream().toList();
+        admin.stream().map(chatroom::addMember).map(memberChatroomMappingRepository::save);
 
         return chatroom;
     }
@@ -56,7 +65,7 @@ public class ChatService {
             updateLastCheckedAt(member, currentChatroomId);
         }
         // ===================== 수정 =====================
-        if (memberChatroomMappingRepository.existsByMember_MemberIdAndChatroomId(member.getMemberId(), newChatroomId)) {
+        if (memberChatroomMappingRepository.existsByMember_MemberIdAndChatroom_Id(member.getMemberId(), newChatroomId)) {
             //  방을 다시 열었으면 '읽음'으로 처리하여 NEW 제거
             updateLastCheckedAt(member, newChatroomId);
             log.info("이미 참여 중인 채팅방입니다. lastCheckedAt 갱신 처리 완료");
@@ -102,7 +111,9 @@ public class ChatService {
     }
 
     // 채팅방에 참여한 사용자들의 목록을 가져오는 로직
-    public List<ChatroomEntity> getChatroomList(MemberEntity member) {
+    @PreAuthorize("isAuthenticated()")
+    @Transactional(readOnly = true)
+    public List<ChatroomDTO> getChatroomList(MemberEntity member) {
 
         List<MemberChatroomMapping> memberChatroomMappingList = memberChatroomMappingRepository.findAllByMember_MemberId(member.getMemberId());
 
@@ -124,9 +135,11 @@ public class ChatService {
                     }
                     chatroom.setHasNewMessage(hasNew);
                     return chatroom;
-                })
+                }).map(ChatroomDTO::from)
                 .toList();
     }
+
+
 
     @Transactional // 추가
     public MessageEntity saveMessage(MemberEntity member, Long chatroomId, String text) {
@@ -149,6 +162,8 @@ public class ChatService {
         return messageRepository.findAllWithMemberByChatroomId(chatroomId);
     }
 
+
+
     @Transactional(readOnly = true)
     public ChatroomDTO getChatroom(Long chatroomId) {
 
@@ -167,33 +182,5 @@ public class ChatService {
     }
 
 
-    @Transactional(readOnly = true)
-    public List<ChatroomDTO> getChatroomListDTO(MemberEntity member) {
-        var mappingList = memberChatroomMappingRepository.findAllByMember_MemberId(member.getMemberId());
 
-        return mappingList.stream().map(mapping -> {
-            var chatroom = mapping.getChatroom();
-            if (chatroom == null) return null; // 혹시라도 무결성 깨진 경우 방어
-
-            var lastChecked = mapping.getLastCheckedAt();
-
-            boolean hasNew = (lastChecked == null)
-                    ? messageRepository.existsByChatroomId(chatroom.getId())
-                    : messageRepository.existsByChatroomIdAndCreatedAtAfter(chatroom.getId(), lastChecked);
-
-            int memberCount = 0;
-            try {
-                memberCount = memberChatroomMappingRepository.countByChatroomId(chatroom.getId());
-            } catch (Exception ignore) { /* 0 유지 */ }
-
-            chatroom.setHasNewMessage(hasNew);
-            return new com.anpetna.chat.dto.ChatroomDTO(
-                    chatroom.getId(),
-                    chatroom.getTitle(),
-                    hasNew,
-                    memberCount,
-                    chatroom.getCreatedAt()
-            );
-        }).filter(Objects::nonNull).toList();
-    }
 }

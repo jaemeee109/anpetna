@@ -27,45 +27,22 @@ public class ChatController {
 
     private final MemberService memberService;
 
-    // 추가
     private final MemberRepository memberRepository;
 
 
     @PostMapping
     public ChatroomDTO createChatroom(Authentication authentication, @RequestParam String title) {
-
         String memberId = authentication.getName();
         MemberEntity member = memberService.findById(memberId);
-
         ChatroomEntity chatroom = chatService.createChatroom(member, title);
-
-        //================== 추가 ========================
-        try {
-            if (member.getMemberRole() != MemberRole.ADMIN) {
-                // 모든 관리자 ID 조회
-                List<String> adminIds = memberRepository.findIdsByRole(MemberRole.ADMIN);
-
-                for (String adminId : adminIds) {
-                    if (!chatService.isParticipant(adminId, chatroom.getId())) {
-                        MemberEntity admin = memberService.findById(adminId);
-                        chatService.joinChatroom(admin, chatroom.getId(), null);
-                    }
-                }
-            }
-        } catch (Exception e) {
-            log.warn("관리자 자동 참여 처리 중 오류: {}", e.getMessage());
-        }
-
-        //================== 추가 끝 ========================
         return ChatroomDTO.from(chatroom);
     }
 
+
     @PostMapping("/{chatroomId}")
     public Boolean joinChatroom(Authentication authentication, @PathVariable Long chatroomId, @RequestParam(required = false) Long currentChatroomId) {
-
         String memberId = authentication.getName();
         MemberEntity member = memberService.findById(memberId);
-
         return chatService.joinChatroom(member, chatroomId, currentChatroomId);
     }
 
@@ -77,44 +54,14 @@ public class ChatController {
 
         return chatService.leaveChatroom(member, chatroomId);
     }
-/*
-    @GetMapping
-    public List<ChatroomDTO> getChatroomList(Authentication authentication) {
-
-        String memberId = authentication.getName();
-        MemberEntity member = memberService.findById(memberId);
-
-        List<ChatroomEntity> chatroomList = chatService.getChatroomList(member);
-
-        return chatroomList.stream()
-                .map(ChatroomDTO::from)
-                .toList();
-    }
-*/
-//================== 추가 ========================
-
 
     @GetMapping
     public List<ChatroomDTO> getChatroomList(Authentication authentication) {
-
-        if (authentication == null || authentication.getName() == null) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "인증이 필요합니다.");
-        }
         final String memberId = authentication.getName().trim();
-        if (memberId.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "인증 정보가 올바르지 않습니다.");
-        }
-
         MemberEntity member = memberService.findById(memberId);
-
         //  서비스에서 DTO 변환까지 완료
-        return chatService.getChatroomListDTO(member);
+        return chatService.getChatroomList(member);
     }
-
-
-
-//================== 추가 끝 ========================
-
 
 
     // 특정 채팅방의 메세지들을 갖고오는 api
