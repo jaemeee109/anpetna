@@ -366,7 +366,7 @@ export default function ChatListPage() {
         <div className="rowRight">
           {!admin && (
             <button type="button" className="btnNew" onClick={onNew}>
-              문의하기
+              새 채팅
             </button>
           )}
         </div>

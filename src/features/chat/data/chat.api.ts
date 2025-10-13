@@ -29,9 +29,8 @@ function isAdminClient(): boolean {
   }
 }
 
-/** (관리자) 채팅방 목록: Page → content 배열만 추출 */
+/** (관리자) 채팅방 목록 */
 async function adminList(): Promise<ChatroomDTO[]> {
-  // 관리자도 본인 기준(hasNewMessage 계산 포함) 목록을 받도록 /chats 사용
   const resp = await http.get('/chats');
   const data = resp.data ?? [];
   return Array.isArray(data) ? (data as ChatroomDTO[]) : [];

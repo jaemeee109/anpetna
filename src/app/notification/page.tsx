@@ -392,13 +392,13 @@ ul { margin: 0; padding-left: 0; }
 }
 .badge {
   display: inline-block;
-  border: 1px solid #dd8989ff;
-  background: #ffd7d7ff;
+  border: 1px solid #ffa1acff;
+  background: #fca6a6ff;
   border-radius: 8px;
   padding: 3px 4px;
   font-size: 12px;
   line-height: 1;
-  color: #ac0f0f !important;
+  color: #ffffffff !important;
   margin-left: 5px;
   margin-top: 3px;
 }

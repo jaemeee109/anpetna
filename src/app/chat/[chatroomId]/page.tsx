@@ -4,7 +4,8 @@
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import RequireLogin from '@/components/auth/RequireLogin';
-import chatApi, { type ChatMessageDTO } from '@/features/chat/data/chat.api';
+import chatApi, { type ChatMessageDTO, type ChatroomDTO } from '@/features/chat/data/chat.api';
+import ChevronIcon from '@/components/icons/Chevron';
 
 
 function isChatMessageDTO(v: any): v is ChatMessageDTO {
@@ -13,6 +14,7 @@ function isChatMessageDTO(v: any): v is ChatMessageDTO {
     && typeof (v as any).message === 'string';
 }
 
+/** 관리자 여부 판별 */
 function isAdminClient(): boolean {
   try {
     const raw =
@@ -30,7 +32,7 @@ function isAdminClient(): boolean {
   } catch { return false; }
 }
 
-/** API 베이스(포트 보정) — app/page.tsx 와 동일 패턴 */
+/** API 베이스(포트 보정) */
 function resolveApiBase(): string {
   const envBase =
     (process.env.NEXT_PUBLIC_API_BASE as string | undefined) ||
@@ -43,7 +45,7 @@ function resolveApiBase(): string {
   return `${protocol}//${hostname}${guessPort ? `:${guessPort}` : ''}`.replace(/\/+$/, '');
 }
 
-/** 최소 STOMP 클라이언트 */
+/**  STOMP 클라이언트 */
 class MiniStomp {
   private ws: WebSocket | null = null;
   private url: string;
@@ -59,23 +61,20 @@ class MiniStomp {
       onOpen?.();
     };
     this.ws.onmessage = (ev) => {
-        const text = String(ev.data || '');
-        const idx = text.indexOf('\n\n');
-        let body = (idx >= 0 ? text.slice(idx + 2) : text).replace(/\u0000+$/, '');
-        body = body.trim();
-
-     
-        if (!body) return;
-        try {
-          const obj = JSON.parse(body);
-          if (obj && typeof obj === 'object' && 'sender' in obj && 'message' in obj) {
-            this.onMessage(body); 
-          }
-        } catch {
-         
+      const text = String(ev.data || '');
+      const idx = text.indexOf('\n\n');
+      let body = (idx >= 0 ? text.slice(idx + 2) : text).replace(/\u0000+$/, '');
+      body = (body || '').trim();
+      if (!body) return;
+      try {
+        const obj = JSON.parse(body);
+        if (isChatMessageDTO(obj)) {
+          this.onMessage(body);
         }
-      };
-
+      } catch {
+        // 비-JSON 프레임은 무시
+      }
+    };
     this.ws.onerror = () => { /* STOMP 실패해도 REST 전송은 가능해야 함 */ };
     this.ws.onclose = () => { /* noop */ };
   }
@@ -95,6 +94,26 @@ class MiniStomp {
   }
 }
 
+/** 내 메시지 판단  */
+function isMine(sender: string, admin: boolean): boolean {
+  try {
+    const nameCandidates = [
+      localStorage.getItem('memberName'),
+      localStorage.getItem('username'),
+      localStorage.getItem('loginId'),
+      sessionStorage.getItem('memberName'),
+      sessionStorage.getItem('username'),
+    ].filter(Boolean) as string[];
+    const myName = (nameCandidates[0] || '').trim();
+    if (myName && sender.trim() === myName) return true;
+  } catch {}
+  if (admin) {
+    const s = sender.trim().toUpperCase();
+    if (s === 'ADMIN' || s === 'ROLE_ADMIN' || s.includes('관리자')) return true;
+  }
+  return false;
+}
+
 export default function ChatRoomPage() {
   const router = useRouter();
   const { chatroomId } = useParams<{ chatroomId: string }>();
@@ -104,24 +123,45 @@ export default function ChatRoomPage() {
   const [text, setText] = useState('');
   const [err, setErr] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const [roomTitle, setRoomTitle] = useState<string>(`채팅방 #${id}`); 
   const stompRef = useRef<MiniStomp | null>(null);
   const admin = isAdminClient();
 
-  // 1-a) (추가) 방 진입 시 참여 등록 (관리자 제외)
+  // 방 제목 : 목록에서 id 매칭 (단건 API가 없음)
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const rooms: ChatroomDTO[] = admin ? await chatApi.adminList() : await chatApi.list();
+        if (!alive) return;
+        const found = rooms.find(r => Number(r.id) === id);
+        const title = (found?.title || '').trim();
+        if (title) {
+          setRoomTitle(title);
+          try { document.title = `${title} - Chat`; } catch {}
+        } else {
+          setRoomTitle(`채팅방 #${id}`);
+        }
+      } catch {
+        setRoomTitle(`채팅방 #${id}`);
+      }
+    })();
+    return () => { alive = false; };
+  }, [id, admin]);
+
+  //  방 진입 시 참여 등록 (관리자 제외)
   useEffect(() => {
     let alive = true;
     (async () => {
       if (!id || admin) return;
       try {
         await chatApi.join(id);  // 서버의 @PostMapping("/{chatroomId}") 호출
-      } catch {
-        // 조인은 실패해도 화면은 계속 동작(목록/권한 보정 목적)
-      }
+      } catch {}
     })();
     return () => { alive = false; };
   }, [id, admin]);
 
-  // 1-b) 과거 대화 로드 (GET /chats/{id}/messages)
+  //  과거 대화 로드
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -136,31 +176,19 @@ export default function ChatRoomPage() {
     return () => { alive = false; };
   }, [id]);
 
-  // 2) STOMP 연결 + 구독 (백엔드 8000으로 붙이기)
+  //  STOMP 연결 + 구독
   useEffect(() => {
     if (!id) return;
-
-    // STOMP 성공 여부와 무관하게 전송 버튼 사용 가능
-    setReady(true);
-
+    setReady(true); // STOMP 성공 여부와 무관하게 전송 버튼 사용 가능
     const url = `${resolveApiBase()}/stomp/chats`;
     const s = new MiniStomp(url, (body) => {
-  try {
-    const obj = JSON.parse(body);
-    if (isChatMessageDTO(obj)) {
-      setHistory((prev) => [...prev, obj]); // ✅ 타입 확정: 빨간줄 사라짐
-    }
-  } catch {
-    // 비-JSON 프레임은 무시
-  }
-});
-
-
-
-    stompRef.current = s;
-    s.connect(() => {
-      s.subscribe(`/sub/chats/${id}`);
+      try {
+        const obj = JSON.parse(body);
+        if (isChatMessageDTO(obj)) setHistory((prev) => [...prev, obj]);
+      } catch {}
     });
+    stompRef.current = s;
+    s.connect(() => s.subscribe(`/sub/chats/${id}`));
     return () => { s.disconnect(); stompRef.current = null; };
   }, [id]);
 
@@ -168,10 +196,8 @@ export default function ChatRoomPage() {
     const msg = text.trim();
     if (!msg) return;
     try {
-     await chatApi.send(id, msg);
-      // STOMP 브로드캐스트로만 반영(중복 방지)
-      setText('');
-
+      await chatApi.send(id, msg);
+      setText(''); // STOMP 브로드캐스트로 반영
     } catch (e: any) {
       alert(e?.message || '전송 실패');
     }
@@ -188,39 +214,253 @@ export default function ChatRoomPage() {
     }
   };
 
+  const goList = () => router.push('/chat');
+
   return (
     <RequireLogin>
-      <main className="mx-auto w-[700px] px-4">
-        <h1 className="text-xl font-semibold text-center my-4">채팅방 #{id}</h1>
+      <main className="chat-wrap">
+        <h1 className="chat-title">{roomTitle}</h1>
 
-        {err && <div className="text-center text-red-600 mb-2">{err}</div>}
+        {err && <div className="error-box">{err}</div>}
 
-        <div className="border rounded-lg p-3 h-[420px] overflow-y-auto bg-white/70">
-          {history.map((m, i) => (
-            <div key={i} className="mb-1">
-              <span className="font-semibold mr-2">{m.sender}</span>
-              <span>{m.message}</span>
-            </div>
-          ))}
+        {/* 본문 메시지 영역 */}
+        <div className="chat-body" role="log" aria-live="polite">
+          {history.map((m, i) => {
+            const mine = isMine(m.sender, admin);
+            return (
+              <div key={i} className={mine ? 'row me' : 'row you'}>
+               
+                <div className={mine ? 'bubble mine' : 'bubble yours'}>
+                  <div className="sender">{m.sender}</div>
+                  <div className="message">{m.message}</div>
+                </div>
+              </div>
+            );
+          })}
           {history.length === 0 && (
-            <div className="text-center text-gray-500 py-10">대화가 없습니다. 첫 메시지를 보내보세요.</div>
+            <div className="empty">대화가 없습니다. 첫 메시지를 보내보세요.</div>
           )}
         </div>
 
-        <div className="mt-3 flex items-center gap-2">
+       
+        <div className="composer">
           <input
             value={text}
             onChange={(e)=>setText(e.target.value)}
             onKeyDown={(e)=>{ if (e.key==='Enter') onSend(); }}
-            className="flex-1 border rounded px-3 py-2"
+            className="composer-input"
             placeholder="메시지를 입력하세요"
+            aria-label="메시지 입력"
           />
-          <button type="button" className="btn-3d btn-white" onClick={onSend} disabled={!ready}>전송</button>
+          <button
+            type="button"
+            onClick={onSend}
+            disabled={!ready}
+            className="btn-send"
+            aria-label="전송"
+          >
+            <ChevronIcon className="icon-send" title="전송" />
+          </button>
+
+        </div>
+
+      
+        <div className="footer-actions">
+          <button type="button" onClick={goList} className="btn">목록으로</button>
           {!admin && (
-            <button type="button" className="btn-3d btn-white" onClick={onLeave}>퇴장</button>
+            <button type="button" onClick={onLeave} className="btn">퇴장하기</button>
           )}
         </div>
       </main>
+
+      {/* ==================== 스타일 ==================== */}
+      <style jsx>{`
+        /* ===== 조정 지점: 전체 컨테이너 폭/패딩 ===== */
+        .chat-wrap {
+          max-width: 440px;     /* ← 전체 가로폭 */
+          margin: 0 auto;
+          padding: 0 16px;      /* ← 좌우 여백 */
+          box-sizing: border-box;
+          font-family: system-ui, -apple-system, Segoe UI, Roboto, 'Noto Sans KR', sans-serif;
+          color: #111111;       /* ← 기본 글자색 */
+        }
+
+        /* ===== 조정 지점: 제목 폰트/여백 ===== */
+        .chat-title {
+          text-align: center;
+          font-size: 20px;      /* ← 제목 크기 */
+          font-weight: 600;     /* ← 제목 굵기 */
+          margin: 12px 0;
+        }
+
+        .error-box {
+          text-align: center;
+          color: #c1121f;       /* ← 에러 글자색 */
+          margin-bottom: 8px;
+        }
+
+        /* ===== 조정 지점: 본문 영역 크기/테두리/배경 ===== */
+        .chat-body {
+          height: 500px;                 /* ← 메시지 영역 높이 */
+          overflow-y: auto;
+          background: rgba(255,255,255,0.7);
+          border: 1px solid #c9c9c9;     /* ← 본문 테두리색 */
+          border-radius: 12px;           /* ← 둥근 모서리 */
+          padding: 15px 10px 15px 10px;                 /* ← 내부 여백 */
+          box-sizing: border-box;
+        }
+        .empty {
+          color: #6b7280;               
+          text-align: center;
+          padding: 20px 0;
+        }
+
+        /* 줄 컨테이너: 좌/우 정렬 */
+        .row {
+          display: flex;
+          margin: 8px 8px;               /* ← 말풍선 간격 */
+        }
+        .row.you { justify-content: flex-start; }
+        .row.me  { justify-content: flex-end; }
+
+        /* ===== 조정 지점: 말풍선 공통 스타일 ===== */
+        .bubble {
+          max-width: 80%;                /* ← 말풍선 최대폭 */
+          border: 0px solid #c9c9c9;     /* ← 말풍선 테두리색 */
+          border-radius: 12px;           /* ← 말풍선 둥근 모서리 */
+          padding: 8px 10px;             /* ← 말풍선 내부 여백 */
+          display: grid;
+          grid-auto-rows: min-content;
+          gap: 6px;                      /* ← 보낸이/본문 간격 */
+          word-break: break-word;
+          white-space: pre-wrap;         /* ← 줄바꿈 유지 */
+          box-sizing: border-box;
+
+           position: relative; /* ::before 하이라이트용 */
+            box-shadow:
+              0 2px 3px rgba(0, 0, 0, 0.06),
+              0 1px 3px rgba(0, 0, 0, 0.08),
+              0 2px 3px rgba(0, 0, 0, 0.08); 
+            background-clip: padding-box; /* 테두리와 그림자 경계 깔끔하게 */
+        }
+
+        .bubble::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          border-radius: 12px; /* .bubble과 동일 */
+          pointer-events: none;
+          box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.65),  /* 위쪽 하이라이트 */
+            inset 0 -1px 0 rgba(0, 0, 0, 0.06);       /* 아래쪽 살짝 음영 */
+        }
+        /* ===== 조정 지점: 받는사람/보내는사람 배경색 ===== */
+        .bubble.yours { background: #e8f4ff; } /* ← 하늘색 */
+        .bubble.mine  { background: #fff6cc; } /* ← 노란색 */
+
+
+        /* ===== 조정 지점: 보낸이/메시지 텍스트 ===== */
+        .sender {
+          font-size: 12px;               /* ← 보낸이 폰트 크기 */
+          color: #111111;                /* ← 보낸이 색상 */
+          opacity: 0.75;                 /* ← 보낸이 투명도 */
+        }
+        .message {
+          font-size: 14px;               /* ← 메시지 폰트 크기 */
+          font-weight: 400;              /* ← 메시지 굵기 */
+          color: #111111;                /* ← 메시지 색상 */
+          line-height: 1.5;
+        }
+
+        /* ===== 조정 지점: 입력+전송 박스 배치/폭 ===== */
+        .composer {
+          width: 80%;                    /* ← 입력영역 전체 너비 (가운데 정렬) */
+          margin: 12px auto 0;           /* ← 상단 간격/가운데/하단 0 */
+          display: flex;
+          align-items: center;
+          justify-content: center;       /* ← 가운데 정렬 */
+          gap: 8px;                      /* ← 입력창과 버튼 간격 */
+          box-sizing: border-box;
+        }
+
+        /* ===== 조정 지점: 입력창 색/테두리/둥글기/패딩 ===== */
+        .composer-input {
+          flex: 1 1 auto;
+          background: #ffffff;           /* ← 배경 하얀색 */
+          color: #111111;                /* ← 글자색 */
+          border: 1px solid #c9c9c9;     /* ← 테두리 회색 */
+          border-radius: 10px;           /* ← 둥근 모서리 */
+          padding: 10px 12px;            /* ← 내부 여백 */
+          outline: none;
+        }
+
+        /* ===== 조정 지점: 버튼 공통 ===== */
+        .btn {
+          background: #ffffff;           /* ← 버튼 배경 하얀색 */
+          color: #111111;                /* ← 버튼 글자색 */
+          border: 1px solid #c9c9c9;     /* ← 버튼 테두리 회색 */
+          border-radius: 10px;           /* ← 둥근 모서리 */
+          padding: 10px 14px;            /* ← 내부 여백 */
+          cursor: pointer;
+          transition: transform 0.02s ease;
+          user-select: none;
+        }
+        .btn:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+        .btn:active {
+          transform: translateY(1px);
+        }
+
+        /* ===== 전송 아이콘 버튼(아이콘 중심 정렬/크기/색) ===== */
+          .btn-send {
+            background: #ffd4d8ff;        /* 버튼 배경색 */
+            color: #111111;             /* 아이콘(=currentColor) 색 */
+            border: 1px solid #ecc8c8ff;  /* 버튼 테두리 */
+            border-radius: 10px;
+            cursor: pointer;
+            transition: transform 0.02s ease;
+            user-select: none;
+
+        
+
+            /* 크기 조정 지점 */
+            width: 36px;                /* ← 버튼 가로 */
+            height: 36px;               /* ← 버튼 세로 */
+
+            /* 아이콘 중앙 정렬 */
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+          }
+
+          .btn-send:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+          }
+          .btn-send:active {
+            transform: translateY(1px);
+          }
+
+          /* 아이콘 자체 크기/색 — fill='currentColor' 이므로 color만 바꾸면 됨 */
+         :global(.icon-send) {
+            width: 18px;         /* ← 아이콘 가로 */
+            height: 18px;        /* ← 아이콘 세로 */
+            display: block;      /* 정렬 안정화 */
+            color: #ffffff;      /* ← 원하는 아이콘 색 */
+            fill: currentColor;  /* 안전망: 혹시 상위 설정에 가려질 때 대비 */
+          }
+
+
+        /* ===== 조정 지점: 하단 버튼 영역 배치/간격 ===== */
+        .footer-actions {
+          display: flex;
+          gap: 10px;                     /* ← 버튼 사이 간격 */
+          justify-content: center;       /* ← 가운데 정렬 */
+          margin: 20px 0 60px;           /* ← 상/중/하 여백 */
+        }
+      `}</style>
     </RequireLogin>
   );
 }
