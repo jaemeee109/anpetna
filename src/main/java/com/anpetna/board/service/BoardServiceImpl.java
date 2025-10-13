@@ -16,6 +16,7 @@ import com.anpetna.board.dto.updateBoard.UpdateBoardReq;
 import com.anpetna.board.dto.updateBoard.UpdateBoardRes;
 import com.anpetna.board.event.BoardCreatedEvent;
 import com.anpetna.board.repository.BoardJpaRepository;
+import com.anpetna.board.repository.CommentJpaRepository;
 import com.anpetna.core.coreDto.PageRequestDTO;
 import com.anpetna.core.coreDto.PageResponseDTO;
 import com.anpetna.image.domain.ImageEntity;
@@ -59,6 +60,7 @@ public class BoardServiceImpl implements BoardService {
     private final ModelMapper modelMapper;
     private final ApplicationEventPublisher publisher;
     private final LikeNotificationService likeNotificationService;
+    private final CommentJpaRepository commentJpaRepository;
 
     /* ==================== 관리자 판별용 메서드 추가 ==================== */
     // ★★★ 공통 유틸: 관리자 여부 판별
@@ -190,7 +192,12 @@ public class BoardServiceImpl implements BoardService {
             page = boardJpaRepository.findByBoardTypeSafe(boardTypeStr, pageable);
         }
 
-        List<BoardDTO> list = page.map(BoardDTO::new).getContent();
+        List<BoardDTO> list = page.map(entity -> {
+            BoardDTO dto = new BoardDTO(entity);
+            long commentCount = commentJpaRepository.countByBoardId(entity.getBno());
+            dto.setCommentCount((int) commentCount);
+            return dto;
+        }).getContent();
 
         return PageResponseDTO.<BoardDTO>withAll()
                 .pageRequestDTO(pr)
@@ -226,7 +233,12 @@ public class BoardServiceImpl implements BoardService {
             page = boardJpaRepository.findByBoardTypeSafe(type == null ? null : type.name(), pageable);
         }
 
-        List<BoardDTO> list = page.map(BoardDTO::new).getContent();
+        List<BoardDTO> list = page.map(entity -> {
+            BoardDTO dto = new BoardDTO(entity);
+            long commentCount = commentJpaRepository.countByBoardId(entity.getBno());
+            dto.setCommentCount((int) commentCount);
+            return dto;
+        }).getContent();
 
         return PageResponseDTO.<BoardDTO>withAll()
                 .pageRequestDTO(pr)
@@ -449,7 +461,12 @@ public class BoardServiceImpl implements BoardService {
         Pageable top5 = PageRequest.of(0, 5);
         return boardJpaRepository.noticeCreateDateTop5(BoardType.NOTICE, top5)
                 .stream()
-                .map(NoticeTop5Res::from)
+                .map(board -> {
+                    NoticeTop5Res dto = NoticeTop5Res.from(board);
+                    long commentCount = commentJpaRepository.countByBoardId(board.getBno());
+                    dto.setCommentCount((int) commentCount);   // ✅ 댓글 수 추가
+                    return dto;
+                })
                 .toList();
     }
 
@@ -459,7 +476,12 @@ public class BoardServiceImpl implements BoardService {
         Pageable top5 = PageRequest.of(0, 5);
         return boardJpaRepository.freeLikeCountTop5(BoardType.FREE, top5)
                 .stream()
-                .map(LikeCountTop5Res::from)
+                .map(board -> {
+                    LikeCountTop5Res dto = LikeCountTop5Res.from(board);
+                    long commentCount = commentJpaRepository.countByBoardId(board.getBno());
+                    dto.setCommentCount((int) commentCount);   // ✅ 댓글 수 추가
+                    return dto;
+                })
                 .toList();
     }
 }

@@ -27,7 +27,6 @@ public class StompChatController {
 
     private final MemberService memberService;
 
-
     // 메시지 전송(저장) REST 엔드포인트
     @PostMapping("/{chatroomId}/messages") // ⬅️ 변경 포인트 2: HTTP POST
     public ChatMessageDTO postMessage(Authentication authentication,

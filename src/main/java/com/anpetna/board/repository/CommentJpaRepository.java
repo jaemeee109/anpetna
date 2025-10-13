@@ -27,6 +27,9 @@ public interface CommentJpaRepository extends JpaRepository<CommentEntity, Long>
             """)
         // 댓글 좋아요 -1 (하한 0 보장)
     int decCommentLike(@Param("cno") Long cno);
+
+    @Query("SELECT COUNT(c) FROM CommentEntity c WHERE c.board.bno = :bno")
+    long countByBoardId(@Param("bno") Long bno);
 }
 /**
  * 댓글 JPA 레포지토리

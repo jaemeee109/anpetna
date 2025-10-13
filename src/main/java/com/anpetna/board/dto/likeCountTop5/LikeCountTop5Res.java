@@ -19,6 +19,10 @@ public class LikeCountTop5Res {
     private LocalDateTime createDate;
     private Integer bLikeCount;
 
+    // 댓글 개수 추가
+    @Builder.Default
+    private int commentCount = 0;
+
     // Entity -> DTO 변환
     public static LikeCountTop5Res from(BoardEntity boardEntity) {
         return LikeCountTop5Res.builder()
@@ -29,6 +33,11 @@ public class LikeCountTop5Res {
                 .bLikeCount(boardEntity.getBLikeCount())
                 .build();
 
+    }
+
+    // ✅ Service 에서 commentCount 주입용 setter
+    public void setCommentCount(int commentCount) {
+        this.commentCount = commentCount;
     }
 }
 /**
