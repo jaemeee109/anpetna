@@ -54,7 +54,7 @@ public class ChatService {
         }
 
         // 이미 참여하고 있는 채팅방인지 검사
-        if (memberChatroomMappingRepository.existsByMember_MemberIdAndChatroomId(member.getMemberId(), newChatroomId)) {
+        if (memberChatroomMappingRepository.existsByMember_MemberIdAndChatroom_Id(member.getMemberId(), newChatroomId)) {
             log.info("이미 참여 중인 채팅방입니다.");
             return false;
         }
@@ -73,7 +73,7 @@ public class ChatService {
 
     private void updateLastCheckedAt(MemberEntity member, Long currentChatroomId) {
 
-        MemberChatroomMapping memberChatroomMapping = memberChatroomMappingRepository.findByMember_MemberIdAndChatroomId(member.getMemberId(), currentChatroomId).get();
+        MemberChatroomMapping memberChatroomMapping = memberChatroomMappingRepository.findByMember_MemberIdAndChatroom_Id(member.getMemberId(), currentChatroomId).get();
 
         memberChatroomMapping.updateLastCheckedAt();
 
@@ -85,12 +85,12 @@ public class ChatService {
     public Boolean leaveChatroom(MemberEntity member, Long chatroomId) {
 
         // 이미 참여하고 있는 채팅방인지 검사
-        if (!memberChatroomMappingRepository.existsByMember_MemberIdAndChatroomId(member.getMemberId(), chatroomId)) {
+        if (!memberChatroomMappingRepository.existsByMember_MemberIdAndChatroom_Id(member.getMemberId(), chatroomId)) {
             log.info("참여 중인 채팅방이 아닙니다.");
             return false;
         }
 
-        memberChatroomMappingRepository.deleteByMember_MemberIdAndChatroomId(member.getMemberId(), chatroomId);
+        memberChatroomMappingRepository.deleteByMember_MemberIdAndChatroom_Id(member.getMemberId(), chatroomId);
 
         return true;
     }
@@ -101,9 +101,22 @@ public class ChatService {
         List<MemberChatroomMapping> memberChatroomMappingList = memberChatroomMappingRepository.findAllByMember_MemberId(member.getMemberId());
 
         return memberChatroomMappingList.stream()
-                .map(memberChatroomMapping -> {
-                    ChatroomEntity chatroom = memberChatroomMapping.getChatroom();
-                    chatroom.setHasNewMessage(messageRepository.existsByChatroomIdAndCreatedAtAfter(chatroom.getId(), memberChatroomMapping.getLastCheckedAt()));
+                .filter(m -> m != null && m.getChatroom() != null)
+                .map(m -> {
+                    ChatroomEntity chatroom = m.getChatroom();
+
+                    boolean hasNew = false;
+                    LocalDateTime checkedAt = m.getLastCheckedAt();
+
+                    if (checkedAt != null) {
+                        hasNew = Boolean.TRUE.equals(
+                                messageRepository.existsByChatroomIdAndCreatedAtAfter(
+                                        chatroom.getId(),
+                                        checkedAt
+                                )
+                        );
+                    }
+                    chatroom.setHasNewMessage(hasNew);
                     return chatroom;
                 })
                 .toList();

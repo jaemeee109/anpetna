@@ -67,13 +67,13 @@ public class ChatController {
     }
 
     // 특정 채팅방의 메세지들을 갖고오는 api
-    @GetMapping("/{chatroomId}/messages")
-    public List<ChatMessageDTO> getMessageList(@PathVariable Long chatroomId) {
-
-        List<MessageEntity> messageList = chatService.getMessageList(chatroomId);
-
-        return messageList.stream()
-                .map(message -> new ChatMessageDTO(message.getMember().getMemberId(), message.getText()))
-                .toList();
-    }
+//    @GetMapping("/{chatroomId}/messages")
+//    public List<ChatMessageDTO> getMessageList(@PathVariable Long chatroomId) {
+//
+//        List<MessageEntity> messageList = chatService.getMessageList(chatroomId);
+//
+//        return messageList.stream()
+//                .map(message -> new ChatMessageDTO(message.getMember().getMemberId(), message.getText()))
+//                .toList();
+//    }
 }
