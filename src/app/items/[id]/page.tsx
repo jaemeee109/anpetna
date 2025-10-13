@@ -7,6 +7,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useAddCart } from '@/features/cart/hooks/useCart';
 import ReviewSection from '@/features/review/ui/ReviewSection';
 import { pickHttpErrorMessage } from '@/shared/data/http';
+import { cartApi } from '@/features/cart/data/cart.api';
 
 
 /** 가격 포맷(1,000 단위 + 원) */
@@ -322,23 +323,30 @@ export default function ItemDetailPage() {
               type="button"
               className="btn-3d btn-white btn-cta rounded border"
               onClick={async () => {
-                  
-                  if (!getAccessToken()) {
-                    alert('로그인 후 이용이 가능합니다');
-                    return;
-                  }
-                 
-                  if (soldOut) {
-                    alert('품절된 상품입니다');
-                    return;
-                  }
-                  try {
-                    await addMut.mutateAsync({ itemId: Number(id), quantity: Math.max(1, Number(qty || 1)) });
-                    alert('장바구니에 담겼습니다.');
-                  } catch (err) {
-                   
-                  }
-                }}
+              if (!getAccessToken()) { alert('로그인 후 이용이 가능합니다'); return; }
+              if (soldOut) { alert('품절된 상품입니다'); return; }
+
+              const m = location.pathname.match(/\/items\/(\d+)/);
+              const parsedId = m ? Number(m[1]) : 0;
+              const q = Math.max(1, Number(qty || 1));
+              if (parsedId <= 0) { alert('상품 정보를 확인할 수 없습니다.'); return; }
+
+              try {
+                
+                await addMut.mutateAsync({ itemId: Number(id), quantity: Math.max(1, Number(qty || 1)) });
+                
+                location.href = `/order/checkout?itemId=${parsedId}&qty=${q}`;
+              } catch (e: any) {
+               
+                const msg = e?.response?.data?.message || e?.message || '장바구니 담기 중 오류가 발생했습니다.';
+                if (String(msg).includes('재고') || e?.response?.status === 409) {
+                  alert('재고 수량을 초과하여 담을 수 없습니다.');
+                } else {
+                  alert(msg);
+                }
+              }
+            }}
+
 
               disabled={addMut.isPending}
             >
@@ -371,9 +379,7 @@ export default function ItemDetailPage() {
 
                 try {
                   // 재고 부족 시 여기서 에러로 떨어져서 아래로 이동하지 않음
-                  await addMut.mutateAsync({ itemId: parsedId, quantity: q });
-
-                  //  통과 시에만 주문서로 이동
+                  await cartApi.add({ itemId: parsedId, quantity: q });
                   location.href = `/order/checkout?itemId=${parsedId}&qty=${q}`;
                 } catch (err) {
                  

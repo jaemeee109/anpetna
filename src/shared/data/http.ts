@@ -221,27 +221,26 @@ let refreshPromise: Promise<void> | null = null;
 
 async function tryRefreshTokens(): Promise<void> {
   const refresh = getRefreshToken();
-  const access = getAccessToken(); // 만료일 수 있음(서버에서 참고 가능)
+  if (!refresh) throw new Error("NO_REFRESH_TOKEN");
 
-  if (!refresh) {
-    throw new Error("NO_REFRESH_TOKEN");
-  }
+  //  만료/포맷과 무관하게 “저장소의 원본” Access 토큰을 가져와 전송
+  const raw = pickRawAccessFromStores(); // 'Bearer xxx' 혹은 'xxx'
+  const accessForRefresh =
+    raw ? (raw.startsWith("Bearer ") ? raw.slice(7) : raw) : null;
 
-  // POST /jwt/refresh  (TokenRequest { refreshToken, accessToken })
-  // 백엔드: JwtController.refresh(TokenRequest) → TokenResponse { accessToken, refreshToken, memberRole }
-  // ref: JwtController, TokenRequest, TokenResponse
-  // (withCredentials 허용: SecurityConfig에서 /jwt/** 허용 및 CORS allowCredentials) 
   try {
     const url = `${BASE}${PREFIX}/jwt/refresh`;
-    const res = await axios.post(url, { refreshToken: refresh, accessToken: access }, { withCredentials: true });
+    const res = await axios.post(
+      url,
+      { refreshToken: refresh, accessToken: accessForRefresh },
+      { withCredentials: true }
+    );
     const r: any = (res.data?.result ?? res.data) || {};
 
     const newAccess: string | undefined = r.accessToken;
     const newRefresh: string | undefined = r.refreshToken;
 
-    if (!newAccess) {
-      throw new Error("REFRESH_NO_ACCESS");
-    }
+    if (!newAccess) throw new Error("REFRESH_NO_ACCESS");
 
     setAccessToken(newAccess);
     if (newRefresh) setRefreshToken(newRefresh);

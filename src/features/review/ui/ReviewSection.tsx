@@ -1,3 +1,4 @@
+//src/features/review/ui/ReviewSection.tsx
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
