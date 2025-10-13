@@ -51,7 +51,7 @@ public class HotelServiceImpl implements HotelService {
     private final HotelReservationService hotelReservationService;
     private final ReservationReminderService reservationReminderService;
     // ==========================================
-    
+
     private static final LocalTime DEFAULT_CHECKIN_TIME = LocalTime.of(14, 0);
     private static final DateTimeFormatter HOTEL_FMT = DateTimeFormatter.ofPattern("MM월 dd일 HH:mm");
     private final HotelCancelNotificationService hotelCancelNotificationService;
@@ -149,11 +149,11 @@ public class HotelServiceImpl implements HotelService {
     // 예약 확정
     @Override
     public void confirm(Long reservationId) {
-        
+
         // 예약 검증
         HotelReservationEntity found = hotelReservationRepository.findById(reservationId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "예약을 찾을 수 없습니다."));
-        
+
         // 예약 상태 변경
         found.setStatus(ReservationStatus.CONFIRMED);
 
@@ -225,7 +225,7 @@ public class HotelServiceImpl implements HotelService {
         // ================================
 
     } // markNoShow 종료
-    
+
     // 관리자용 리스트
     @Transactional(readOnly = true)
     @Override
@@ -249,7 +249,7 @@ public class HotelServiceImpl implements HotelService {
             }
             // 상태 필터
             if (statusEnum != null && r.getStatus() != statusEnum) continue;
-            
+
             // 회원ID 필터
             if (memberId != null) {
                 if (r.getMember() == null || r.getMember().getMemberId() == null || !r.getMember().getMemberId().equals(memberId)) {
@@ -279,7 +279,7 @@ public class HotelServiceImpl implements HotelService {
     @Transactional
     @Override
     public boolean tryUpdateStatus(Long reservationId, String nextStatus) {
-        
+
 
         if (reservationId == null || nextStatus == null) return false;
         final ReservationStatus next;
@@ -352,10 +352,10 @@ public class HotelServiceImpl implements HotelService {
         }
 
         return true;
-        
+
     } // tryUpdateStatus 종료
 
-    
+
     // 관리자용 상세 조회
     @Transactional(readOnly = true)
     @Override
