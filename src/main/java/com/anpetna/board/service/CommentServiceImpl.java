@@ -1,9 +1,7 @@
 package com.anpetna.board.service;
 
-import com.anpetna.board.constant.LikeTargetType;
 import com.anpetna.board.domain.BoardEntity;
 import com.anpetna.board.domain.CommentEntity;
-import com.anpetna.board.domain.LikeEntity;
 import com.anpetna.board.dto.CommentDTO;
 import com.anpetna.board.dto.createComment.CreateCommReq;
 import com.anpetna.board.dto.createComment.CreateCommRes;
@@ -15,7 +13,6 @@ import com.anpetna.board.dto.updateComment.UpdateCommReq;
 import com.anpetna.board.dto.updateComment.UpdateCommRes;
 import com.anpetna.board.repository.BoardJpaRepository;
 import com.anpetna.board.repository.CommentJpaRepository;
-import com.anpetna.board.repository.LikeJpaRepository;
 import com.anpetna.core.coreDto.PageResponseDTO;
 import com.anpetna.notification.common.constant.NotificationType;
 import com.anpetna.notification.common.constant.TargetType;
@@ -26,7 +23,6 @@ import com.anpetna.notification.feature.like.service.LikeNotificationService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -50,7 +46,9 @@ public class CommentServiceImpl implements CommentService {
     private final MemberRepository memberRepository;
     private final CommentNotificationService commentNotificationService;
     private final LikeNotificationService likeNotificationService;
-    private final LikeJpaRepository likeJpaRepository;
+
+    // 댓글 좋아요 누를때 누른 사람이 또 못누르게 막기 위해 메서드 추가
+    private final ConcurrentMap<Long, Set<String>> likeGuard = new ConcurrentHashMap<>();
 
     // 로그인 + 회원여부 검증, 실패 시 AccessDeniedException
     private String requireLoginAndMember() {
@@ -178,9 +176,8 @@ public class CommentServiceImpl implements CommentService {
 
         // 삭제 전 스냅샷
         CommentDTO snapshot = CommentDTO.fromEntity(entity);
-        // [ADD] 댓글에 달린 좋아요 선삭제(정합성)
-        likeJpaRepository.deleteByTargetTypeAndTargetId(LikeTargetType.COMMENT, deleteCommReq.getCno());
         commentJpaRepository.delete(entity);
+        likeGuard.remove(deleteCommReq.getCno());
 
         return DeleteCommRes.builder()
                 .deleteComment(snapshot)
@@ -197,46 +194,36 @@ public class CommentServiceImpl implements CommentService {
         CommentEntity entity = commentJpaRepository.findById(cno)
                 .orElseThrow(() -> new EntityNotFoundException("존재하지 않는 댓글입니다. cno=" + cno));
 
-        // 3) 현재 상태 조회 (이미 눌렀는지)
-        boolean exists = likeJpaRepository.existsByTargetTypeAndTargetIdAndMemberId(
-                LikeTargetType.COMMENT, cno, memberId
-        );
+        // 3) 본인 댓글 금지
+        if (memberId.equals(entity.getCWriter())) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST,
+                    "본인 댓글에는 좋아요를 누를 수 없습니다."
+            );
+        }
 
-        if (exists) {
-            // 3-A) 이미 눌림 → "취소": 기록 삭제 + 카운트 -1
-            likeJpaRepository.findByTargetTypeAndTargetIdAndMemberId(
-                    LikeTargetType.COMMENT, cno, memberId
-            ).ifPresent(likeJpaRepository::delete);
+        // 4) 중복 방지 + 토글(댓글도 한 번 더 누르면 취소)
+        Set<String> users = likeGuard.computeIfAbsent(cno, k -> ConcurrentHashMap.newKeySet());
+        boolean firstTime = users.add(memberId);
 
-            commentJpaRepository.decCommentLike(cno); // 원자적 감소(하한 0)
-
-            return UpdateCommRes.builder()
-                    .updateComment(CommentDTO.fromEntity(entity))
-                    .build();
+        int current = entity.getCLikeCount() == null ? 0 : entity.getCLikeCount();
+        if (!firstTime) {
+            // 이미 눌렀다면 → 취소(토글)
+            users.remove(memberId);
+            entity.setCLikeCount(Math.max(0, current - 1));
         } else {
-            // 3-B) 아직 안 눌림 → "좋아요": 기록 저장 + 카운트 +1
-            try {
-                likeJpaRepository.save(
-                        LikeEntity.builder()
-                                .targetType(LikeTargetType.COMMENT)
-                                .targetId(cno)
-                                .memberId(memberId)
-                                .build()
-                );
-                commentJpaRepository.incCommentLike(cno); // 원자적 증가
-            } catch (DataIntegrityViolationException dup) {
-                // 경쟁: 다른 트랜잭션이 먼저 insert → 최종 상태는 ON이므로 그대로 진행
-            }
-
+            // 처음 눌렀다면 → +1
+            entity.setCLikeCount(current + 1);
             try {
                 likeNotificationService.notifyCommentLike(entity, memberId);
             } catch (Exception ex) {
                 log.warn("notifyCommentLike failed: cno={}, actor={}", cno, memberId, ex);
             }
-
-            return UpdateCommRes.builder()
-                    .updateComment(CommentDTO.fromEntity(entity))
-                    .build();
         }
+
+        return UpdateCommRes.builder()
+                .updateComment(CommentDTO.fromEntity(entity))
+                .build();
     }
+
 }

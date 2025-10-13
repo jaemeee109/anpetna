@@ -54,7 +54,13 @@ public class ReadMemberOneRes {
                 .social(memberEntity.isMemberSocial())
                 .memberHasPet(memberEntity.getMemberHasPet())
                 .memberRole(memberEntity.getMemberRole())
-                .memberFileImage(memberEntity.getImages())
+                .memberFileImage(
+                        (memberEntity.getImages() == null)
+                                ? java.util.List.of()
+                                : memberEntity.getImages().stream()
+                                .map(img -> img.getUrl())
+                                .toList()
+                )
                 .etc(memberEntity.getMemberEtc())
                 .build();
 

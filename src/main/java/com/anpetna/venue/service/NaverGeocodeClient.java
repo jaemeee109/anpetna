@@ -1,4 +1,3 @@
-// src/main/java/com/anpetna/venue/service/NaverGeocodeClient.java
 package com.anpetna.venue.service;
 
 import org.springframework.web.client.HttpStatusCodeException;
@@ -17,42 +16,47 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
+// 네이버 지도 OpenAPI (지오코딩/역지오코딩) 호출 전용 클래스
+// application.properties에 ClientId와 SecretKey 값을 설정해야 함
+// ClientId와 SecretKey가 없으면 호출을 하지 않고, 빈 화면만 반환
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class NaverGeocodeClient {
 
     @Value("${naver.geocode.client-id:}")
-    private String clientId;
+    private String clientId; // API 클라이언트 아이디
 
     @Value("${naver.geocode.client-secret:}")
-    private String clientSecret;
+    private String clientSecret; // API 클라이언트 시크릿 키
 
     private static final String GEOCODE_ENDPOINT =
             "https://naveropenapi.apigw.ntruss.com/map-geocode/v2/geocode";
     private static final String REVERSE_ENDPOINT =
             "https://naveropenapi.apigw.ntruss.com/map-reversegeocode/v2/gc";
 
-    /** 기존 시그니처(좌표 없음) */
+    // 기존 시그니처, 단순 문자열 검색 (위치 바이어스 미적용)
     public SuggestionList search(String query) {
         return search(query, null, null);
     }
 
-    /** 좌표 바이어스 + 실패 시 지역 접두어 보강 재시도 */
+   // 좌표 바이어스 -> 실패 시 지역 접두어 보강 재시도
+   //  1차 : 검색어 원문으로 지오코딩 시도
+   //  2차 : (위도, 경도가 있을 경우) 사용자의 좌표로 역지오코딩해서 지역명+검색어로 재시도
     public SuggestionList search(String query, Double lat, Double lng) {
         if (isBlank(query)) {
             return new SuggestionList(Collections.<Suggestion>emptyList());
         }
 
-        // 1차: 원문
+        // 1차
         SuggestionList first = doGeocode(query, lat, lng);
         if (first.getItems() != null && !first.getItems().isEmpty()) {
             return first;
         }
 
-        // 2차: 좌표 있으면 역지오코딩으로 접두어 → 보강 쿼리
+        // 2차
         if (lat != null && lng != null) {
-            String regionPrefix = reverseRegion(lat.doubleValue(), lng.doubleValue()); // 예: "평택시 비전동"
+            String regionPrefix = reverseRegion(lat.doubleValue(), lng.doubleValue());
             if (!isBlank(regionPrefix)) {
                 String boosted = (regionPrefix + " " + query).trim();
                 SuggestionList second = doGeocode(boosted, lat, lng);
@@ -64,7 +68,9 @@ public class NaverGeocodeClient {
         return new SuggestionList(Collections.<Suggestion>emptyList());
     }
 
-    /** 실제 지오코딩 호출 */
+    // 실제 지오코딩 호출
+    // 좌표 바이어스 지원
+    // 지번, 도로명, 영문 주소를 우선순위로 라벨을 빌드 후, 위도 경도 파싱후 리스트 구성
     private SuggestionList doGeocode(String query, Double lat, Double lng) {
         // NCP 키 미설정이면 외부 호출하지 않고 빈 목록
         if (isBlank(clientId) || isBlank(clientSecret)) {
@@ -78,7 +84,7 @@ public class NaverGeocodeClient {
                 .fromHttpUrl(GEOCODE_ENDPOINT)
                 .queryParam("query", query);
 
-        // 좌표 바이어스 (coordinate=lng,lat)
+        // 좌표 바이어스
         if (lat != null && lng != null) {
             b.queryParam("coordinate",
                     String.format(java.util.Locale.US, "%.6f,%.6f", lng.doubleValue(), lat.doubleValue()));
@@ -113,7 +119,7 @@ public class NaverGeocodeClient {
         LinkedHashSet<String> dup = new LinkedHashSet<String>();
         List<Suggestion> out = new ArrayList<Suggestion>();
         try {
-            java.util.List<NaverGeocodeResponse.Address> addrs = body.getAddresses();
+            List<NaverGeocodeResponse.Address> addrs = body.getAddresses();
             for (int i = 0; i < addrs.size(); i++) {
                 NaverGeocodeResponse.Address a = addrs.get(i);
 
@@ -145,7 +151,7 @@ public class NaverGeocodeClient {
         return new SuggestionList(out);
     }
 
-    /** 역지오코딩으로 "시/군/구 읍/면/동" 접두어 생성 */
+    // 역지오코딩으로 '시/군/구 읍/면/동' 접두어 생성
     private String reverseRegion(double lat, double lng) {
         if (isBlank(clientId) || isBlank(clientSecret)) {
             return "";
@@ -214,6 +220,8 @@ public class NaverGeocodeClient {
         return (n == null) ? null : String.valueOf(n);
     }
 
+    // 인증 헤더 생성
+    // 네이버  API 게이트웨에 요구 헤더 세팅
     private HttpHeaders buildHeaders() {
         HttpHeaders headers = new HttpHeaders();
         headers.set("X-NCP-APIGW-API-KEY-ID", clientId);
@@ -223,12 +231,12 @@ public class NaverGeocodeClient {
         return headers;
     }
 
-    /** Java 8용 isBlank 대체 */
+    // 문자열 검사
     private static boolean isBlank(String s) {
-        return s == null || s.trim().isEmpty();
+        return s == null || s.isBlank();
     }
 
-
+    // 애플리케이션 시작 시 자격증명 상태 로그 출력(운영상 확인용)
     @PostConstruct
     void _logNcpCred() {
         if (clientId == null || clientId.isBlank() || clientSecret == null || clientSecret.isBlank()) {

@@ -5,6 +5,8 @@ import com.anpetna.core.coreDomain.BaseEntity;
 import com.anpetna.member.domain.MemberEntity;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
 
 @Entity
 @Getter
@@ -36,6 +38,7 @@ public class KeywordSubscriptionEntity extends BaseEntity {
     /** 구독자 (회원) */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "subscriber_id", nullable = false)
+    @OnDelete(action = OnDeleteAction.CASCADE)
     private MemberEntity subscriber;
 
     /** 사용자가 입력한 키워드 (그대로 비교) */

@@ -32,7 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
-
+import com.anpetna.member.constant.MemberRole;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -58,7 +58,6 @@ public class MemberServiceImpl implements MemberService {
 
     @Value("${app.upload.url-base}")  // 접근 URL 베이스 (예: /files or https://cdn.example.com/files)
     private String uploadUrlBase;
-
 
     // 프로필 1장만 허용할 때: 기존 이미지가 있으면 지우고 새로 저장
     private void replaceProfileImage(MemberEntity member, MultipartFile file) {
@@ -109,7 +108,6 @@ public class MemberServiceImpl implements MemberService {
     }
 
 
-
     @Override
     public JoinMemberRes join(JoinMemberReq joinMemberReq, MultipartFile profileFile)
             throws MemberIdExistException {
@@ -131,23 +129,36 @@ public class MemberServiceImpl implements MemberService {
         return JoinMemberRes.from(saved);
     }
 
+    // MemberId를 통한 단순 MemberEntity 조회용
+    public MemberEntity findById(String memberId) {
+        return memberRepository.findById(memberId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 회원입니다: " + memberId));
+    }
+
     @Override
     public UserDetails loadUserByUsername(String memberId) throws UsernameNotFoundException {
         MemberEntity member = memberRepository.findById(memberId).orElse(null);
-
         if (member == null) {
             throw new UsernameNotFoundException(memberId);
         }
 
-        return User.builder()
-                .username(member.getMemberId())
+        // 기존: 이메일/폰번호가 비어있으면 탈퇴로 간주
+        boolean deleted = (member.getMemberEmail() == null || member.getMemberEmail().isBlank())
+                && (member.getMemberPhone() == null || member.getMemberPhone().isBlank());
+
+        // 추가: BLACKLIST면 로그인 차단
+        boolean blacklisted = (member.getMemberRole() == com.anpetna.member.constant.MemberRole.BLACKLIST);
+
+        return org.springframework.security.core.userdetails.User.withUsername(member.getMemberId())
                 .password(member.getMemberPw())
                 .roles(member.getMemberRole().name())
+                .disabled(deleted || blacklisted)   // ← 여기 보강
                 .build();
     }
 
+
     @Override
-    @PreAuthorize("hasRole('ADMIN') or (#p0 != null and #p0.memberId == authentication.name)")
+    @PreAuthorize("isAuthenticated() and (hasRole('ADMIN') or #p0.memberId == authentication.name)")
     @Transactional(readOnly = true)
     public ReadMemberOneRes readOne(ReadMemberOneReq readMemberOneReq) {
 
@@ -167,7 +178,7 @@ public class MemberServiceImpl implements MemberService {
     @Override
     @PreAuthorize("hasRole('ADMIN')")
     @Transactional(readOnly = true)
-     public List<ReadMemberAllRes> memberReadAll() {
+    public List<ReadMemberAllRes> memberReadAll() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()
                 || authentication instanceof org.springframework.security.authentication.AnonymousAuthenticationToken) {
@@ -194,7 +205,10 @@ public class MemberServiceImpl implements MemberService {
         }
 //        ResponseStatusException(HttpStatus.)
 
-        member.setMemberPw(passwordEncoder.encode(modifyMemberReq.getMemberPw()));
+        String rawPw = modifyMemberReq.getMemberPw();
+        if (StringUtils.hasText(rawPw)) {
+            member.setMemberPw(passwordEncoder.encode(rawPw));
+        }
         member.setMemberPhone(modifyMemberReq.getMemberPhone());
         member.setMemberEmail(modifyMemberReq.getMemberEmail());
         member.setMemberDetailAddress(modifyMemberReq.getMemberDetailAddress());
@@ -224,23 +238,44 @@ public class MemberServiceImpl implements MemberService {
     }
 
     @Override
+    @Transactional
     public DeleteMemberRes delete(DeleteMemberReq deleteMemberReq) {
 
         String memberId = deleteMemberReq.getMemberId();
+        String currentPw = deleteMemberReq.getCurrentPw();
 
-        MemberEntity member = memberRepository.findById(memberId).orElse(null);
+        // 1) 회원 확인
+        MemberEntity member = memberRepository.findById(memberId).orElseThrow(() ->
+                new ResponseStatusException(HttpStatus.NOT_FOUND, "회원을 찾을 수 없습니다."));
 
-        Instant now = Instant.now();
-        tokenRepository.revokeAllActiveByMemberId(memberId, now);
-        tokenRepository.deleteByMemberId(memberId);
+        // 2) 비밀번호 검증
+        if (currentPw == null || currentPw.isBlank()
+                || !passwordEncoder.matches(currentPw, member.getMemberPw())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "비밀번호가 일치하지 않습니다.");
+        }
 
-        memberRepository.delete(member);
+        // 3) 토큰 회수/삭제 (기존 그대로)
+        try {
+            java.time.Instant now = java.time.Instant.now();
+            tokenRepository.revokeAllActiveByMemberId(memberId, now);
+        } catch (Exception ex) {
+            log.warning("[member-delete] revoke tokens failed for " + memberId + ": " + ex.getMessage());
+        }
+        try {
+            tokenRepository.deleteByMemberId(memberId);
+        } catch (Exception ex) {
+            log.warning("[member-delete] delete tokens failed for " + memberId + ": " + ex.getMessage());
+        }
+
+        // 4) 블랙리스트 전환
+        member.setMemberRole(com.anpetna.member.constant.MemberRole.BLACKLIST);
+        memberRepository.saveAndFlush(member);
+
 
         return DeleteMemberRes.builder()
                 .memberId(memberId)
                 .build();
     }
-
 
 
 

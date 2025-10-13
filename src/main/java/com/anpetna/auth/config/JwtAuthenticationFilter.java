@@ -52,6 +52,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain) throws IOException, ServletException {
 
+
+        // Swagger UI, API docs, favicon은 JWT 없이 통과
+        if (request.getRequestURI().startsWith("/v3/api-docs") ||
+                request.getRequestURI().startsWith("/swagger-ui") ||
+                request.getRequestURI().equals("/favicon.ico")) {
+            log.info("JwtAuthenticationFilter.java request.getRequestURI(): " + request.getRequestURI());
+            chain.doFilter(request, response);
+            return;
+        }
         // 1) Authorization 헤더 확인=======================================================
         String header = request.getHeader("Authorization");
         if (header == null || !header.startsWith("Bearer ")) {

@@ -5,6 +5,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 
@@ -29,6 +30,7 @@ public interface NotificationRepository extends JpaRepository<NotificationEntity
                                                      @Param("receiverMemberId") String receiverMemberId);
 
     @Modifying
+    @Transactional
     @Query("""
         update NotificationEntity n
         set n.isRead = true,
@@ -39,4 +41,3 @@ public interface NotificationRepository extends JpaRepository<NotificationEntity
     int markAllRead(String memberId);
 
 }
-

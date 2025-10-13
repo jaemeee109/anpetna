@@ -14,6 +14,7 @@ import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -24,7 +25,6 @@ import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true) // 기본적으로 읽기 전용 트랜잭션(성능 최적화, 쓰기 메서드는 개별 @Transactional로 오버라이드)
 public class NotificationServiceImpl implements NotificationService {
 
     // SSE 연결 타임아웃(밀리초) – 1시간. 서버가 이 시간까지 연결을 유지하려 시도.
@@ -40,6 +40,7 @@ public class NotificationServiceImpl implements NotificationService {
     private final MemberRepository memberRepository;
 
     @Override
+    @Transactional(readOnly = true)
     public PageResponseDTO<NotificationDTO> list(String receiverMemberId, PageRequestDTO pageRequestDTO, Boolean unreadOnly) {
         // 프런트에서 온 PageRequestDTO로 Pageable 생성(정렬 기준: createdAt)
         var pageable = pageRequestDTO.getPageable("createdAt");
@@ -54,6 +55,7 @@ public class NotificationServiceImpl implements NotificationService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public UnreadCountRes countUnread(String receiverMemberId) {
         // 미읽음 카운트만 빠르게 조회 (뱃지 숫자용)
         return new UnreadCountRes(repo.countByReceiver_MemberIdAndIsReadFalse(receiverMemberId));
@@ -113,7 +115,6 @@ public class NotificationServiceImpl implements NotificationService {
         return new DeleteNotificationRes(nId, true);
     }
 
-    @Transactional // 연결 등록/해제 등 상태 변화가 있다면 트랜잭션으로 묶는 것도 안전
     public SseEmitter connect(String receiverMemberId, String lastEventId) {
         // 1) 사용자별 SSE Emitter 등록(타임아웃 지정)
         SseEmitter emitter = sse.register(receiverMemberId, 60L * 60 * 1000);
@@ -146,7 +147,7 @@ public class NotificationServiceImpl implements NotificationService {
     }
 
     @Override
-    @Transactional // 쓰기 작업
+    @Transactional(propagation = Propagation.REQUIRES_NEW) // 쓰기 작업
     public NotificationDTO createAndPush(CreateNotificationCmd cmd) {
 
         // 1) 수신자/행위자 엔티티 조회

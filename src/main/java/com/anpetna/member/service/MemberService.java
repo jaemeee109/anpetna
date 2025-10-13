@@ -1,5 +1,6 @@
 package com.anpetna.member.service;
 
+import com.anpetna.member.domain.MemberEntity;
 import com.anpetna.member.dto.deleteMember.DeleteMemberReq;
 import com.anpetna.member.dto.deleteMember.DeleteMemberRes;
 import com.anpetna.member.dto.joinMember.JoinMemberReq;
@@ -16,6 +17,8 @@ import java.util.List;
 
 public interface MemberService extends UserDetailsService {
 
+    MemberEntity findById(String memberId);
+
     JoinMemberRes join(JoinMemberReq joinMemberReq, MultipartFile multipartFile) throws MemberIdExistException;
 
     ReadMemberOneRes readOne(ReadMemberOneReq readMemberOneReq);
@@ -25,7 +28,7 @@ public interface MemberService extends UserDetailsService {
     ModifyMemberRes modify(ModifyMemberReq modifyMemberReq, MultipartFile profileFile,
                            Boolean removeProfile) throws MemberIdExistException;
 
-    DeleteMemberRes delete(DeleteMemberReq deleteMemberReq) throws MemberIdExistException;
+    DeleteMemberRes delete(DeleteMemberReq deleteMemberReq);
 
     static class MemberIdExistException extends Exception {
 
