@@ -1,5 +1,7 @@
 package com.anpetna.chat.config;
 
+import com.anpetna.config.WebConfig;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
@@ -8,12 +10,15 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 
 @EnableWebSocketMessageBroker
 @Configuration
+@RequiredArgsConstructor
 public class StompConfiguration implements WebSocketMessageBrokerConfigurer {
+
+    private final WebConfig webConfig;
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         registry.addEndpoint("/stomp/chats")
-         .setAllowedOriginPatterns("http://192.168.0.160:3000", "http://localhost:3000"); // 추가
+         .setAllowedOriginPatterns(webConfig.getFrontUrl()); // 추가
     }
 
     @Override

@@ -2,6 +2,7 @@ package com.anpetna.auth.config;
 
 import com.anpetna.adminPage.repository.AdminBlacklistJpaRepository;
 import com.anpetna.auth.service.BlacklistServiceImpl;
+import com.anpetna.config.WebConfig;
 import com.anpetna.member.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -47,8 +48,7 @@ public class SecurityConfig {
         return http.build();
     }*/
 
-    @Value("${frontend.api-url}")
-    private String frontUrl;
+    private final WebConfig webConfig;
 
     @Bean   // 스프링 기본 AuthenticationManager 노출
     public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration)
@@ -251,7 +251,7 @@ public class SecurityConfig {
         // === Origin 허용 목록 ===
         // CorsConfiguration을 직접 써서 리스트로 지정하는 방식
         // setAllowedOrigins는 여러 개 origin을 한 번에 넣을 수 있으니 다 허용
-        cfg.setAllowedOrigins(java.util.List.of(frontUrl));
+        cfg.setAllowedOrigins(java.util.List.of(webConfig.getFrontUrl()));
         // === 허용 메서드 ===
         cfg.setAllowedMethods(List.of(
                 "GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"
