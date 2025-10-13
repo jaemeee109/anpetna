@@ -179,38 +179,48 @@ pipeline {
           string(credentialsId: 'naver_geocode_client_id', variable: 'NAVER_ID'),
           string(credentialsId: 'naver_geocode_client_secret', variable: 'NAVER_SECRET')
         ]) {
-          sh '''
-        set -euxo pipefail
-        TARGET="app-${NEXT_COLOR}"
-        IMAGE="${DOCKERHUB_REPO}:${IMAGE_TAG_BASE}-${NEXT_COLOR}"
+          sh '''#!/bin/sh
+    set -euxo pipefail
 
-        OVERRIDE_FILE="${WORKSPACE}/override-${TARGET}.yml"
-        cat > "${OVERRIDE_FILE}" <<EOF
-        services:
-          ${TARGET}:
-            image: ${IMAGE}
-            environment:
-              SPRING_DATASOURCE_URL: "${DB_URL}"
-              SPRING_DATASOURCE_USERNAME: "${DB_USER}"
-              SPRING_DATASOURCE_PASSWORD: "${DB_PASS}"
-              SPRING_PROFILES_ACTIVE: "prod"
-              TOSS_SECRET_KEY: "${TOSS_SECRET}"
-              NAVER_MAP_CLIENT_ID: "${NAVER_ID}"
-              NAVER_MAP_CLIENT_SECRET: "${NAVER_SECRET}"
-            networks:
-              - ${DOCKER_NETWORK}
+    TARGET="app-${NEXT_COLOR}"
+    IMAGE="${DOCKERHUB_REPO}:${IMAGE_TAG_BASE}-${NEXT_COLOR}"
+    OVERRIDE_FILE="${WORKSPACE}/override-${TARGET}.yml"
+
+    cat > "${OVERRIDE_FILE}" <<EOF
+    services:
+      ${TARGET}:
+        image: ${IMAGE}
+        environment:
+          SPRING_DATASOURCE_URL: "${DB_URL}"
+          SPRING_DATASOURCE_USERNAME: "${DB_USER}"
+          SPRING_DATASOURCE_PASSWORD: "${DB_PASS}"
+          SPRING_PROFILES_ACTIVE: "prod"
+          TOSS_SECRET_KEY: "${TOSS_SECRET}"
+          NAVER_MAP_CLIENT_ID: "${NAVER_ID}"
+          NAVER_MAP_CLIENT_SECRET: "${NAVER_SECRET}"
         networks:
-          ${DOCKER_NETWORK}:
-            external: true
-        EOF
+          - ${DOCKER_NETWORK}
+    networks:
+      ${DOCKER_NETWORK}:
+        external: true
+    EOF
 
-        docker compose -f ${APP_DIR}/docker-compose.yml -f "${OVERRIDE_FILE}" pull ${TARGET} || true
-        docker compose -f ${APP_DIR}/docker-compose.yml -f "${OVERRIDE_FILE}" up -d ${TARGET}
+    # (디버그) 실제 머지 결과 확인
+    docker compose -f ${APP_DIR}/docker-compose.yml -f "${OVERRIDE_FILE}" config | awk "/${TARGET}:/,/^$/" || true
 
-        shred -u "${OVERRIDE_FILE}" 2>/dev/null || rm -f "${OVERRIDE_FILE}"
+    # 실제 배포! ← 이 두 줄이 로그에 반드시 찍혀야 함
+    docker compose -f ${APP_DIR}/docker-compose.yml -f "${OVERRIDE_FILE}" pull ${TARGET} || true
+    docker compose -f ${APP_DIR}/docker-compose.yml -f "${OVERRIDE_FILE}" up -d ${TARGET}
 
-        docker ps --format 'table {{.Names}}\\t{{.Image}}\\t{{.Status}}' | grep -E "${TARGET}"
-        '''
+    # 상태 확인
+    docker compose -f ${APP_DIR}/docker-compose.yml -f "${OVERRIDE_FILE}" ps
+
+    # 컨테이너가 없으면 즉시 실패 처리(헬스체크로 넘어가지 않게)
+    docker ps --format '{{.Names}}' | grep -w "${TARGET}"
+
+    # 민감 파일 삭제
+    shred -u "${OVERRIDE_FILE}" 2>/dev/null || rm -f "${OVERRIDE_FILE}"
+    '''
         }
       }
     }
