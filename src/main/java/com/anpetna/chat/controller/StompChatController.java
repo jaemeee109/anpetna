@@ -86,6 +86,11 @@ public class StompChatController {
         if (!chatService.isParticipant(memberId, chatroomId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "채팅방 접근 권한이 없습니다.");
         }
+
+        { //메시지 열람 -> 읽음 처리
+            var member = memberService.findById(memberId);
+            chatService.updateLastCheckedAt(member, chatroomId);
+        }
         //================== 추가 끝 ========================
 
         return chatService.getMessageList(chatroomId).stream()

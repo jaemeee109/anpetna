@@ -55,12 +55,14 @@ public class ChatService {
         if (currentChatroomId != null) {
             updateLastCheckedAt(member, currentChatroomId);
         }
-
-        // 이미 참여하고 있는 채팅방인지 검사
-        if (memberChatroomMappingRepository.existsByMember_MemberIdAndChatroom_Id(member.getMemberId(), newChatroomId)) {
-            log.info("이미 참여 중인 채팅방입니다.");
+        // ===================== 수정 =====================
+        if (memberChatroomMappingRepository.existsByMember_MemberIdAndChatroomId(member.getMemberId(), newChatroomId)) {
+            //  방을 다시 열었으면 '읽음'으로 처리하여 NEW 제거
+            updateLastCheckedAt(member, newChatroomId);
+            log.info("이미 참여 중인 채팅방입니다. lastCheckedAt 갱신 처리 완료");
             return false;
         }
+        // ===================== 수정 끝 =====================
 
         ChatroomEntity chatroom = chatroomRepository.findById(newChatroomId).get();
 
@@ -74,7 +76,8 @@ public class ChatService {
         return true;
     }
 
-    private void updateLastCheckedAt(MemberEntity member, Long currentChatroomId) {
+
+    public void updateLastCheckedAt(MemberEntity member, Long currentChatroomId) {
 
         MemberChatroomMapping memberChatroomMapping = memberChatroomMappingRepository.findByMember_MemberIdAndChatroom_Id(member.getMemberId(), currentChatroomId).get();
 
