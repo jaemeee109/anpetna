@@ -1,16 +1,19 @@
 package com.anpetna.chat.controller;
 
 import com.anpetna.chat.domain.ChatroomEntity;
-import com.anpetna.chat.domain.MessageEntity;
-import com.anpetna.chat.dto.ChatMessageDTO;
+
 import com.anpetna.chat.dto.ChatroomDTO;
 import com.anpetna.chat.service.ChatService;
+import com.anpetna.member.constant.MemberRole;
 import com.anpetna.member.domain.MemberEntity;
+import com.anpetna.member.repository.MemberRepository;
 import com.anpetna.member.service.MemberService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
@@ -74,7 +77,7 @@ public class ChatController {
 
         return chatService.leaveChatroom(member, chatroomId);
     }
-
+/*
     @GetMapping
     public List<ChatroomDTO> getChatroomList(Authentication authentication) {
 

@@ -124,6 +124,7 @@ public class ChatService {
                 })
                 .toList();
     }
+
     @Transactional // 추가
     public MessageEntity saveMessage(MemberEntity member, Long chatroomId, String text) {
 
@@ -161,7 +162,6 @@ public class ChatService {
         return memberChatroomMappingRepository
                 .existsByMember_MemberIdAndChatroom_Id(memberId, chatroomId);
     }
-
 
 
     @Transactional(readOnly = true)
