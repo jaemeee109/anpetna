@@ -362,6 +362,21 @@ export default function ChatListPage() {
             <PawIcon />
           </span>
         </h1>
+        <div className="notice">
+      <ul>
+        * 실시간 채팅상담 운영시간은 <strong>평일 10시 ~ 18시</strong> 입니다
+      <p/>  * 상담 문의량이 많을 경우 연결이 지연 될 수 있습니다 
+      <p/>  * 민감한 개인정보는 채팅창에 입력하지 마십시오
+      <p/>  * 더 나은 서비스 제공과 분쟁 해결을 위해 상담 내용은 
+        <br/>&nbsp;&nbsp;저장 및 보관될 수 있습니다
+      <p/>  * 상담 내용은 개인정보보호법에 따라 엄격히 보호되며,
+         <br/>&nbsp;&nbsp; 법령에 정해진 경우 외에는 제3자에게 제공되지 않습니다
+      <p/>  * 상담 내용을 무단으로 외부에 배포하거나 공개할 경우
+         <br/>&nbsp;&nbsp; 법적 책임을 질 수 있습니다
+      <p/>  * 상담사에게 욕설, 비방, 성희롱 등 부적절한 언어를 사용하거나
+          <br/>&nbsp;&nbsp; 인격 모독적인 발언을 할 경우 상담이 강제 종료될 수 있습니다
+      </ul>
+        </div>
 
         <div className="rowRight">
           {!admin && (
@@ -506,6 +521,18 @@ export default function ChatListPage() {
         .emptyItem { padding: 24px 0; text-align: center; color: #6b7280; }
 
         .pagerWrap { margin-top: 30px; margin-bottom: 70px;}
+
+        .notice{
+         border: 1px solid #d6d6d6ff; 
+         padding-top: 25px;
+         padding-bottom: 25px;
+         background: #f0f0f0ff; 
+         border-radius: 9px;
+         margin: 0 0 20px 0;
+         font-size: 14px;
+         color: #2e2b2bff;
+         line-height : 1.6em;
+        }
       `}</style>
     </RequireLogin>
   );
