@@ -5,6 +5,7 @@ import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import Providers from './providers';
 
+export const dynamic = 'force-dynamic';
 export const metadata = { title: 'AnPetNa', description: 'Animal Pet & Me' };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
