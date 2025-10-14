@@ -172,35 +172,41 @@ docker logout || true
           string(credentialsId: 'naver_geocode_client_secret', variable: 'NAVER_SECRET')
         ]) {
           sh '''#!/bin/sh
-    set -euo pipefail
+    # -u 제거 (nounset로 인한 예기치 않은 종료 방지)
+    set -e -o pipefail
 
+    echo "STEP[0] ========== setup vars =========="
     TARGET="app-${NEXT_COLOR}"
     IMAGE="${DOCKERHUB_REPO}:${IMAGE_TAG_BASE}-${NEXT_COLOR}"
     OVERRIDE_FILE="${WORKSPACE}/override-${TARGET}.yml"
 
-    # 필수 환경변수 존재 확인(명시적 에러 메시지)
-    : "${APP_DIR:?APP_DIR is required}"
-    : "${DOCKER_NETWORK:?DOCKER_NETWORK is required}"
-    : "${DB_URL:?DB_URL is required}"
-    : "${DB_USER:?DB_USER is required}"
-    : "${DB_PASS:?DB_PASS is required}"
+    # 필수 환경값 수동 검증 (unset/empty 모두 체크)
+    require() { v="$1"; name="$2"; if [ -z "$v" ]; then echo "ERROR: $name is required"; exit 1; fi; }
+    require "${APP_DIR-}"        "APP_DIR"
+    require "${DOCKER_NETWORK-}" "DOCKER_NETWORK"
+    require "${DB_URL-}"         "DB_URL"
+    require "${DB_USER-}"        "DB_USER"
+    require "${DB_PASS-}"        "DB_PASS"
+    require "${DOCKERHUB_REPO-}" "DOCKERHUB_REPO"
+    require "${IMAGE_TAG_BASE-}" "IMAGE_TAG_BASE"
+    require "${NEXT_COLOR-}"     "NEXT_COLOR"
 
+    echo "STEP[1] ========== secret length debug =========="
     echo "[DEBUG] Byte-lengths (no secrets printed)"
     printf 'DB_URL bytes = ';   printf '%s' "$DB_URL"   | wc -c
     printf 'DB_USER bytes = ';  printf '%s' "$DB_USER"  | wc -c
     printf 'DB_PASS bytes = ';  printf '%s' "$DB_PASS"  | wc -c
 
-    # 따옴표 이스케이프
+    echo "STEP[2] ========== escape & write override =========="
     escq() { printf '%s' "${1-}" | sed 's/"/\\"/g'; }
     DB_URL_S=$(escq "$DB_URL")
     DB_USER_S=$(escq "$DB_USER")
     DB_PASS_S=$(escq "$DB_PASS")
-    TOSS_SECRET_S=$(escq "$TOSS_SECRET")
-    NAVER_ID_S=$(escq "$NAVER_ID")
-    NAVER_SECRET_S=$(escq "$NAVER_SECRET")
+    TOSS_SECRET_S=$(escq "${TOSS_SECRET-}")
+    NAVER_ID_S=$(escq "${NAVER_ID-}")
+    NAVER_SECRET_S=$(escq "${NAVER_SECRET-}")
     IMAGE_S=$(escq "$IMAGE")
 
-    # (1) override 작성
     cat > "${OVERRIDE_FILE}" <<EOF
     services:
       ${TARGET}:
@@ -221,22 +227,23 @@ docker logout || true
         external: true
     EOF
 
-    # (2) 머지 결과 일부 프린트
-    echo "[compose-config] merged service block for ${TARGET}"
+    echo "STEP[3] ========== show merged config (partial) =========="
     docker compose -f "${APP_DIR}/docker-compose.yml" -f "${OVERRIDE_FILE}" config \
       | awk "/${TARGET}:/,/^[^[:space:]]/" || true
 
-    # (3) 실제 배포 (반드시 up -d 먼저!)
+    echo "STEP[4] ========== compose up -d ${TARGET} =========="
     docker compose -f "${APP_DIR}/docker-compose.yml" -f "${OVERRIDE_FILE}" pull "${TARGET}" || true
     docker compose -f "${APP_DIR}/docker-compose.yml" -f "${OVERRIDE_FILE}" up -d "${TARGET}"
 
-    echo "[docker ps -a (grep app-)]"
+    echo "STEP[5] ========== ps snapshot =========="
+    docker compose -f "${APP_DIR}/docker-compose.yml" -f "${OVERRIDE_FILE}" ps || true
     docker ps -a --format 'table {{.Names}}\\t{{.Status}}\\t{{.Image}}' | grep -E 'app-(blue|green)' || true
 
-    # (4) CID 확인 (up -d 이후에만 조회)
+    echo "STEP[6] ========== resolve CID (after up -d) =========="
+    CID=""
     CID="$(docker compose -f "${APP_DIR}/docker-compose.yml" -f "${OVERRIDE_FILE}" ps -q "${TARGET}" || true)"
-    if [ -z "${CID}" ]; then
-      echo "Container for ${TARGET} not found after up -d"
+    if [ -z "$CID" ]; then
+      echo "ERROR: Container for ${TARGET} not found after up -d"
       docker compose -f "${APP_DIR}/docker-compose.yml" -f "${OVERRIDE_FILE}" ps || true
       docker logs --tail=200 "${TARGET}" || true
       shred -u "${OVERRIDE_FILE}" 2>/dev/null || rm -f "${OVERRIDE_FILE}"
@@ -244,25 +251,26 @@ docker logout || true
     fi
     echo "[INFO] ${TARGET} CID=${CID}"
 
-    # (5) 런타임 ENV 키만 확인(값 마스킹)
-    echo "[inspect-env] keys only"
+    echo "STEP[7] ========== inspect env keys (masked) =========="
     docker inspect "${CID}" --format '{{range .Config.Env}}{{println .}}{{end}}' \
       | grep -E '^SPRING_DATASOURCE_URL=|^SPRING_DATASOURCE_USERNAME=|^SPRING_DATASOURCE_PASSWORD=' \
       | sed 's/=.*/=<redacted>/' || true
 
-    # (6) DB TCP 연결 테스트(컨테이너 네임스페이스)
+    echo "STEP[8] ========== DB TCP test from container namespace =========="
     HOSTPORT=$(printf "%s" "$DB_URL" | sed -E 's#^jdbc:[a-zA-Z0-9]+://([^/]+)/.*#\\1#')
     HOST=${HOSTPORT%:*}
     PORT=${HOSTPORT#*:}
     [ "$HOST" = "$PORT" ] && PORT=3306
-    echo "[TCP test] from container namespace (${TARGET}) -> $HOST:$PORT"
+    echo "[TCP test] ${TARGET} -> $HOST:$PORT"
     docker run --rm --network "container:${TARGET}" busybox sh -lc "nc -vz -w3 $HOST $PORT || true"
 
-    echo "[last 60 lines of ${TARGET}]"
+    echo "STEP[9] ========== last 60 lines of ${TARGET} =========="
     docker logs --tail=60 "${TARGET}" || true
 
-    # (7) 민감 파일 삭제
+    echo "STEP[10] ========== cleanup =========="
     shred -u "${OVERRIDE_FILE}" 2>/dev/null || rm -f "${OVERRIDE_FILE}"
+
+    echo "STEP[DONE] =========="
     '''
         }
       }
