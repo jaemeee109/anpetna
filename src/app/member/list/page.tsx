@@ -510,38 +510,21 @@ export default function AdminUsersPage() {
       <div className="admin-actions flex items-center justify-center gap-2 mt-[25px]">
         {/* 권한 옵션: 관리자/회원/블랙리스트 */}
         <select
-            className="dropdown role-select"
-            value={role}
-            onChange={(e) => {
-              const next = e.target.value as 'ADMIN' | 'USER' | 'BLACKLIST' | 'NONE';
-              setRole(next);
-              setRoleEnabled(next !== 'NONE');
-              setPage(1);
-
-              // 역할 선택 시 서버 역할검색을 바로 트리거: q/keyword를 역할 키워드로 맞춤
-              if (next === 'ADMIN') {
-                setQ('관리자');     // 서버 parseRoleKeyword에서 인식됨
-                setKeyword('관리자');
-              } else if (next === 'USER') {
-                setQ('회원');
-                setKeyword('회원');
-              } else if (next === 'BLACKLIST') {
-                setQ('블랙리스트');
-                setKeyword('블랙리스트');
-              } else {
-                // 선택안함
-                setQ('');
-                setKeyword('');
-              }
-            }}
-            aria-label="권한 옵션"
-          >
-            <option value="NONE">선택안함</option>
-            <option value="ADMIN">관리자</option>
-            <option value="USER">회원</option>
-            <option value="BLACKLIST">블랙리스트</option>
-          </select>
-
+          className="dropdown role-select"
+          value={role}
+          onChange={(e) => {
+            const next = e.target.value as 'ADMIN' | 'USER' | 'BLACKLIST' | 'NONE';
+            setRole(next);
+            setRoleEnabled(next !== 'NONE');
+            setPage(1);
+          }}
+          aria-label="권한 옵션"
+        >
+          <option value="NONE">선택안함</option>
+          <option value="ADMIN">관리자</option>
+          <option value="USER">회원</option>
+          <option value="BLACKLIST">블랙리스트</option>
+        </select>
 
         {/* 기존 검색창 유지 (디자인 변경 없음) */}
         <div className="admin-search">
