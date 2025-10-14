@@ -1,3 +1,4 @@
+//src/app/cart/page.tsx
 'use client';
 
 import Image from 'next/image';
@@ -109,13 +110,22 @@ export default function CartPage() {
     else setSelected(new Set(cart.items.map((it) => it.itemId)));
   };
 
-  // (6) 수량 변경
-  const changeQty = (it: CartItemDTO, delta: -1 | 1) => {
-    const current = Math.max(1, Number(it.quantity) || 1);
-    const next = Math.max(1, current + delta);
-    if (next === current) return;
-    updateMut.mutate({ itemId: it.itemId, quantity: next });
-  };
+ 
+ // (6) 수량 변경
+const changeQty = (it: CartItemDTO, delta: -1 | 1) => {
+  const current = Math.max(1, Number(it.quantity) || 1);
+  const next = Math.max(1, current + delta);
+  if (next === current) return;
+
+  // 서버가 /cart/{id} 를 기대하므로 cartItemId 우선, 없으면 itemId로 폴백
+  const payload = (it.cartItemId != null)
+    ? { cartItemId: Number(it.cartItemId), quantity: next }
+    : { itemId: Number(it.itemId), quantity: next };
+
+  updateMut.mutate(payload);
+};
+
+
 
   // (4)(16) 선택 삭제
   const handleDeleteSelected = async () => {

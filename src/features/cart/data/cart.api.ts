@@ -20,13 +20,19 @@ function toCartItemDTO(x: any): CartItemDTO {
     (x?.imageUrl as string | undefined) ??
     '';
 
-  return {
-    itemId: Number(x?.itemId ?? x?.item?.itemId ?? 0),
+    return {
+     itemId: Number(x?.itemId ?? x?.item?.itemId ?? 0),
     name: String(x?.name ?? x?.itemName ?? x?.item?.itemName ?? ''),
     price: Number(x?.price ?? x?.itemPrice ?? x?.item?.itemPrice ?? 0),
-    quantity: Number(x?.quantity ?? x?.item?.quantity ?? 1), // 백: ItemDTO.quantity 제공 :contentReference[oaicite:4]{index=4}
+    quantity: Number(x?.quantity ?? x?.item?.quantity ?? 1),
     imageUrl: firstThumb,
-    cartItemId: x?.cartItemId != null ? Number(x.cartItemId) : undefined,
+
+    // ✅ 백엔드가 cart 항목 PK를 어떤 키로 주든 안전하게 수용
+    cartItemId:
+      x?.cartItemId != null ? Number(x.cartItemId) :
+      x?.id != null ? Number(x.id) :
+      x?.cartId != null ? Number(x.cartId) :
+      (x?.cartItem?.id != null ? Number(x.cartItem.id) : undefined),
   };
 }
 

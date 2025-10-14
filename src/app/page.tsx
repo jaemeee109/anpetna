@@ -1,3 +1,4 @@
+//src/app/page.tsx
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -153,7 +154,13 @@ export default function HomePage() {
                 {/* (5) 제목 필드 보정: bTitle 우선, 없으면 title/subject 대체 */}
                 <Link href={`/board/NOTICE/${r.bno}`} prefetch={false}>
                   {(r as any).bTitle ?? (r as any).btitle ?? (r as any).subject ?? '제목 없음'}
+                 &nbsp;{Number((r as any).commentCount ?? 0) > 0 && (
+                    <span style={{ fontSize: '0.9em', color: '#a1a1a1ff' }}>
+                      ({Number((r as any).commentCount ?? 0)})
+                    </span>
+                  )}
                 </Link>
+
                 {/* <span className="home-board-date">{ymd(r.createDate)}</span>*/}
               </li>
             ))}
@@ -165,9 +172,15 @@ export default function HomePage() {
             {(free || []).map((r) => (
               <li key={r.bno} className="home-board-item">
                 {/* (6) 제목 필드 보정 동일 적용 */}
-                <Link href={`/board/FREE/${r.bno}`} prefetch={false}>
-                  {(r as any).bTitle ?? (r as any).btitle ?? (r as any).subject ?? '제목 없음'}
-                </Link>
+                <Link href={`/board/NOTICE/${r.bno}`} prefetch={false}>
+                {(r as any).bTitle ?? (r as any).btitle ?? (r as any).subject ?? '제목 없음'}
+               &nbsp; {Number((r as any).commentCount ?? 0) > 0 && (
+                  <span style={{ fontSize: '0.9em', color: '#a1a1a1ff' }}>
+                    ({Number((r as any).commentCount ?? 0)})
+                  </span>
+                )}
+</Link>
+
                {/*   <span className="home-board-date">{ymd(r.createDate)}</span>*/}
               </li>
             ))}

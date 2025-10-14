@@ -335,7 +335,7 @@ export default function ItemDetailPage() {
                 
                 await addMut.mutateAsync({ itemId: Number(id), quantity: Math.max(1, Number(qty || 1)) });
                 
-                location.href = `/order/checkout?itemId=${parsedId}&qty=${q}`;
+              
               } catch (e: any) {
                
                 const msg = e?.response?.data?.message || e?.message || '장바구니 담기 중 오류가 발생했습니다.';
