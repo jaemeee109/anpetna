@@ -171,6 +171,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/chats/**").hasAnyRole("ADMIN","USER")
                         .requestMatchers(HttpMethod.DELETE, "/chats/**").hasAnyRole("ADMIN","USER")
 
+
                         // --- Home ---
                         .requestMatchers("/home/**").permitAll()
 
