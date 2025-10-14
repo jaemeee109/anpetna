@@ -227,9 +227,10 @@ docker logout || true
     docker ps --format '{{.Names}}' | grep -w "${TARGET}"
 
     # --- (5) 런타임 ENV 검증 ---
-    # nounset에 안전하게: CID 조회 구간만 set +u로 완화
+    # nounset으로 인한 미정의 변수 오류를 막기 위해 CID 구간만 잠시 해제
     set +u
-    CID="$(docker ps -q -f "name=^/${TARGET}$" 2>/dev/null || true)"
+    CID="$(docker compose -f ${APP_DIR}/docker-compose.yml -f "${OVERRIDE_FILE}" ps -q ${TARGET} 2>/dev/null || true)"
+    : "${CID:=}"   # 비정의면 빈 값으로
     set -u
 
     if [ -z "${CID:-}" ]; then
@@ -244,7 +245,7 @@ docker logout || true
 
     echo "[/proc/1/environ lengths]"
     docker exec -i "${CID}" sh -lc '
-      getv(){ tr "\\0" "\\n" </proc/1/environ | awk -F= -v k="$1" "$0 ~ \"^\"k\"=\" {sub(/^[^=]*=/,\"\"); print; exit}"; }
+      getv(){ tr "\\0" "\\n" </proc/1/environ | awk -F= -v k="$1" "$0 ~ "^"k"=" {sub(/^[^=]*=/,""); print; exit}"; }
       plen(){ val="$(getv "$1")"; printf "%s bytes = " "$1"; printf "%s" "$val" | wc -c; }
       plen SPRING_DATASOURCE_URL
       plen SPRING_DATASOURCE_USERNAME
