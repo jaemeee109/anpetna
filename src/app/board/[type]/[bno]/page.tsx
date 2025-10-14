@@ -22,8 +22,7 @@ import { pickHttpErrorMessage } from '@/shared/data/http';
 const WRAP = "mx-auto w-full max-w-[960px] px-4";
 
 const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE_URL?.trim() ||
-  "http://192.168.0.160:8000";
+  process.env.NEXT_PUBLIC_API_BASE_URL;
 
 function absUrl(p?: string) {
   if (!p) return "";

@@ -67,7 +67,7 @@ export const itemApi = {
    */
   async list(params: ItemListQuery & { excludeSoldOut?: boolean }): Promise<PageRes<ItemDTO>> {
   // 베이스 URL (기존 normalizeBase 사용)
-  const base = normalizeBase(process.env.NEXT_PUBLIC_API_BASE as any);
+  const base = normalizeBase(process.env.NEXT_PUBLIC_API_BASE_URL as any);
   // window.origin 대체 (개발 3000→8000 스와프까지 고려하고 싶으면 필요에 맞게 조정)
   const origin =
     base ||
