@@ -355,7 +355,7 @@ docker compose -f ${APP_DIR}/docker-compose.yml rm -f ${PREV} || true
 
   post {
     success {
-      echo "✅ Switched to ${env.NEXT_COLOR} (${env.IMAGE_TAG_BASE}-${env.NEXT_COLOR})"
+      echo "Switched to ${env.NEXT_COLOR} (${env.IMAGE_TAG_BASE}-${env.NEXT_COLOR})"
     }
     unsuccessful {
       script {
