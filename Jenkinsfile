@@ -227,8 +227,12 @@ docker logout || true
           docker ps --format '{{.Names}}' | grep -w "${TARGET}"
 
           # --- (5) 런타임 ENV 검증: docker inspect + env 길이 ---
-          CID=$(docker ps -q -f "name=^/${TARGET}$")
-          [ -n "$CID" ] || { echo "Container for ${TARGET} not found"; exit 1; }
+          # nounset에 안전하게: 비어 있어도 변수는 정의되도록 := 사용
+          CID="$(docker ps -q -f "name=^/${TARGET}$" || true)"; : "${CID:=}"
+          if [ -z "$CID" ]; then
+            echo "Container for ${TARGET} not found after up -d"
+            exit 1
+          fi
 
           echo "[inspect-env] (names only, not values)"
           docker inspect "$CID" --format '{{range .Config.Env}}{{println .}}{{end}}' \
