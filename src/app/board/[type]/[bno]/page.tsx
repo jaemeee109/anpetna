@@ -193,10 +193,21 @@ export default function BoardDetailPage({
   }
 
   const rawToken =
-    typeof window !== "undefined"
-      ? (localStorage.getItem("accessToken") || localStorage.getItem("Authorization") || "")
-      : "";
-  const admin = isAdminFromToken(rawToken);
+  typeof window !== 'undefined'
+    ? (localStorage.getItem('accessToken') ||
+       localStorage.getItem('Authorization') ||
+       '')
+    : '';
+
+const roleFlag =
+  typeof window !== 'undefined'
+    ? (localStorage.getItem('memberRole') ||
+       sessionStorage.getItem('memberRole') ||
+       '').toUpperCase()
+    : '';
+
+const admin = roleFlag.includes('ADMIN') || isAdminFromToken(rawToken);
+
 
   // 서버가 내려준 비밀글 여부(백엔드 ReadOneBoardRes에 포함)
   const secretFlag = !!view?.isSecret;
@@ -230,12 +241,12 @@ export default function BoardDetailPage({
 
   const iAmWriter = !!me && !!writer && me === String(writer);
 
-  // ===== 서버가 200을 주는 특이 케이스 대비: isSecret 보조 가드 =====
-  if (secretFlag && !iAmWriter && !admin) {
-    return (
-      <ForbiddenSecretView onBack={() => router.push(`/board/${type}`)} />
-    );
-  }
+    // ===== 서버가 200을 주는 특이 케이스 대비: isSecret 보조 가드 =====
+    //if (secretFlag && !iAmWriter && !admin) {
+    //  return (
+    //    <ForbiddenSecretView onBack={() => router.push(`/board/${type}`)} />
+    //  );
+   // }
 
   // ===== 여기부터 정상 상세 화면 (기존 UI 그대로) =====
   return (
