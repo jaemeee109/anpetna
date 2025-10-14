@@ -278,18 +278,37 @@ docker logout || true
 
     TARGET="app-${NEXT_COLOR}"
     echo "[health] TARGET=${TARGET}"
-    docker pull curlimages/curl:latest >/dev/null
 
-    # 네트워크에서 바로 찍어보기(1회)
+    # 0) 먼저 컨테이너 존재 확인(최대 60초 대기)
+    t=0
+    while [ $t -lt 60 ]; do
+      if docker ps --format '{{.Names}}' | grep -qx "${TARGET}"; then
+        break
+      fi
+      sleep 2; t=$((t+2))
+    done
+
+    if ! docker ps --format '{{.Names}}' | grep -qx "${TARGET}"; then
+      echo "[health] ${TARGET} container not found"
+      docker ps -a || true
+      exit 1
+    fi
+
+    # 스냅샷
+    docker ps -a --format 'table {{.Names}}\\t{{.Status}}\\t{{.Image}}' | grep -E 'app-(blue|green)' || true
+    docker inspect -f '{{json .NetworkSettings.Networks}}' "${TARGET}" || true
+
+    # 1) 네트워크에서 1회 찍어보기(코드+바디 일부)
+    docker pull curlimages/curl:latest >/dev/null
     docker run --rm --network "${DOCKER_NETWORK}" curlimages/curl:latest sh -lc '
       set -e
       url="http://'"$TARGET"':8080/actuator/health"
       code=$(curl -sS -o /tmp/body -w "%{http_code}" "$url" || true)
       head -c 200 /tmp/body || true; echo
-      echo "[health] code=$code"
-    '
+      echo "[health] first-shot code=$code"
+    ' || true
 
-    # 재시도 루프(최대 180초)
+    # 2) 재시도(최대 180초)
     SECONDS=0
     until [ $SECONDS -ge 180 ]; do
       ok=$(docker run --rm --network "${DOCKER_NETWORK}" -e TARGET="${TARGET}" curlimages/curl:latest sh -lc '
