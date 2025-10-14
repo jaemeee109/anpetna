@@ -64,6 +64,19 @@ export function useBoardDetail(
     queryKey: qk.detail((id as number) ?? 0),
     queryFn: () => fetchBoardById(id as number),
     enabled: !!id && (opts?.enabled ?? true),
+
+    /** ===== 여기부터 핵심: '한참 로딩' 제거용 옵션 ===== */
+    // 403/404 등 권한/부재 에러는 즉시 실패로 처리(재시도 금지)
+    retry: (failureCount, err: any) => {
+      const status = err?.status ?? err?.response?.status;
+      if (status === 403 || status === 404) return false;
+      // 그 외(네트워크 오류 등)도 재시도 0~1회로 최소화
+      return failureCount < 1;
+    },
+    retryDelay: 0,                 // 재시도 대기 제거
+    refetchOnWindowFocus: false,   // 포커스 재조회로 인한 깜빡임 방지
+    gcTime: 5 * 60 * 1000,         // 기본값 유지(원하시면 조정 가능)
+    staleTime: 0,                  // 항상 서버 권한 최신 반영
   });
 }
 

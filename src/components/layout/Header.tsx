@@ -493,14 +493,29 @@ function handleLogout() {
           <div className="dropdown-menu" role="menu" aria-label="Help submenu">
             <Link href="/board/FAQ" className="dropdown-item" role="menuitem">FAQ</Link>
             <Link href="/board/QNA" className="dropdown-item" role="menuitem">Q&amp;A</Link>
+            {/* ▼ CHAT: 비회원이면 경고 후 로그인으로, 관리자 분기 유지 */}
             <Link
-                href={admin ? "/chat?forceAdmin=1" : "/chat"}
-                className="dropdown-item"
-                role="menuitem"
-                onClick={() => { if (admin) { try { localStorage.setItem('memberRole', 'ADMIN'); } catch {} } }}
-              >
-                CHAT
-              </Link>
+              href={admin ? "/chat?forceAdmin=1" : "/chat"}
+              className="dropdown-item"
+              role="menuitem"
+              prefetch={false}
+              onClick={(e) => {
+                const authed = !!(getTokenFromStorage() || getCookie('JSESSIONID'));
+                if (!authed) {
+                  e.preventDefault();
+                  alert('회원만 이용이 가능합니다');
+                  if (typeof window !== 'undefined') window.location.href = '/member/login';
+                  return;
+                }
+                // 로그인 상태에서만 관리자 로컬 역할 스티칭(기존 동작 유지)
+                if (admin) {
+                  try { localStorage.setItem('memberRole', 'ADMIN'); } catch {}
+                }
+              }}
+            >
+              CHAT
+            </Link>
+
 
           </div>
         </div>

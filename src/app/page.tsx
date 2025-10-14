@@ -10,6 +10,7 @@ import HeartIcon from '@/components/icons/HeartIcon';
 function resolveApiBase(): string {
   const envBase =
     (process.env.NEXT_PUBLIC_API_BASE as string | undefined) ||
+    (process.env.NEXT_PUBLIC_API_BASE_URL as string | undefined) ||
     '';
   if (envBase) return envBase.replace(/\/+$/, '');
   if (typeof window === 'undefined') return '';
@@ -133,9 +134,9 @@ export default function HomePage() {
                   )}
                 </div>
                 <div className="home-item-body">
-                  <div className="home-item-name">{it.itemName || '상품'}</div>
+                  <div className="home-item-name mt-[10px] mb-[7px]">{it.itemName || '상품'}</div>
                   {/* (3)(4) 색상/여백은 CSS에서 처리 */}
-                  <div className="home-item-price">{typeof it.itemPrice === 'number' ? it.itemPrice.toLocaleString() : '-'}원</div>
+                  <div className="home-item-price mb-[5px] ">{typeof it.itemPrice === 'number' ? it.itemPrice.toLocaleString() : '-'}원</div>
                 </div>
               </Link>
             );

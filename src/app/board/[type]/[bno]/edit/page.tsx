@@ -13,7 +13,8 @@ const WRAP = 'mx-auto w-full max-w-[700px] px-4';
 
 /** 절대 URL 보정 */
 const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE;
+  process.env.NEXT_PUBLIC_API_BASE_URL?.trim() ||
+  'http://192.168.0.160:8000';
 function absUrl(p?: string) {
   if (!p) return '';
   if (/^https?:\/\//i.test(p)) return p;

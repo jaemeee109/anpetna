@@ -1,7 +1,7 @@
 // src/components/auth/RequireLogin.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 function getCookie(name: string) {
@@ -11,6 +11,7 @@ function getCookie(name: string) {
     return m ? decodeURIComponent(m[1]) : '';
   } catch { return ''; }
 }
+
 function hasAuthNow(): boolean {
   try {
     return !!(
@@ -24,6 +25,7 @@ function hasAuthNow(): boolean {
 export default function RequireLogin({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [authed, setAuthed] = useState<boolean | null>(null);
+  const alerted = useRef(false); // ← 누락되었던 부분 (추가)
 
   const evaluate = () => setAuthed(hasAuthNow());
 
@@ -41,6 +43,7 @@ export default function RequireLogin({ children }: { children: React.ReactNode }
     window.addEventListener('storage', onStorage);
     window.addEventListener('focus', onFocus);
     window.addEventListener('auth-changed', onAuthChanged as EventListener);
+
     return () => {
       window.removeEventListener('storage', onStorage);
       window.removeEventListener('focus', onFocus);
@@ -49,7 +52,13 @@ export default function RequireLogin({ children }: { children: React.ReactNode }
   }, []);
 
   useEffect(() => {
-    if (authed === false) router.replace('/member/login');
+    if (authed === false) {
+      if (!alerted.current) {
+        alerted.current = true;
+        alert('회원만 이용이 가능합니다');
+      }
+      router.replace('/member/login');
+    }
   }, [authed, router]);
 
   if (authed === null) return null; // 초기 깜빡임 방지

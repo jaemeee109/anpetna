@@ -59,9 +59,27 @@ export async function fetchBoards(params?: FetchBoardsParams) {
 
 export async function fetchBoardById(bno: number, opts?: { like?: boolean }) {
   const like = opts?.like ?? false;
-  const r = await http.get(`${BASE_PATH}/readOne/${bno}`, { params: { like } });
-  return unwrap<BoardDetail>(r);
+
+  // ✅ 인터셉터에만 맡기지 말고, 여기서도 명시적으로 Authorization 강제 부착
+  const token = getAccessToken();
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers.Authorization = token.startsWith('Bearer ')
+      ? token
+      : `Bearer ${token}`;
+  }
+
+  const r = await http.get(`/board/readOne/${bno}`, {
+    params: { like },
+    headers,               // ← 명시적으로 추가
+    withCredentials: !!token, // ← 세션/쿠키형 백엔드 겸용 대응
+  });
+
+  // 서버가 {result: {...}} 또는 {...}를 주는 두 케이스 모두 안전 해제
+  const data = (r as any)?.data ?? r;
+  return (data && data.result !== undefined) ? data.result : data;
 }
+
 
 /** 등록 (JSON + 파일을 받아 FormData로 만들어 전송) */
 export async function createBoard(body: CreateBoardReq, files?: File[]) {
