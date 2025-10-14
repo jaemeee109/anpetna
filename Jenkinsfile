@@ -172,96 +172,99 @@ docker logout || true
           string(credentialsId: 'naver_geocode_client_secret', variable: 'NAVER_SECRET')
         ]) {
           sh '''#!/bin/sh
-          set -euxo pipefail
+    set -euxo pipefail
 
-          TARGET="app-${NEXT_COLOR}"
-          IMAGE="${DOCKERHUB_REPO}:${IMAGE_TAG_BASE}-${NEXT_COLOR}"
-          OVERRIDE_FILE="${WORKSPACE}/override-${TARGET}.yml"
+    TARGET="app-${NEXT_COLOR}"
+    IMAGE="${DOCKERHUB_REPO}:${IMAGE_TAG_BASE}-${NEXT_COLOR}"
+    OVERRIDE_FILE="${WORKSPACE}/override-${TARGET}.yml"
 
-          # --- (0) Jenkins 변수 바이트 검증 (마스킹 출력) ---
-          echo "[DEBUG] Byte-lengths (no secrets printed)"
-          printf 'DB_URL bytes = ';   printf '%s' "$DB_URL"   | wc -c
-          printf 'DB_USER bytes = ';  printf '%s' "$DB_USER"  | wc -c
-          printf 'DB_PASS bytes = ';  printf '%s' "$DB_PASS"  | wc -c
+    # --- (0) Jenkins 변수 바이트 검증 (마스킹 출력) ---
+    echo "[DEBUG] Byte-lengths (no secrets printed)"
+    printf 'DB_URL bytes = ';   printf '%s' "$DB_URL"   | wc -c
+    printf 'DB_USER bytes = ';  printf '%s' "$DB_USER"  | wc -c
+    printf 'DB_PASS bytes = ';  printf '%s' "$DB_PASS"  | wc -c
 
-          # --- (1) 따옴표만 이스케이프한 안전값 준비 ---
-          escq() { printf '%s' "$1" | sed 's/"/\\"/g'; }
-          DB_URL_S=$(escq "$DB_URL")
-          DB_USER_S=$(escq "$DB_USER")
-          DB_PASS_S=$(escq "$DB_PASS")
-          TOSS_SECRET_S=$(escq "$TOSS_SECRET")
-          NAVER_ID_S=$(escq "$NAVER_ID")
-          NAVER_SECRET_S=$(escq "$NAVER_SECRET")
-          IMAGE_S=$(escq "$IMAGE")
+    # --- (1) 따옴표만 이스케이프한 안전값 준비 ---
+    escq() { printf '%s' "$1" | sed 's/"/\\"/g'; }
+    DB_URL_S=$(escq "$DB_URL")
+    DB_USER_S=$(escq "$DB_USER")
+    DB_PASS_S=$(escq "$DB_PASS")
+    TOSS_SECRET_S=$(escq "$TOSS_SECRET")
+    NAVER_ID_S=$(escq "$NAVER_ID")
+    NAVER_SECRET_S=$(escq "$NAVER_SECRET")
+    IMAGE_S=$(escq "$IMAGE")
 
-          # --- (2) 오버라이드 파일을 직접 작성 (변수 즉시 확장) ---
-          cat > "${OVERRIDE_FILE}" <<EOF
-          services:
-            ${TARGET}:
-              image: "${IMAGE_S}"
-              environment:
-                SPRING_DATASOURCE_URL: "${DB_URL_S}"
-                SPRING_DATASOURCE_USERNAME: "${DB_USER_S}"
-                SPRING_DATASOURCE_PASSWORD: "${DB_PASS_S}"
-                SPRING_PROFILES_ACTIVE: "prod"
-                TOSS_SECRET_KEY: "${TOSS_SECRET_S}"
-                NAVER_MAP_CLIENT_ID: "${NAVER_ID_S}"
-                NAVER_MAP_CLIENT_SECRET: "${NAVER_SECRET_S}"
-              networks:
-                - ${DOCKER_NETWORK}
-          networks:
-            ${DOCKER_NETWORK}:
-              external: true
-          EOF
+    # --- (2) 오버라이드 파일을 직접 작성 (변수 즉시 확장) ---
+    cat > "${OVERRIDE_FILE}" <<EOF
+    services:
+      ${TARGET}:
+        image: "${IMAGE_S}"
+        environment:
+          SPRING_DATASOURCE_URL: "${DB_URL_S}"
+          SPRING_DATASOURCE_USERNAME: "${DB_USER_S}"
+          SPRING_DATASOURCE_PASSWORD: "${DB_PASS_S}"
+          SPRING_PROFILES_ACTIVE: "prod"
+          TOSS_SECRET_KEY: "${TOSS_SECRET_S}"
+          NAVER_MAP_CLIENT_ID: "${NAVER_ID_S}"
+          NAVER_MAP_CLIENT_SECRET: "${NAVER_SECRET_S}"
+        networks:
+          - ${DOCKER_NETWORK}
+    networks:
+      ${DOCKER_NETWORK}:
+        external: true
+    EOF
 
-          # --- (3) compose 머지 결과 확인 ---
-          echo "[compose-config] merged service block for ${TARGET}"
-          docker compose -f ${APP_DIR}/docker-compose.yml -f "${OVERRIDE_FILE}" config | awk "/${TARGET}:/,/^[^[:space:]]/" || true
+    # --- (3) compose 머지 결과 확인 ---
+    echo "[compose-config] merged service block for ${TARGET}"
+    docker compose -f ${APP_DIR}/docker-compose.yml -f "${OVERRIDE_FILE}" config | awk "/${TARGET}:/,/^[^[:space:]]/" || true
 
-          # --- (4) 실제 배포 ---
-          docker compose -f ${APP_DIR}/docker-compose.yml -f "${OVERRIDE_FILE}" pull ${TARGET} || true
-          docker compose -f ${APP_DIR}/docker-compose.yml -f "${OVERRIDE_FILE}" up -d ${TARGET}
+    # --- (4) 실제 배포 ---
+    docker compose -f ${APP_DIR}/docker-compose.yml -f "${OVERRIDE_FILE}" pull ${TARGET} || true
+    docker compose -f ${APP_DIR}/docker-compose.yml -f "${OVERRIDE_FILE}" up -d ${TARGET}
 
-          # 컨테이너 존재/상태 출력
-          docker compose -f ${APP_DIR}/docker-compose.yml -f "${OVERRIDE_FILE}" ps
-          docker ps --format '{{.Names}}' | grep -w "${TARGET}"
+    # 컨테이너 존재/상태 출력
+    docker compose -f ${APP_DIR}/docker-compose.yml -f "${OVERRIDE_FILE}" ps
+    docker ps --format '{{.Names}}' | grep -w "${TARGET}"
 
-          # --- (5) 런타임 ENV 검증: docker inspect + env 길이 ---
-          # nounset에 안전하게: 비어 있어도 변수는 정의되도록 := 사용
-          CID="$(docker ps -q -f "name=^/${TARGET}$" || true)"; : "${CID:=}"
-          if [ -z "$CID" ]; then
-            echo "Container for ${TARGET} not found after up -d"
-            exit 1
-          fi
+    # --- (5) 런타임 ENV 검증 ---
+    # nounset에 안전하게: CID 조회 구간만 set +u로 완화
+    set +u
+    CID="$(docker ps -q -f "name=^/${TARGET}$" 2>/dev/null || true)"
+    set -u
 
-          echo "[inspect-env] (names only, not values)"
-          docker inspect "$CID" --format '{{range .Config.Env}}{{println .}}{{end}}' \
-           | grep -E '^SPRING_DATASOURCE_URL=|^SPRING_DATASOURCE_USERNAME=|^SPRING_DATASOURCE_PASSWORD=' \
-           | sed 's/=.*/=<redacted>/' || true
+    if [ -z "${CID:-}" ]; then
+      echo "Container for ${TARGET} not found after up -d"
+      exit 1
+    fi
 
-          echo "[env lengths]"
-          docker exec -i "$CID" sh -lc '
-            getv(){ env | awk -F= -v k="$1" "$0 ~ \"^\"k\"=\" {sub(/^[^=]*=/,\"\"); print; exit}"; }
-            f(){ v="$(getv "$1")"; printf "%s bytes = " "$1"; printf "%s" "$v" | wc -c; }
-            f SPRING_DATASOURCE_URL
-            f SPRING_DATASOURCE_USERNAME
-            f SPRING_DATASOURCE_PASSWORD
-          '
+    echo "[inspect-env] (names only, not values)"
+    docker inspect "${CID}" --format '{{range .Config.Env}}{{println .}}{{end}}' \
+     | grep -E '^SPRING_DATASOURCE_URL=|^SPRING_DATASOURCE_USERNAME=|^SPRING_DATASOURCE_PASSWORD=' \
+     | sed 's/=.*/=<redacted>/' || true
 
-          # --- (6) 컨테이너 네임스페이스에서 DB TCP 연결 테스트 ---
-          HOSTPORT=$(printf "%s" "$DB_URL" | sed -E 's#^jdbc:[a-zA-Z0-9]+://([^/]+)/.*#\\1#')
-          HOST=${HOSTPORT%:*}
-          PORT=${HOSTPORT#*:}
-          [ "$HOST" = "$PORT" ] && PORT=3306
-          echo "[TCP test] from container namespace (${TARGET}) -> $HOST:$PORT"
-          docker run --rm --network "container:${TARGET}" busybox sh -lc "nc -vz -w2 $HOST $PORT || true"
+    echo "[/proc/1/environ lengths]"
+    docker exec -i "${CID}" sh -lc '
+      getv(){ tr "\\0" "\\n" </proc/1/environ | awk -F= -v k="$1" "$0 ~ \"^\"k\"=\" {sub(/^[^=]*=/,\"\"); print; exit}"; }
+      plen(){ val="$(getv "$1")"; printf "%s bytes = " "$1"; printf "%s" "$val" | wc -c; }
+      plen SPRING_DATASOURCE_URL
+      plen SPRING_DATASOURCE_USERNAME
+      plen SPRING_DATASOURCE_PASSWORD
+    '
 
-          # (선택) 최근 로그 30줄
-          docker logs --tail=30 ${TARGET} || true
+    # --- (6) 컨테이너 네임스페이스에서 DB TCP 연결 테스트 ---
+    HOSTPORT=$(printf "%s" "$DB_URL" | sed -E 's#^jdbc:[a-zA-Z0-9]+://([^/]+)/.*#\\1#')
+    HOST=${HOSTPORT%:*}
+    PORT=${HOSTPORT#*:}
+    [ "$HOST" = "$PORT" ] && PORT=3306
+    echo "[TCP test] from container namespace (${TARGET}) -> $HOST:$PORT"
+    docker run --rm --network "container:${TARGET}" busybox sh -lc "nc -vz -w2 $HOST $PORT || true"
 
-          # --- (7) 민감 오버라이드 파일 삭제 ---
-          shred -u "${OVERRIDE_FILE}" 2>/dev/null || rm -f "${OVERRIDE_FILE}"
-          '''
+    # (선택) 최근 로그 30줄
+    docker logs --tail=30 ${TARGET} || true
+
+    # --- (7) 민감 오버라이드 파일 삭제 ---
+    shred -u "${OVERRIDE_FILE}" 2>/dev/null || rm -f "${OVERRIDE_FILE}"
+    '''
         }
       }
     }
@@ -350,7 +353,7 @@ docker compose -f ${APP_DIR}/docker-compose.yml rm -f ${PREV} || true
 set +e
 echo "[PIPELINE-ROLLBACK] revert Nginx to CURRENT & stop NEXT service"
 
-printf 'set $active_upstream app-%s:8080\\n' "${CURRENT_COLOR}" > "${NGINX_ACTIVE_VAR}" || true
+printf 'set $active_upstream app-%s:8080;\n' "${CURRENT_COLOR}" > "${NGINX_ACTIVE_VAR}" || true
 docker exec ${NGINX_CONTAINER} nginx -s reload || docker restart ${NGINX_CONTAINER} || true
 
 docker compose -f ${APP_DIR}/docker-compose.yml stop app-${NEXT_COLOR}  || true
