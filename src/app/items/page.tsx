@@ -143,7 +143,6 @@ function Pager({
 /** 이미지 절대경로 베이스 계산 */
 function resolveImgBase(): string {
   const envBase =
-    (process.env.NEXT_PUBLIC_API_BASE_URL as string | undefined) ||
     (process.env.NEXT_PUBLIC_API_BASE as string | undefined) ||
     '';
   if (envBase) return envBase.replace(/\/+$/, '');

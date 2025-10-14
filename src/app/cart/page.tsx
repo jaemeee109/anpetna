@@ -24,7 +24,6 @@ function formatKRW(n: number | bigint) {
 function resolveImgBase(): string {
   const envBase =
     (process.env.NEXT_PUBLIC_API_BASE as string | undefined) ||
-    (process.env.NEXT_PUBLIC_API_BASE_URL as string | undefined) ||
     '';
   if (envBase) return envBase.replace(/\/+$/, '');
   if (typeof window === 'undefined') return '';
