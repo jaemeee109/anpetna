@@ -172,7 +172,7 @@ docker logout || true
           string(credentialsId: 'naver_geocode_client_secret', variable: 'NAVER_SECRET')
         ]) {
           sh '''#!/bin/sh
-    # -u 제거 (nounset로 인한 예기치 않은 종료 방지)
+    # set -u 제거, -e/pipefail만 유지
     set -e -o pipefail
 
     echo "STEP[0] ========== setup vars =========="
@@ -180,16 +180,16 @@ docker logout || true
     IMAGE="${DOCKERHUB_REPO}:${IMAGE_TAG_BASE}-${NEXT_COLOR}"
     OVERRIDE_FILE="${WORKSPACE}/override-${TARGET}.yml"
 
-    # 필수 환경값 수동 검증 (unset/empty 모두 체크)
-    require() { v="$1"; name="$2"; if [ -z "$v" ]; then echo "ERROR: $name is required"; exit 1; fi; }
+    # 필수값 점검
+    require(){ v="$1"; n="$2"; if [ -z "$v" ]; then echo "ERROR: $n is required"; exit 1; fi; }
     require "${APP_DIR-}"        "APP_DIR"
     require "${DOCKER_NETWORK-}" "DOCKER_NETWORK"
-    require "${DB_URL-}"         "DB_URL"
-    require "${DB_USER-}"        "DB_USER"
-    require "${DB_PASS-}"        "DB_PASS"
     require "${DOCKERHUB_REPO-}" "DOCKERHUB_REPO"
     require "${IMAGE_TAG_BASE-}" "IMAGE_TAG_BASE"
     require "${NEXT_COLOR-}"     "NEXT_COLOR"
+    require "${DB_URL-}"         "DB_URL"
+    require "${DB_USER-}"        "DB_USER"
+    require "${DB_PASS-}"        "DB_PASS"
 
     echo "STEP[1] ========== secret length debug =========="
     echo "[DEBUG] Byte-lengths (no secrets printed)"
@@ -198,10 +198,8 @@ docker logout || true
     printf 'DB_PASS bytes = ';  printf '%s' "$DB_PASS"  | wc -c
 
     echo "STEP[2] ========== escape & write override =========="
-    escq() { printf '%s' "${1-}" | sed 's/"/\\"/g'; }
-    DB_URL_S=$(escq "$DB_URL")
-    DB_USER_S=$(escq "$DB_USER")
-    DB_PASS_S=$(escq "$DB_PASS")
+    escq(){ printf '%s' "${1-}" | sed 's/"/\\"/g'; }
+    DB_URL_S=$(escq "$DB_URL"); DB_USER_S=$(escq "$DB_USER"); DB_PASS_S=$(escq "$DB_PASS")
     TOSS_SECRET_S=$(escq "${TOSS_SECRET-}")
     NAVER_ID_S=$(escq "${NAVER_ID-}")
     NAVER_SECRET_S=$(escq "${NAVER_SECRET-}")
@@ -227,11 +225,18 @@ docker logout || true
         external: true
     EOF
 
-    echo "STEP[3] ========== show merged config (partial) =========="
+    # (디버그) override 파일 한 번 보여주기 — 민감값은 이미 이스케이프된 상태
+    echo "----- OVERRIDE (${OVERRIDE_FILE}) -----"
+    cat "${OVERRIDE_FILE}" | sed -E 's/(SPRING_DATASOURCE_PASSWORD: ).*/\\1<redacted>/' || true
+    echo "--------------------------------------"
+
+    echo "STEP[3] ========== merged config (non-blocking) =========="
+    # 이 부분은 실패해도 배포를 계속하기 위해 || true
     docker compose -f "${APP_DIR}/docker-compose.yml" -f "${OVERRIDE_FILE}" config \
       | awk "/${TARGET}:/,/^[^[:space:]]/" || true
 
     echo "STEP[4] ========== compose up -d ${TARGET} =========="
+    # 이미지 풀은 실패해도 계속 진행
     docker compose -f "${APP_DIR}/docker-compose.yml" -f "${OVERRIDE_FILE}" pull "${TARGET}" || true
     docker compose -f "${APP_DIR}/docker-compose.yml" -f "${OVERRIDE_FILE}" up -d "${TARGET}"
 
@@ -239,11 +244,11 @@ docker logout || true
     docker compose -f "${APP_DIR}/docker-compose.yml" -f "${OVERRIDE_FILE}" ps || true
     docker ps -a --format 'table {{.Names}}\\t{{.Status}}\\t{{.Image}}' | grep -E 'app-(blue|green)' || true
 
-    echo "STEP[6] ========== resolve CID (after up -d) =========="
+    echo "STEP[6] ========== resolve CID =========="
     CID=""
     CID="$(docker compose -f "${APP_DIR}/docker-compose.yml" -f "${OVERRIDE_FILE}" ps -q "${TARGET}" || true)"
     if [ -z "$CID" ]; then
-      echo "ERROR: Container for ${TARGET} not found after up -d"
+      echo "ERROR: ${TARGET} not found after up -d"
       docker compose -f "${APP_DIR}/docker-compose.yml" -f "${OVERRIDE_FILE}" ps || true
       docker logs --tail=200 "${TARGET}" || true
       shred -u "${OVERRIDE_FILE}" 2>/dev/null || rm -f "${OVERRIDE_FILE}"
@@ -251,20 +256,18 @@ docker logout || true
     fi
     echo "[INFO] ${TARGET} CID=${CID}"
 
-    echo "STEP[7] ========== inspect env keys (masked) =========="
+    echo "STEP[7] ========== env keys (masked) =========="
     docker inspect "${CID}" --format '{{range .Config.Env}}{{println .}}{{end}}' \
       | grep -E '^SPRING_DATASOURCE_URL=|^SPRING_DATASOURCE_USERNAME=|^SPRING_DATASOURCE_PASSWORD=' \
       | sed 's/=.*/=<redacted>/' || true
 
-    echo "STEP[8] ========== DB TCP test from container namespace =========="
+    echo "STEP[8] ========== DB TCP test =========="
     HOSTPORT=$(printf "%s" "$DB_URL" | sed -E 's#^jdbc:[a-zA-Z0-9]+://([^/]+)/.*#\\1#')
-    HOST=${HOSTPORT%:*}
-    PORT=${HOSTPORT#*:}
-    [ "$HOST" = "$PORT" ] && PORT=3306
+    HOST=${HOSTPORT%:*}; PORT=${HOSTPORT#*:}; [ "$HOST" = "$PORT" ] && PORT=3306
     echo "[TCP test] ${TARGET} -> $HOST:$PORT"
     docker run --rm --network "container:${TARGET}" busybox sh -lc "nc -vz -w3 $HOST $PORT || true"
 
-    echo "STEP[9] ========== last 60 lines of ${TARGET} =========="
+    echo "STEP[9] ========== last logs =========="
     docker logs --tail=60 "${TARGET}" || true
 
     echo "STEP[10] ========== cleanup =========="
