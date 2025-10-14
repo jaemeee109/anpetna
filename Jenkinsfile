@@ -16,45 +16,42 @@ pipeline {
     NGINX_DIR          = '/opt/anpetna/nginx'
     NGINX_ACTIVE_VAR   = '/opt/anpetna/nginx/conf.d/active-upstream.var'
 
-    // 컨테이너/네트워크 명
     NGINX_CONTAINER    = 'anpetna-nginx'
     DOCKER_NETWORK     = 'anpetna_net'
 
-    // 헬스/버전 태그
     HEALTH_TIMEOUT_SEC = '180'
-    IMAGE_TAG_BASE     = "v1.0.${env.BUILD_NUMBER}"   // color는 뒤에서 붙임
+    IMAGE_TAG_BASE     = "v1.0.${env.BUILD_NUMBER}"
+
+    // 디버그 토글: 1로 켜면 민감값 원문도 출력(주의)
+    DEBUG_ENV          = '0'
   }
 
   stages {
 
     stage('Preflight') {
       steps {
-        sh '''
-          set -euxo pipefail
+        sh '''#!/bin/sh
+set -euxo pipefail
 
-          # 워커 컨테이너에서 경로 접근 가능한지(볼륨 마운트) 사전 점검
-          test -f "${APP_DIR}/docker-compose.yml" || { echo "Missing ${APP_DIR}/docker-compose.yml (worker volume?)"; exit 1; }
-          test -d "${NGINX_DIR}" || { echo "Missing ${NGINX_DIR} (worker volume?)"; exit 1; }
+test -f "${APP_DIR}/docker-compose.yml" || { echo "Missing ${APP_DIR}/docker-compose.yml (worker volume?)"; exit 1; }
+test -d "${NGINX_DIR}" || { echo "Missing ${NGINX_DIR} (worker volume?)"; exit 1; }
 
-          # docker/compose 사용 가능 여부(권한 포함)
-          docker version >/dev/null
-          docker compose version >/dev/null
+docker version >/dev/null
+docker compose version >/dev/null
 
-          docker network ls | grep -w "${DOCKER_NETWORK}" >/dev/null || docker network create ${DOCKER_NETWORK} || true
+docker network ls | grep -w "${DOCKER_NETWORK}" >/dev/null || docker network create ${DOCKER_NETWORK} || true
 
-          # active-upstream.var 최초 생성 (없으면 app-blue:8080 으로 시작)
-          if [ ! -f "${NGINX_ACTIVE_VAR}" ]; then
-            mkdir -p "$(dirname ${NGINX_ACTIVE_VAR})"
-            printf 'set $active_upstream app-blue:8080;\n' > "${NGINX_ACTIVE_VAR}"
-          fi
+if [ ! -f "${NGINX_ACTIVE_VAR}" ]; then
+  mkdir -p "$(dirname ${NGINX_ACTIVE_VAR})"
+  printf 'set $active_upstream app-blue:8080\\n' > "${NGINX_ACTIVE_VAR}"
+fi
 
-          # nginx 컨테이너 확인 + 네트워크 연결 보정
-          docker ps --format '{{.Names}}' | grep -w "${NGINX_CONTAINER}" >/dev/null || { echo "Nginx container ${NGINX_CONTAINER} not running"; exit 1; }
+docker ps --format '{{.Names}}' | grep -w "${NGINX_CONTAINER}" >/dev/null || { echo "Nginx container ${NGINX_CONTAINER} not running"; exit 1; }
 
-          if ! docker inspect -f '{{json .NetworkSettings.Networks}}' ${NGINX_CONTAINER} | grep -q "\"${DOCKER_NETWORK}\""; then
-            docker network connect ${DOCKER_NETWORK} ${NGINX_CONTAINER} || true
-          fi
-        '''
+if ! docker inspect -f '{{json .NetworkSettings.Networks}}' ${NGINX_CONTAINER} | grep -q "\"${DOCKER_NETWORK}\""; then
+  docker network connect ${DOCKER_NETWORK} ${NGINX_CONTAINER} || true
+fi
+'''
       }
     }
 
@@ -79,98 +76,93 @@ pipeline {
       }
     }
 
-   stage('Build (Gradle)') {
-     options { timeout(time: 20, unit: 'MINUTES') }
-     steps {
-       retry(2) {
-         sh '''#!/bin/sh
-   set -euxo pipefail
+    stage('Build (Gradle)') {
+      options { timeout(time: 20, unit: 'MINUTES') }
+      steps {
+        retry(2) {
+          sh '''#!/bin/sh
+set -euxo pipefail
 
-   export JAVA_HOME=/opt/java/openjdk
-   export PATH="$JAVA_HOME/bin:$PATH"
+export JAVA_HOME=/opt/java/openjdk
+export PATH="$JAVA_HOME/bin:$PATH"
 
-   # 워크스페이스 내 Gradle 캐시
-   export GRADLE_USER_HOME="$WORKSPACE/.gradle-cache"
-   mkdir -p "$GRADLE_USER_HOME"
+export GRADLE_USER_HOME="$WORKSPACE/.gradle-cache"
+mkdir -p "$GRADLE_USER_HOME"
 
-   # 네트워크 타임아웃 여유
-   printf '%s\n' \
-     'org.gradle.daemon=false' \
-     'org.gradle.console=plain' \
-     'systemProp.org.gradle.internal.http.connectionTimeout=120000' \
-     'systemProp.org.gradle.internal.http.socketTimeout=120000' \
-     > "$GRADLE_USER_HOME/gradle.properties"
+printf '%s\n' \
+  'org.gradle.daemon=false' \
+  'org.gradle.console=plain' \
+  'systemProp.org.gradle.internal.http.connectionTimeout=120000' \
+  'systemProp.org.gradle.internal.http.socketTimeout=120000' \
+  > "$GRADLE_USER_HOME/gradle.properties"
 
-   test -f ./gradlew || { echo "gradlew not found"; exit 1; }
-   chmod +x ./gradlew
+test -f ./gradlew || { echo "gradlew not found"; exit 1; }
+chmod +x ./gradlew
 
-   ./gradlew --no-daemon --max-workers=1 \
-     -Dorg.gradle.workers.max=1 \
-     -Dorg.gradle.jvmargs=-Xmx1536m \
-     -Dfile.encoding=UTF-8 \
-     --info --stacktrace --console=plain \
-     clean bootJar -x test
+./gradlew --no-daemon --max-workers=1 \
+  -Dorg.gradle.workers.max=1 \
+  -Dorg.gradle.jvmargs=-Xmx1536m \
+  -Dfile.encoding=UTF-8 \
+  --info --stacktrace --console=plain \
+  clean bootJar -x test
 
-   # 산출물 확인(없으면 실패)
-   JAR_PATH=$(ls -1 build/libs/*.jar | head -n1 || true)
-   [ -f "$JAR_PATH" ] || { echo "JAR not found under build/libs"; exit 1; }
-   ls -l "$JAR_PATH"
-   '''
-       }
-     }
-   }
+JAR_PATH=$(ls -1 build/libs/*.jar | head -n1 || true)
+[ -f "$JAR_PATH" ] || { echo "JAR not found under build/libs"; exit 1; }
+ls -l "$JAR_PATH"
+'''
+        }
+      }
+    }
 
-   stage('Docker Build & Push') {
-     environment {
-       DOCKER_BUILDKIT = '1'
-       COMPOSE_DOCKER_CLI_BUILD = '1'
-     }
-     steps {
-       withCredentials([usernamePassword(credentialsId: 'docker-hub-access-token',
-                                         usernameVariable: 'DOCKER_USER',
-                                         passwordVariable: 'DOCKER_PASS')]) {
-         sh '''#!/bin/sh
-   set -euxo pipefail
+    stage('Docker Build & Push') {
+      environment {
+        DOCKER_BUILDKIT = '1'
+        COMPOSE_DOCKER_CLI_BUILD = '1'
+      }
+      steps {
+        withCredentials([usernamePassword(credentialsId: 'docker-hub-access-token',
+                                          usernameVariable: 'DOCKER_USER',
+                                          passwordVariable: 'DOCKER_PASS')]) {
+          sh '''#!/bin/sh
+set -euxo pipefail
 
-   : "${DOCKERHUB_REPO:?DOCKERHUB_REPO not set}"
-   : "${IMAGE_TAG_BASE:?IMAGE_TAG_BASE not set}"
-   : "${NEXT_COLOR:?NEXT_COLOR not set}"
+: "${DOCKERHUB_REPO:?DOCKERHUB_REPO not set}"
+: "${IMAGE_TAG_BASE:?IMAGE_TAG_BASE not set}"
+: "${NEXT_COLOR:?NEXT_COLOR not set}"
 
-   echo "${DOCKER_PASS}" | docker login -u "${DOCKER_USER}" --password-stdin
+echo "${DOCKER_PASS}" | docker login -u "${DOCKER_USER}" --password-stdin
 
-   JAR_PATH=$(ls -1 build/libs/*.jar | head -n1)
-   [ -f "$JAR_PATH" ] || { echo "JAR not found under build/libs"; exit 1; }
+JAR_PATH=$(ls -1 build/libs/*.jar | head -n1)
+[ -f "$JAR_PATH" ] || { echo "JAR not found under build/libs"; exit 1; }
 
-   IMAGE_BASE="${DOCKERHUB_REPO}:${IMAGE_TAG_BASE}"
-   # 반대 색상도 미리 태깅 (manifest unknown 예방)
-   if [ "${NEXT_COLOR}" = "green" ]; then OTHER_COLOR="blue"; else OTHER_COLOR="green"; fi
+IMAGE_BASE="${DOCKERHUB_REPO}:${IMAGE_TAG_BASE}"
+if [ "${NEXT_COLOR}" = "green" ]; then OTHER_COLOR="blue"; else OTHER_COLOR="green"; fi
 
-   docker build --pull \
-     --build-arg JAR_FILE="$JAR_PATH" \
-     -t "${IMAGE_BASE}" \
-     -f Dockerfile .
+docker build --pull \
+  --build-arg JAR_FILE="$JAR_PATH" \
+  -t "${IMAGE_BASE}" \
+  -f Dockerfile .
 
-   docker tag "${IMAGE_BASE}" "${IMAGE_BASE}-${NEXT_COLOR}"
-   docker tag "${IMAGE_BASE}" "${IMAGE_BASE}-${OTHER_COLOR}"
+docker tag "${IMAGE_BASE}" "${IMAGE_BASE}-${NEXT_COLOR}"
+docker tag "${IMAGE_BASE}" "${IMAGE_BASE}-${OTHER_COLOR}"
 
-   docker push "${IMAGE_BASE}"
-   docker push "${IMAGE_BASE}-${NEXT_COLOR}"
-   docker push "${IMAGE_BASE}-${OTHER_COLOR}"
+docker push "${IMAGE_BASE}"
+docker push "${IMAGE_BASE}-${NEXT_COLOR}"
+docker push "${IMAGE_BASE}-${OTHER_COLOR}"
 
-   # 배포 스테이지 호환: NEXT 이미지 한 줄짜리 파일과 전체 목록 둘 다 남김
-   echo "${IMAGE_BASE}-${NEXT_COLOR}" > image.tag
-   printf '%s\n' \
-     "${IMAGE_BASE}" \
-     "${IMAGE_BASE}-${NEXT_COLOR}" \
-     "${IMAGE_BASE}-${OTHER_COLOR}" > image.tags
+echo "${IMAGE_BASE}-${NEXT_COLOR}" > image.tag
+printf '%s\n' \
+  "${IMAGE_BASE}" \
+  "${IMAGE_BASE}-${NEXT_COLOR}" \
+  "${IMAGE_BASE}-${OTHER_COLOR}" > image.tags
 
-   docker logout || true
-   '''
-       }
-     }
-   }
+docker logout || true
+'''
+        }
+      }
+    }
 
-    stage('Deploy NEXT (compose override)') {
+    stage('Deploy NEXT (compose override + 강력 검증)') {
       steps {
         withCredentials([
           string(credentialsId: 'db_url',  variable: 'DB_URL'),
@@ -180,89 +172,138 @@ pipeline {
           string(credentialsId: 'naver_geocode_client_secret', variable: 'NAVER_SECRET')
         ]) {
           sh '''#!/bin/sh
-    set -euxo pipefail
+set -euxo pipefail
 
-    TARGET="app-${NEXT_COLOR}"
-    IMAGE="${DOCKERHUB_REPO}:${IMAGE_TAG_BASE}-${NEXT_COLOR}"
-    OVERRIDE_FILE="${WORKSPACE}/override-${TARGET}.yml"
+TARGET="app-${NEXT_COLOR}"
+IMAGE="${DOCKERHUB_REPO}:${IMAGE_TAG_BASE}-${NEXT_COLOR}"
+OVERRIDE_FILE="${WORKSPACE}/override-${TARGET}.yml"
 
-    # 1) 오버라이드 파일 생성
-    cat > "${OVERRIDE_FILE}" <<'EOF'
-    services:
-      __TARGET__:
-        image: __IMAGE__
-        environment:
-          SPRING_DATASOURCE_URL: "__DB_URL__"
-          SPRING_DATASOURCE_USERNAME: "__DB_USER__"
-          SPRING_DATASOURCE_PASSWORD: "__DB_PASS__"
-          SPRING_PROFILES_ACTIVE: "prod"
-          TOSS_SECRET_KEY: "__TOSS_SECRET__"
-          NAVER_MAP_CLIENT_ID: "__NAVER_ID__"
-          NAVER_MAP_CLIENT_SECRET: "__NAVER_SECRET__"
-        networks:
-          - __DOCKER_NETWORK__
+# --- (0) Jenkins 변수 바이트 검증 (개행/CRLF 탐지) ---
+echo "[DEBUG] Byte-lengths (no secrets printed)"
+printf 'DB_URL bytes = ';   printf '%s' "$DB_URL"   | wc -c
+printf 'DB_USER bytes = ';  printf '%s' "$DB_USER"  | wc -c
+printf 'DB_PASS bytes = ';  printf '%s' "$DB_PASS"  | wc -c
+
+if [ "${DEBUG_ENV}" = "1" ]; then
+  echo "[DEBUG_ENV=1] RAW hexdump (sensitive!)"
+  printf '%s' "$DB_URL"  | hexdump -C || true
+fi
+
+# sed/printf-safe 이스케이프 함수들
+esc_sed()  { printf '%s' "$1" | sed 's/[\\/&|]/\\&/g; s/"/\\"/g'; }
+esc_yaml() { printf '%s' "$1" | sed 's/"/\\"/g'; }  # 따옴표만 이스케이프, YAML은 쌍따옴표로 감쌈
+
+# --- (1) 오버라이드 파일 생성 (문자 그대로 주입) ---
+cat > "${OVERRIDE_FILE}" <<'EOF'
+services:
+  __TARGET__:
+    image: __IMAGE__
+    environment:
+      SPRING_DATASOURCE_URL: "__DB_URL__"
+      SPRING_DATASOURCE_USERNAME: "__DB_USER__"
+      SPRING_DATASOURCE_PASSWORD: "__DB_PASS__"
+      SPRING_PROFILES_ACTIVE: "prod"
+      TOSS_SECRET_KEY: "__TOSS_SECRET__"
+      NAVER_MAP_CLIENT_ID: "__NAVER_ID__"
+      NAVER_MAP_CLIENT_SECRET: "__NAVER_SECRET__"
     networks:
-      __DOCKER_NETWORK__:
-        external: true
-    EOF
+      - __DOCKER_NETWORK__
+networks:
+  __DOCKER_NETWORK__:
+    external: true
+EOF
 
-    # 변수 치환
-    sed -i "s#__TARGET__#${TARGET}#g"           "${OVERRIDE_FILE}"
-    sed -i "s#__IMAGE__#${IMAGE}#g"             "${OVERRIDE_FILE}"
-    sed -i "s#__DB_URL__#${DB_URL}#g"           "${OVERRIDE_FILE}"
-    sed -i "s#__DB_USER__#${DB_USER}#g"         "${OVERRIDE_FILE}"
-    sed -i "s#__DB_PASS__#${DB_PASS}#g"         "${OVERRIDE_FILE}"
-    sed -i "s#__TOSS_SECRET__#${TOSS_SECRET}#g" "${OVERRIDE_FILE}"
-    sed -i "s#__NAVER_ID__#${NAVER_ID}#g"       "${OVERRIDE_FILE}"
-    sed -i "s#__NAVER_SECRET__#${NAVER_SECRET}#g" "${OVERRIDE_FILE}"
-    sed -i "s#__DOCKER_NETWORK__#${DOCKER_NETWORK}#g" "${OVERRIDE_FILE}"
+sed -i "s|__TARGET__|${TARGET}|g"           "${OVERRIDE_FILE}"
+sed -i "s|__IMAGE__|$(esc_sed "${IMAGE}")|g"             "${OVERRIDE_FILE}"
+sed -i "s|__DB_URL__|$(esc_sed "$(esc_yaml "${DB_URL}")")|g"       "${OVERRIDE_FILE}"
+sed -i "s|__DB_USER__|$(esc_sed "$(esc_yaml "${DB_USER}")")|g"     "${OVERRIDE_FILE}"
+sed -i "s|__DB_PASS__|$(esc_sed "$(esc_yaml "${DB_PASS}")")|g"     "${OVERRIDE_FILE}"
+sed -i "s|__TOSS_SECRET__|$(esc_sed "$(esc_yaml "${TOSS_SECRET}")")|g" "${OVERRIDE_FILE}"
+sed -i "s|__NAVER_ID__|$(esc_sed "$(esc_yaml "${NAVER_ID}")")|g"   "${OVERRIDE_FILE}"
+sed -i "s|__NAVER_SECRET__|$(esc_sed "$(esc_yaml "${NAVER_SECRET}")")|g" "${OVERRIDE_FILE}"
+sed -i "s|__DOCKER_NETWORK__|${DOCKER_NETWORK}|g" "${OVERRIDE_FILE}"
 
-    # 2) 최종 머지 결과(디버그)
-    docker compose -f ${APP_DIR}/docker-compose.yml -f "${OVERRIDE_FILE}" config | awk "/${TARGET}:/,/^$/" || true
+# --- (2) compose 머지 결과 확인 (민감값은 길이만) ---
+echo "[compose-config] merged service block for ${TARGET}"
+docker compose -f ${APP_DIR}/docker-compose.yml -f "${OVERRIDE_FILE}" config | awk "/${TARGET}:/,/^[^[:space:]]/" || true
 
-    # 3) 실제 배포 (이 출력이 반드시 로그에 보여야 함)
-    docker compose -f ${APP_DIR}/docker-compose.yml -f "${OVERRIDE_FILE}" pull ${TARGET} || true
-    docker compose -f ${APP_DIR}/docker-compose.yml -f "${OVERRIDE_FILE}" up -d ${TARGET}
+# --- (3) 실제 배포 ---
+docker compose -f ${APP_DIR}/docker-compose.yml -f "${OVERRIDE_FILE}" pull ${TARGET} || true
+docker compose -f ${APP_DIR}/docker-compose.yml -f "${OVERRIDE_FILE}" up -d ${TARGET}
 
-    # 4) 상태 확인 + 컨테이너 없으면 즉시 실패
-    docker compose -f ${APP_DIR}/docker-compose.yml -f "${OVERRIDE_FILE}" ps
-    docker ps --format '{{.Names}}' | grep -w "${TARGET}"
+# 컨테이너 존재/상태 출력
+docker compose -f ${APP_DIR}/docker-compose.yml -f "${OVERRIDE_FILE}" ps
+docker ps --format '{{.Names}}' | grep -w "${TARGET}"
 
-    # (선택) 로그 한 줄
-    docker logs --tail=50 ${TARGET} || true
+# --- (4) 런타임 ENV 검증: docker inspect + /proc/1/environ 바이트 ---
+CID=$(docker ps -q -f "name=^/${TARGET}$")
+[ -n "$CID" ] || { echo "Container for ${TARGET} not found"; exit 1; }
 
-    # 5) 민감 파일 정리
-    shred -u "${OVERRIDE_FILE}" 2>/dev/null || rm -f "${OVERRIDE_FILE}"
-    '''
+echo "[inspect-env] (names only, not values)"
+docker inspect "$CID" --format '{{range .Config.Env}}{{println .}}{{end}}' \
+ | grep -E '^SPRING_DATASOURCE_URL=|^SPRING_DATASOURCE_USERNAME=|^SPRING_DATASOURCE_PASSWORD=' \
+ | sed 's/=.*/=<redacted>/' || true
+
+echo "[/proc/1/environ lengths]"
+docker exec -i "$CID" sh -lc '
+  f(){ v=$(tr "\0" "\n" </proc/1/environ | awk -F= "/^$1=/{\$1=\"\"; sub(/^=/,\"\"); print; exit}"); printf "%s bytes = " "$1"; printf "%s" "$v" | wc -c; }
+  f SPRING_DATASOURCE_URL
+  f SPRING_DATASOURCE_USERNAME
+  f SPRING_DATASOURCE_PASSWORD
+'
+if [ "${DEBUG_ENV}" = "1" ]; then
+  echo "[/proc/1/environ hexdump - URL ONLY] (sensitive!)"
+  docker exec -i "$CID" sh -lc '
+    val=$(tr "\0" "\n" </proc/1/environ | awk -F= "/^SPRING_DATASOURCE_URL=/{\$1=\"\"; sub(/^=/,\"\"); print; exit}")
+    printf "%s" "$val" | hexdump -C
+  ' || true
+fi
+
+# --- (5) 컨테이너 네임스페이스에서 DB TCP 연결 테스트 ---
+# URL에서 host/port 파싱 (jdbc:mariadb://host:port/db?...). 포트 없으면 3306 기본.
+HOSTPORT=$(printf "%s" "$DB_URL" | sed -E 's#^jdbc:[a-zA-Z0-9]+://([^/]+)/.*#\\1#')
+HOST=${HOSTPORT%:*}
+PORT=${HOSTPORT#*:}
+[ "$HOST" = "$PORT" ] && PORT=3306
+
+echo "[TCP test] from container namespace (${TARGET}) -> $HOST:$PORT"
+docker run --rm --network "container:${TARGET}" busybox sh -lc "nc -vz -w2 $HOST $PORT || true"
+
+# (선택) 최근 로그 30줄
+docker logs --tail=30 ${TARGET} || true
+
+# --- (6) 민감 오버라이드 파일 삭제 ---
+shred -u "${OVERRIDE_FILE}" 2>/dev/null || rm -f "${OVERRIDE_FILE}"
+'''
         }
       }
     }
 
     stage('Healthcheck NEXT') {
       steps {
-        sh '''
-          set -euxo pipefail
-          TARGET="app-${NEXT_COLOR}"
+        sh '''#!/bin/sh
+set -euxo pipefail
+TARGET="app-${NEXT_COLOR}"
 
-          docker pull curlimages/curl:latest || true
+docker pull curlimages/curl:latest || true
 
-          SECONDS=0
-          until docker run --rm --network ${DOCKER_NETWORK} \
-              -e TARGET="${TARGET}" curlimages/curl:latest \
-              sh -c 'code=$(curl -s -o /dev/null -w "%{http_code}" http://$TARGET:8080/actuator/health); \
-                     if [ "$code" = 200 ]; then \
-                       curl -fsS http://$TARGET:8080/actuator/health | grep -q "\"status\":\"UP\""; \
-                     else \
-                       [ "$code" = 401 ]; \
-                     fi'; do
-            if [ ${SECONDS} -ge ${HEALTH_TIMEOUT_SEC} ]; then
-              echo "Healthcheck timeout for ${TARGET}"
-              exit 1
-            fi
-            sleep 3
-          done
-          echo "NEXT ${NEXT_COLOR} is healthy (HTTP 200/UP or 401)"
-        '''
+SECONDS=0
+until docker run --rm --network ${DOCKER_NETWORK} \
+    -e TARGET="${TARGET}" curlimages/curl:latest \
+    sh -c 'code=$(curl -s -o /dev/null -w "%{http_code}" http://$TARGET:8080/actuator/health); \
+           if [ "$code" = 200 ]; then \
+             curl -fsS http://$TARGET:8080/actuator/health | grep -q "\"status\":\"UP\""; \
+           else \
+             [ "$code" = 401 ]; \
+           fi'; do
+  if [ ${SECONDS} -ge ${HEALTH_TIMEOUT_SEC} ]; then
+    echo "Healthcheck timeout for ${TARGET}"
+    exit 1
+  fi
+  sleep 3
+done
+echo "NEXT ${NEXT_COLOR} is healthy (HTTP 200/UP or 401)"
+'''
       }
     }
 
@@ -270,31 +311,29 @@ pipeline {
       steps {
         script {
           try {
-            sh '''
-              set -euxo pipefail
-              # NEXT로 전환
-              printf 'set $active_upstream app-%s:8080;\\n' "${NEXT_COLOR}" > "${NGINX_ACTIVE_VAR}"
-              docker exec ${NGINX_CONTAINER} nginx -s reload || docker restart ${NGINX_CONTAINER}
+            sh '''#!/bin/sh
+set -euxo pipefail
 
-              # 전환 검증: Nginx(게이트웨이)를 통해 백엔드 헬스가 통과해야 성공
-              docker pull curlimages/curl:latest || true
-              docker run --rm --network ${DOCKER_NETWORK} curlimages/curl:latest sh -lc '
-                code=$(curl -s -o /dev/null -w "%{http_code}" "http://'${NGINX_CONTAINER}'/actuator/health");
-                if [ "$code" = "200" ]; then
-                  curl -fsS "http://'${NGINX_CONTAINER}'/actuator/health" | grep -q "\"status\":\"UP\"";
-                else
-                  [ "$code" = "401" ];
-                fi
-              '
-            '''
+printf 'set $active_upstream app-%s:8080\\n' "${NEXT_COLOR}" > "${NGINX_ACTIVE_VAR}"
+docker exec ${NGINX_CONTAINER} nginx -s reload || docker restart ${NGINX_CONTAINER}
+
+docker pull curlimages/curl:latest || true
+docker run --rm --network ${DOCKER_NETWORK} curlimages/curl:latest sh -lc '
+  code=$(curl -s -o /dev/null -w "%{http_code}" "http://'${NGINX_CONTAINER}'/actuator/health");
+  if [ "$code" = "200" ]; then
+    curl -fsS "http://'${NGINX_CONTAINER}'/actuator/health" | grep -q "\"status\":\"UP\"";
+  else
+    [ "$code" = "401" ];
+  fi
+'
+'''
           } catch (err) {
-            // 즉시 롤백
-            sh '''
-              set +e
-              echo "[SWITCH-ROLLBACK] revert to CURRENT"
-              printf 'set $active_upstream app-%s:8080;\\n' "${CURRENT_COLOR}" > "${NGINX_ACTIVE_VAR}" || true
-              docker exec ${NGINX_CONTAINER} nginx -s reload || docker restart ${NGINX_CONTAINER} || true
-            '''
+            sh '''#!/bin/sh
+set +e
+echo "[SWITCH-ROLLBACK] revert to CURRENT"
+printf 'set $active_upstream app-%s:8080\\n' "${CURRENT_COLOR}" > "${NGINX_ACTIVE_VAR}" || true
+docker exec ${NGINX_CONTAINER} nginx -s reload || docker restart ${NGINX_CONTAINER} || true
+'''
             error "Switchover verification failed → rolled back to ${env.CURRENT_COLOR}"
           }
         }
@@ -303,13 +342,13 @@ pipeline {
 
     stage('Drain & Stop PREV') {
       steps {
-        sh '''
-          set -euxo pipefail
-          sleep 5
-          PREV="app-${CURRENT_COLOR}"
-          docker compose -f ${APP_DIR}/docker-compose.yml stop ${PREV} || true
-          docker compose -f ${APP_DIR}/docker-compose.yml rm -f ${PREV} || true
-        '''
+        sh '''#!/bin/sh
+set -euxo pipefail
+sleep 5
+PREV="app-${CURRENT_COLOR}"
+docker compose -f ${APP_DIR}/docker-compose.yml stop ${PREV} || true
+docker compose -f ${APP_DIR}/docker-compose.yml rm -f ${PREV} || true
+'''
       }
     }
   }
@@ -320,22 +359,19 @@ pipeline {
     }
     unsuccessful {
       script {
-        sh '''
-          set +e
-          echo "[PIPELINE-ROLLBACK] revert Nginx to CURRENT & stop NEXT service"
+        sh '''#!/bin/sh
+set +e
+echo "[PIPELINE-ROLLBACK] revert Nginx to CURRENT & stop NEXT service"
 
-          # 1) 라우팅 복구
-          printf 'set $active_upstream app-%s:8080;\\n' "${CURRENT_COLOR}" > "${NGINX_ACTIVE_VAR}" || true
-          docker exec ${NGINX_CONTAINER} nginx -s reload || docker restart ${NGINX_CONTAINER} || true
+printf 'set $active_upstream app-%s:8080\\n' "${CURRENT_COLOR}" > "${NGINX_ACTIVE_VAR}" || true
+docker exec ${NGINX_CONTAINER} nginx -s reload || docker restart ${NGINX_CONTAINER} || true
 
-          # 2) NEXT 서비스 중지/정리
-          docker compose -f ${APP_DIR}/docker-compose.yml stop app-${NEXT_COLOR}  || true
-          docker compose -f ${APP_DIR}/docker-compose.yml rm -f app-${NEXT_COLOR} || true
+docker compose -f ${APP_DIR}/docker-compose.yml stop app-${NEXT_COLOR}  || true
+docker compose -f ${APP_DIR}/docker-compose.yml rm -f app-${NEXT_COLOR} || true
 
-          # 3) (선택) 오버라이드 파일 치우기
-          rm -f ${APP_DIR}/override-app-${NEXT_COLOR}.yml || true
-          rm -f ${APP_DIR}/override-app-${CURRENT_COLOR}.yml || true
-        '''
+rm -f ${APP_DIR}/override-app-${NEXT_COLOR}.yml || true
+rm -f ${APP_DIR}/override-app-${CURRENT_COLOR}.yml || true
+'''
       }
     }
   }
