@@ -178,13 +178,11 @@ docker logout || true
     IMAGE="${DOCKERHUB_REPO}:${IMAGE_TAG_BASE}-${NEXT_COLOR}"
     OVERRIDE_FILE="${WORKSPACE}/override-${TARGET}.yml"
 
-    # --- (0) Jenkins 변수 바이트 검증 (마스킹 출력) ---
     echo "[DEBUG] Byte-lengths (no secrets printed)"
     printf 'DB_URL bytes = ';   printf '%s' "$DB_URL"   | wc -c
     printf 'DB_USER bytes = ';  printf '%s' "$DB_USER"  | wc -c
     printf 'DB_PASS bytes = ';  printf '%s' "$DB_PASS"  | wc -c
 
-    # --- (1) 따옴표만 이스케이프한 안전값 준비 ---
     escq() { printf '%s' "$1" | sed 's/"/\\"/g'; }
     DB_URL_S=$(escq "$DB_URL")
     DB_USER_S=$(escq "$DB_USER")
@@ -194,7 +192,7 @@ docker logout || true
     NAVER_SECRET_S=$(escq "$NAVER_SECRET")
     IMAGE_S=$(escq "$IMAGE")
 
-    # --- (2) 오버라이드 파일을 직접 작성 (변수 즉시 확장) ---
+    # (1) override 파일 생성
     cat > "${OVERRIDE_FILE}" <<EOF
     services:
       ${TARGET}:
@@ -215,43 +213,47 @@ docker logout || true
         external: true
     EOF
 
-    # --- (3) compose 머지 결과 확인 ---
+    # (2) 머지 결과 프린트(참고)
     echo "[compose-config] merged service block for ${TARGET}"
     docker compose -f "${APP_DIR}/docker-compose.yml" -f "${OVERRIDE_FILE}" config \
       | awk "/${TARGET}:/,/^[^[:space:]]/" || true
 
-    # --- (4) 실제 배포 ---
+    # (3) 배포
     docker compose -f "${APP_DIR}/docker-compose.yml" -f "${OVERRIDE_FILE}" pull "${TARGET}" || true
     docker compose -f "${APP_DIR}/docker-compose.yml" -f "${OVERRIDE_FILE}" up -d "${TARGET}"
 
-    # 컨테이너 존재/상태 출력
     echo "[docker ps -a (grep app-)]"
     docker ps -a --format 'table {{.Names}}\\t{{.Status}}\\t{{.Image}}' | grep -E 'app-(blue|green)' || true
 
-    # CID 확인 (docker compose ps -q 선호)
+    # (4) CID 확인 (up -d 이후에만)
     CID="$(docker compose -f "${APP_DIR}/docker-compose.yml" -f "${OVERRIDE_FILE}" ps -q "${TARGET}" || true)"; : "${CID:=}"
     if [ -z "${CID}" ]; then
       echo "Container for ${TARGET} not found after up -d"
       docker compose -f "${APP_DIR}/docker-compose.yml" -f "${OVERRIDE_FILE}" ps || true
       docker logs --tail=200 "${TARGET}" || true
+      shred -u "${OVERRIDE_FILE}" 2>/dev/null || rm -f "${OVERRIDE_FILE}"
       exit 1
     fi
     echo "[INFO] ${TARGET} CID=${CID}"
 
-    echo "[inspect-env] (names only, not values)"
+    # (5) 런타임 ENV 키만 확인(값 마스킹)
+    echo "[inspect-env] keys only"
     docker inspect "${CID}" --format '{{range .Config.Env}}{{println .}}{{end}}' \
      | grep -E '^SPRING_DATASOURCE_URL=|^SPRING_DATASOURCE_USERNAME=|^SPRING_DATASOURCE_PASSWORD=' \
      | sed 's/=.*/=<redacted>/' || true
 
-    echo "[env lengths via /proc/1/environ]"
-    docker exec -i "${CID}" sh -lc '
-      envlen() { v="$(tr "\\0" "\\n" </proc/1/environ | awk -F= -v k="$1" "$0 ~ ^k\"=\" {sub(/^[^=]*=/,\"\"); print; exit}")"; printf "%s bytes = " "$1"; printf "%s" "$v" | wc -c; }
-      envlen SPRING_DATASOURCE_URL
-      envlen SPRING_DATASOURCE_USERNAME
-      envlen SPRING_DATASOURCE_PASSWORD
-    ' || true
+    # (옵션) 길이 체크: 컨테이너 안에서만 실행 (문제 원인되던 /proc/1/environ 호스트 실행 제거)
+    : '
+    docker exec -i "${CID}" sh -lc "
+      getv(){ env | awk -F= -v k=\"\$1\" \"\\$0 ~ ^\"k\"= {sub(/^[^=]*=/,\\\"\\\"); print; exit}\"; }
+      f(){ v=\\\"\\$(getv \\\"\\$1\\\")\\\"; printf \\\"%s bytes = \\\" \\\"\\$1\\\"; printf \\\"%s\\\" \\\"\\$v\\\" | wc -c; }
+      f SPRING_DATASOURCE_URL
+      f SPRING_DATASOURCE_USERNAME
+      f SPRING_DATASOURCE_PASSWORD
+    " || true
+    '
 
-    # --- (5) 컨테이너 네임스페이스에서 DB TCP 연결 테스트 ---
+    # (6) DB TCP 연결 테스트(컨테이너 네임스페이스에서)
     HOSTPORT=$(printf "%s" "$DB_URL" | sed -E 's#^jdbc:[a-zA-Z0-9]+://([^/]+)/.*#\\1#')
     HOST=${HOSTPORT%:*}
     PORT=${HOSTPORT#*:}
@@ -259,11 +261,10 @@ docker logout || true
     echo "[TCP test] from container namespace (${TARGET}) -> $HOST:$PORT"
     docker run --rm --network "container:${TARGET}" busybox sh -lc "nc -vz -w3 $HOST $PORT || true"
 
-    # (참고) 최근 로그 60줄
     echo "[last 60 lines of ${TARGET}]"
     docker logs --tail=60 "${TARGET}" || true
 
-    # --- (6) 민감 오버라이드 파일 삭제 ---
+    # (7) 민감 파일 삭제
     shred -u "${OVERRIDE_FILE}" 2>/dev/null || rm -f "${OVERRIDE_FILE}"
     '''
         }
