@@ -154,7 +154,15 @@ public class ChatService {
                 .createdAt(LocalDateTime.now())
                 .build();
 
-        return messageRepository.save(message);
+        // =================== 추가 ===================
+        // 1) 저장
+        MessageEntity saved = messageRepository.save(message);
+
+        // 2) 보낸 사람은 방금 메시지를 "본" 상태이므로 즉시 읽음 처리
+        updateLastCheckedAt(member, chatroomId);
+
+        // =================== 추가 ===================
+        return saved; // 수정
     }
 
     // 특정 채팅방에서 작성된 모든 메세지를 불러오는 로직
