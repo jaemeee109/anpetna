@@ -256,6 +256,28 @@ public class BoardServiceImpl implements BoardService {
         BoardEntity e = boardJpaRepository.findById(req.getBno())
                 .orElseThrow(() -> new RuntimeException("존재하지 않는 게시글 입니다."));
 
+        final boolean secret = Boolean.TRUE.equals(e.getIsSecret());
+        if (secret) {
+            final String writer = String.valueOf(e.getBWriter());
+
+            // 로그인 사용자 정보는 항상 SecurityContext에서 읽어 소유자/관리자 판별
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            final String me = (auth != null ? auth.getName() : null);   // ← req.getMemberId() 사용 금지
+            final boolean owner = (me != null) && writer.equalsIgnoreCase(me);
+
+            final boolean admin = (auth != null) &&
+                    auth.getAuthorities().stream()
+                            .map(GrantedAuthority::getAuthority)
+                            .map(String::toUpperCase)
+                            .anyMatch(s -> s.equals("ROLE_ADMIN") || s.equals("ADMIN"));
+
+            if (!owner && !admin) {
+                // 프론트는 403을 감지해 즉시 차단 뷰로 전환(불필요한 추가 로딩 없음)
+                throw new AccessDeniedException("FORBIDDEN: secret post");
+            }
+        }
+
+
         e.setBViewCount((e.getBViewCount() == null ? 0 : e.getBViewCount()) + 1);
 
         e.getImages().size(); // lazy init

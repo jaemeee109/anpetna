@@ -135,7 +135,7 @@ public class BoardController {
 */
     // ===========================================================
     /* 게시글 상세 (회원 전용으로 강제하려면 아래 가드 유지) + (옵션) 좋아요 증가 */
-    @PreAuthorize("@boardGuard.canReadOne(#bno, authentication)")
+    @PreAuthorize("hasRole('ADMIN') or @boardGuard.canReadOne(#bno, authentication)")
     @GetMapping(value = "/readOne/{bno}", produces = "application/json")
     public ApiResult<ReadOneBoardRes> readOneBoard(
             @AuthenticationPrincipal UserDetails user, // 회원 전용이면 필요
