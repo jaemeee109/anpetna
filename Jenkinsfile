@@ -172,7 +172,6 @@ docker logout || true
           string(credentialsId: 'naver_geocode_client_secret', variable: 'NAVER_SECRET')
         ]) {
           sh '''#!/bin/sh
-    # set -u 제거, -e/pipefail만 유지
     set -e -o pipefail
 
     echo "STEP[0] ========== setup vars =========="
@@ -180,7 +179,7 @@ docker logout || true
     IMAGE="${DOCKERHUB_REPO}:${IMAGE_TAG_BASE}-${NEXT_COLOR}"
     OVERRIDE_FILE="${WORKSPACE}/override-${TARGET}.yml"
 
-    # 필수값 점검
+    # 필수값 확인
     require(){ v="$1"; n="$2"; if [ -z "$v" ]; then echo "ERROR: $n is required"; exit 1; fi; }
     require "${APP_DIR-}"        "APP_DIR"
     require "${DOCKER_NETWORK-}" "DOCKER_NETWORK"
@@ -199,7 +198,9 @@ docker logout || true
 
     echo "STEP[2] ========== escape & write override =========="
     escq(){ printf '%s' "${1-}" | sed 's/"/\\"/g'; }
-    DB_URL_S=$(escq "$DB_URL"); DB_USER_S=$(escq "$DB_USER"); DB_PASS_S=$(escq "$DB_PASS")
+    DB_URL_S=$(escq "$DB_URL")
+    DB_USER_S=$(escq "$DB_USER")
+    DB_PASS_S=$(escq "$DB_PASS")
     TOSS_SECRET_S=$(escq "${TOSS_SECRET-}")
     NAVER_ID_S=$(escq "${NAVER_ID-}")
     NAVER_SECRET_S=$(escq "${NAVER_SECRET-}")
@@ -225,18 +226,11 @@ docker logout || true
         external: true
     EOF
 
-    # (디버그) override 파일 한 번 보여주기 — 민감값은 이미 이스케이프된 상태
-    echo "----- OVERRIDE (${OVERRIDE_FILE}) -----"
-    cat "${OVERRIDE_FILE}" | sed -E 's/(SPRING_DATASOURCE_PASSWORD: ).*/\\1<redacted>/' || true
-    echo "--------------------------------------"
-
     echo "STEP[3] ========== merged config (non-blocking) =========="
-    # 이 부분은 실패해도 배포를 계속하기 위해 || true
     docker compose -f "${APP_DIR}/docker-compose.yml" -f "${OVERRIDE_FILE}" config \
       | awk "/${TARGET}:/,/^[^[:space:]]/" || true
 
     echo "STEP[4] ========== compose up -d ${TARGET} =========="
-    # 이미지 풀은 실패해도 계속 진행
     docker compose -f "${APP_DIR}/docker-compose.yml" -f "${OVERRIDE_FILE}" pull "${TARGET}" || true
     docker compose -f "${APP_DIR}/docker-compose.yml" -f "${OVERRIDE_FILE}" up -d "${TARGET}"
 
@@ -245,7 +239,6 @@ docker logout || true
     docker ps -a --format 'table {{.Names}}\\t{{.Status}}\\t{{.Image}}' | grep -E 'app-(blue|green)' || true
 
     echo "STEP[6] ========== resolve CID =========="
-    CID=""
     CID="$(docker compose -f "${APP_DIR}/docker-compose.yml" -f "${OVERRIDE_FILE}" ps -q "${TARGET}" || true)"
     if [ -z "$CID" ]; then
       echo "ERROR: ${TARGET} not found after up -d"
@@ -272,7 +265,6 @@ docker logout || true
 
     echo "STEP[10] ========== cleanup =========="
     shred -u "${OVERRIDE_FILE}" 2>/dev/null || rm -f "${OVERRIDE_FILE}"
-
     echo "STEP[DONE] =========="
     '''
         }
@@ -282,28 +274,40 @@ docker logout || true
     stage('Healthcheck NEXT') {
       steps {
         sh '''#!/bin/sh
-set -euxo pipefail
-TARGET="app-${NEXT_COLOR}"
+    set -e
 
-docker pull curlimages/curl:latest || true
+    TARGET="app-${NEXT_COLOR}"
+    echo "[health] TARGET=${TARGET}"
+    docker pull curlimages/curl:latest >/dev/null
 
-SECONDS=0
-until docker run --rm --network ${DOCKER_NETWORK} \
-    -e TARGET="${TARGET}" curlimages/curl:latest \
-    sh -c 'code=$(curl -s -o /dev/null -w "%{http_code}" http://$TARGET:8080/actuator/health); \
-           if [ "$code" = 200 ]; then \
-             curl -fsS http://$TARGET:8080/actuator/health | grep -q "\"status\":\"UP\""; \
-           else \
-             [ "$code" = 401 ]; \
-           fi'; do
-  if [ ${SECONDS} -ge ${HEALTH_TIMEOUT_SEC} ]; then
-    echo "Healthcheck timeout for ${TARGET}"
+    # 네트워크에서 바로 찍어보기(1회)
+    docker run --rm --network "${DOCKER_NETWORK}" curlimages/curl:latest sh -lc '
+      set -e
+      url="http://'"$TARGET"':8080/actuator/health"
+      code=$(curl -sS -o /tmp/body -w "%{http_code}" "$url" || true)
+      head -c 200 /tmp/body || true; echo
+      echo "[health] code=$code"
+    '
+
+    # 재시도 루프(최대 180초)
+    SECONDS=0
+    until [ $SECONDS -ge 180 ]; do
+      ok=$(docker run --rm --network "${DOCKER_NETWORK}" -e TARGET="${TARGET}" curlimages/curl:latest sh -lc '
+        url="http://$TARGET:8080/actuator/health";
+        code=$(curl -sS -o /tmp/body -w "%{http_code}" "$url" || true);
+        if [ "$code" = "200" ]; then
+          grep -q "\"status\":\"UP\"" /tmp/body && echo ok;
+        elif [ "$code" = "401" ] || [ "$code" = "302" ]; then
+          echo ok;
+        fi
+      ')
+      [ "$ok" = "ok" ] && echo "[health] OK" && exit 0
+      sleep 3
+    done
+
+    echo "[health] TIMEOUT"
     exit 1
-  fi
-  sleep 3
-done
-echo "NEXT ${NEXT_COLOR} is healthy (HTTP 200/UP or 401)"
-'''
+    '''
       }
     }
 
