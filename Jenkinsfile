@@ -172,27 +172,34 @@ docker logout || true
           string(credentialsId: 'naver_geocode_client_secret', variable: 'NAVER_SECRET')
         ]) {
           sh '''#!/bin/sh
-    set -euxo pipefail
+    # -u가 민감하므로, 모든 참조에 기본값을 넣고( ${VAR-} ), CID 구간은 임시로 +u
+    set -eox pipefail
 
     TARGET="app-${NEXT_COLOR}"
     IMAGE="${DOCKERHUB_REPO}:${IMAGE_TAG_BASE}-${NEXT_COLOR}"
     OVERRIDE_FILE="${WORKSPACE}/override-${TARGET}.yml"
 
+    # (A) 필수 변수 존재성 빠르게 체크 (메시지 깔끔)
+    : "${DOCKERHUB_REPO:?missing}"; : "${IMAGE_TAG_BASE:?missing}"; : "${NEXT_COLOR:?missing}"
+    : "${APP_DIR:?missing}"; : "${DOCKER_NETWORK:?missing}"
+
     # --- (0) Jenkins 변수 바이트 검증 (마스킹 출력) ---
     echo "[DEBUG] Byte-lengths (no secrets printed)"
-    printf 'DB_URL bytes = ';   printf '%s' "$DB_URL"   | wc -c
-    printf 'DB_USER bytes = ';  printf '%s' "$DB_USER"  | wc -c
-    printf 'DB_PASS bytes = ';  printf '%s' "$DB_PASS"  | wc -c
+    printf 'DB_URL bytes = ';   printf '%s' "${DB_URL-}"   | wc -c
+    printf 'DB_USER bytes = ';  printf '%s' "${DB_USER-}"  | wc -c
+    printf 'DB_PASS bytes = ';  printf '%s' "${DB_PASS-}"  | wc -c
 
     # --- (1) 따옴표만 이스케이프한 안전값 준비 ---
-    escq() { printf '%s' "$1" | sed 's/"/\\"/g'; }
-    DB_URL_S=$(escq "$DB_URL")
-    DB_USER_S=$(escq "$DB_USER")
-    DB_PASS_S=$(escq "$DB_PASS")
-    TOSS_SECRET_S=$(escq "$TOSS_SECRET")
-    NAVER_ID_S=$(escq "$NAVER_ID")
-    NAVER_SECRET_S=$(escq "$NAVER_SECRET")
-    IMAGE_S=$(escq "$IMAGE")
+    # 인자를 안 주더라도(set -u) 에러 안 나게 ${1-} 사용
+    escq() { printf '%s' "${1-}" | sed 's/"/\\"/g'; }
+
+    DB_URL_S="$(escq "${DB_URL-}")"
+    DB_USER_S="$(escq "${DB_USER-}")"
+    DB_PASS_S="$(escq "${DB_PASS-}")"
+    TOSS_SECRET_S="$(escq "${TOSS_SECRET-}")"
+    NAVER_ID_S="$(escq "${NAVER_ID-}")"
+    NAVER_SECRET_S="$(escq "${NAVER_SECRET-}")"
+    IMAGE_S="$(escq "${IMAGE-}")"
 
     # --- (2) 오버라이드 파일을 직접 작성 (변수 즉시 확장) ---
     cat > "${OVERRIDE_FILE}" <<EOF
@@ -216,24 +223,24 @@ docker logout || true
 
     # --- (3) compose 머지 결과 확인 ---
     echo "[compose-config] merged service block for ${TARGET}"
-    docker compose -f ${APP_DIR}/docker-compose.yml -f "${OVERRIDE_FILE}" config | awk "/${TARGET}:/,/^[^[:space:]]/" || true
+    docker compose -f "${APP_DIR}/docker-compose.yml" -f "${OVERRIDE_FILE}" config | awk "/${TARGET}:/,/^[^[:space:]]/" || true
 
     # --- (4) 실제 배포 ---
-    docker compose -f ${APP_DIR}/docker-compose.yml -f "${OVERRIDE_FILE}" pull ${TARGET} || true
-    docker compose -f ${APP_DIR}/docker-compose.yml -f "${OVERRIDE_FILE}" up -d ${TARGET}
+    docker compose -f "${APP_DIR}/docker-compose.yml" -f "${OVERRIDE_FILE}" pull "${TARGET}" || true
+    docker compose -f "${APP_DIR}/docker-compose.yml" -f "${OVERRIDE_FILE}" up -d "${TARGET}"
 
-    # 컨테이너 존재/상태 출력
-    docker compose -f ${APP_DIR}/docker-compose.yml -f "${OVERRIDE_FILE}" ps
+    # 상태 출력
+    docker compose -f "${APP_DIR}/docker-compose.yml" -f "${OVERRIDE_FILE}" ps
     docker ps --format '{{.Names}}' | grep -w "${TARGET}"
 
     # --- (5) 런타임 ENV 검증 ---
-    # nounset으로 인한 미정의 변수 오류를 막기 위해 CID 구간만 잠시 해제
+    # CID 조회 구간만 nounset 해제
     set +u
-    CID="$(docker compose -f ${APP_DIR}/docker-compose.yml -f "${OVERRIDE_FILE}" ps -q ${TARGET} 2>/dev/null || true)"
-    : "${CID:=}"   # 비정의면 빈 값으로
+    CID="$(docker compose -f "${APP_DIR}/docker-compose.yml" -f "${OVERRIDE_FILE}" ps -q "${TARGET}" 2>/dev/null || true)"
+    : "${CID:=}"
     set -u
 
-    if [ -z "${CID:-}" ]; then
+    if [ -z "${CID}" ]; then
       echo "Container for ${TARGET} not found after up -d"
       exit 1
     fi
@@ -245,23 +252,23 @@ docker logout || true
 
     echo "[/proc/1/environ lengths]"
     docker exec -i "${CID}" sh -lc '
-      getv(){ tr "\\0" "\\n" </proc/1/environ | awk -F= -v k="$1" "$0 ~ "^"k"=" {sub(/^[^=]*=/,""); print; exit}"; }
-      plen(){ val="$(getv "$1")"; printf "%s bytes = " "$1"; printf "%s" "$val" | wc -c; }
+      getv(){ tr "\\0" "\\n" </proc/1/environ | awk -F= -v k="$1" "$0 ~ \"^\"k\"=\" {sub(/^[^=]*=/,\"\"); print; exit}"; }
+      plen(){ v="$(getv "$1")"; printf "%s bytes = " "$1"; printf "%s" "$v" | wc -c; }
       plen SPRING_DATASOURCE_URL
       plen SPRING_DATASOURCE_USERNAME
       plen SPRING_DATASOURCE_PASSWORD
     '
 
     # --- (6) 컨테이너 네임스페이스에서 DB TCP 연결 테스트 ---
-    HOSTPORT=$(printf "%s" "$DB_URL" | sed -E 's#^jdbc:[a-zA-Z0-9]+://([^/]+)/.*#\\1#')
+    HOSTPORT=$(printf "%s" "${DB_URL-}" | sed -E 's#^jdbc:[a-zA-Z0-9]+://([^/]+)/.*#\\1#')
     HOST=${HOSTPORT%:*}
     PORT=${HOSTPORT#*:}
-    [ "$HOST" = "$PORT" ] && PORT=3306
-    echo "[TCP test] from container namespace (${TARGET}) -> $HOST:$PORT"
-    docker run --rm --network "container:${TARGET}" busybox sh -lc "nc -vz -w2 $HOST $PORT || true"
+    [ "${HOST}" = "${PORT}" ] && PORT=3306
+    echo "[TCP test] from container namespace (${TARGET}) -> ${HOST}:${PORT}"
+    docker run --rm --network "container:${TARGET}" busybox sh -lc "nc -vz -w2 ${HOST} ${PORT} || true"
 
     # (선택) 최근 로그 30줄
-    docker logs --tail=30 ${TARGET} || true
+    docker logs --tail=30 "${TARGET}" || true
 
     # --- (7) 민감 오버라이드 파일 삭제 ---
     shred -u "${OVERRIDE_FILE}" 2>/dev/null || rm -f "${OVERRIDE_FILE}"
