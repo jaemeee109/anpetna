@@ -183,7 +183,7 @@ docker logout || true
     set -euxo pipefail
 
     # sanitize & fallback for NEXT_COLOR
-    NEXT_COLOR="$(printf '%s' "${NEXT_COLOR-}" | tr -d '\r' | xargs || true)"
+    NEXT_COLOR="$(printf '%s' "${NEXT_COLOR-}" | tr -d '\\r' | xargs || true)"
     echo "[DEBUG] NEXT_COLOR(raw)=${NEXT_COLOR-}"
     if [ -z "${NEXT_COLOR}" ]; then
       if [ -f "${NGINX_ACTIVE_VAR}" ]; then
@@ -205,7 +205,7 @@ docker logout || true
     echo "STEP[0] ========== setup vars =========="
 
     test -f image.tag || { echo "image.tag missing"; exit 1; }
-    IMAGE="$(tr -d '\r' < image.tag | xargs)"
+    IMAGE="$(tr -d '\\r' < image.tag | xargs)"
     echo "[DEBUG] IMAGE=${IMAGE}"
     OVERRIDE_FILE="${WORKSPACE}/override-${TARGET}.yml"
 
@@ -219,7 +219,7 @@ docker logout || true
     require "${DB_USER-}"        "DB_USER"
     require "${DB_PASS-}"        "DB_PASS"
 
-    # FRONT_ORIGIN 은 선택값: 있으면만 주입
+    # FRONT_ORIGIN 은 선택값
     FRONT_ORIGIN="${FRONT_ORIGIN-}"
 
     echo "STEP[1] ========== secret length debug =========="
@@ -228,45 +228,39 @@ docker logout || true
     printf 'DB_USER bytes = ';  printf '%s' "$DB_USER"  | wc -c
     printf 'DB_PASS bytes = ';  printf '%s' "$DB_PASS"  | wc -c
 
-    echo "STEP[2] ========== escape & write override =========="
+    echo "STEP[2] ========== write override (printf-safe) =========="
+    # 값 escape
     escq(){ printf '%s' "${1-}" | sed 's/"/\\"/g'; }
-    DB_URL_S=$(escq "$DB_URL")
-    DB_USER_S=$(escq "$DB_USER")
-    DB_PASS_S=$(escq "$DB_PASS")
-    TOSS_SECRET_S=$(escq "${TOSS_SECRET-}")
-    NAVER_ID_S=$(escq "${NAVER_ID-}")
-    NAVER_SECRET_S=$(escq "${NAVER_SECRET-}")
-    IMAGE_S=$(escq "$IMAGE")
-    FRONT_ORIGIN_S=$(escq "$FRONT_ORIGIN")
+    DB_URL_S=$(escq "$DB_URL"); DB_USER_S=$(escq "$DB_USER"); DB_PASS_S=$(escq "$DB_PASS")
+    TOSS_SECRET_S=$(escq "${TOSS_SECRET-}"); NAVER_ID_S=$(escq "${NAVER_ID-}"); NAVER_SECRET_S=$(escq "${NAVER_SECRET-}")
+    IMAGE_S=$(escq "$IMAGE"); FRONT_ORIGIN_S=$(escq "$FRONT_ORIGIN")
 
-    # FRONT_API_URL 라인은 FRONT_ORIGIN 있을 때만 생성
-    FRONT_LINE=""
-    [ -n "$FRONT_ORIGIN" ] && FRONT_LINE="      FRONT_API_URL: \\\"${FRONT_ORIGIN_S}\\\""
-
-    cat > "${OVERRIDE_FILE}" <<EOF
-    services:
-      ${TARGET}:
-        image: "${IMAGE_S}"
-        container_name: ${TARGET}
-        environment:
-          SPRING_DATASOURCE_URL: "${DB_URL_S}"
-          SPRING_DATASOURCE_USERNAME: "${DB_USER_S}"
-          SPRING_DATASOURCE_PASSWORD: "${DB_PASS_S}"
-          SPRING_PROFILES_ACTIVE: "prod"
-          TOSS_SECRET_KEY: "${TOSS_SECRET_S}"
-          NAVER_MAP_CLIENT_ID: "${NAVER_ID_S}"
-          NAVER_MAP_CLIENT_SECRET: "${NAVER_SECRET_S}"
-    $(printf "%s\n" "${FRONT_LINE}")
-        networks:
-          - ${DOCKER_NETWORK}
-    networks:
-      ${DOCKER_NETWORK}:
-        external: true
-    EOF
+    # 파일 생성(printf로 안전하게 작성)
+    : > "${OVERRIDE_FILE}"
+    printf 'services:\n' >> "${OVERRIDE_FILE}"
+    printf '  %s:\n' "${TARGET}" >> "${OVERRIDE_FILE}"
+    printf '    image: "%s"\n' "${IMAGE_S}" >> "${OVERRIDE_FILE}"
+    printf '    container_name: %s\n' "${TARGET}" >> "${OVERRIDE_FILE}"
+    printf '    environment:\n' >> "${OVERRIDE_FILE}"
+    printf '      SPRING_DATASOURCE_URL: "%s"\n' "${DB_URL_S}" >> "${OVERRIDE_FILE}"
+    printf '      SPRING_DATASOURCE_USERNAME: "%s"\n' "${DB_USER_S}" >> "${OVERRIDE_FILE}"
+    printf '      SPRING_DATASOURCE_PASSWORD: "%s"\n' "${DB_PASS_S}" >> "${OVERRIDE_FILE}"
+    printf '      SPRING_PROFILES_ACTIVE: "prod"\n' >> "${OVERRIDE_FILE}"
+    printf '      TOSS_SECRET_KEY: "%s"\n' "${TOSS_SECRET_S}" >> "${OVERRIDE_FILE}"
+    printf '      NAVER_MAP_CLIENT_ID: "%s"\n' "${NAVER_ID_S}" >> "${OVERRIDE_FILE}"
+    printf '      NAVER_MAP_CLIENT_SECRET: "%s"\n' "${NAVER_SECRET_S}" >> "${OVERRIDE_FILE}"
+    if [ -n "$FRONT_ORIGIN" ]; then
+      printf '      FRONT_API_URL: "%s"\n' "${FRONT_ORIGIN_S}" >> "${OVERRIDE_FILE}"
+    fi
+    printf '    networks:\n' >> "${OVERRIDE_FILE}"
+    printf '      - %s\n' "${DOCKER_NETWORK}" >> "${OVERRIDE_FILE}"
+    printf 'networks:\n' >> "${OVERRIDE_FILE}"
+    printf '  %s:\n' "${DOCKER_NETWORK}" >> "${OVERRIDE_FILE}"
+    printf '    external: true\n' >> "${OVERRIDE_FILE}"
 
     echo "STEP[3] ========== merged config (non-blocking) =========="
     docker compose -f "${APP_DIR}/docker-compose.yml" -f "${OVERRIDE_FILE}" config \
-       | awk "/${TARGET}:/,/^[^[:space:]]/" || true
+      | awk "/${TARGET}:/,/^[^[:space:]]/" || true
 
     echo "STEP[4] ========== compose up -d ${TARGET} =========="
     docker compose -f "${APP_DIR}/docker-compose.yml" -f "${OVERRIDE_FILE}" pull "${TARGET}" || true
@@ -278,12 +272,12 @@ docker logout || true
 
     echo "STEP[6] ========== resolve CID =========="
     CID="$(docker compose -f "${APP_DIR}/docker-compose.yml" -f "${OVERRIDE_FILE}" ps -q "${TARGET}" 2>/dev/null || true)"
-    : "${CID:=}"     # set -u 안전가드: 미정의→빈값으로 정의
+    : "${CID:=}"
     if [ -z "$CID" ]; then
       echo "ERROR: ${TARGET} not found after up -d"
       docker compose -f "${APP_DIR}/docker-compose.yml" -f "${OVERRIDE_FILE}" ps || true
       docker logs --tail=200 "${TARGET}" || true
-      shred -u "${OVERRIDE_FILE}" 2>/dev/null || rm -f "${OVERRIDE_FILE}"
+      rm -f "${OVERRIDE_FILE}"
       exit 1
     fi
     echo "[INFO] ${TARGET} CID=${CID}"
@@ -294,10 +288,16 @@ docker logout || true
       | sed 's/=.*/=<redacted>/' || true
 
     echo "STEP[8] ========== DB TCP test =========="
-    HOSTPORT=$(printf "%s" "$DB_URL" | sed -E 's#^jdbc:[a-zA-Z0-9]+://([^/]+)/.*#\\1#')
-    HOST=${HOSTPORT%:*}; PORT=${HOSTPORT#*:}; [ "$HOST" = "$PORT" ] && PORT=3306
-    echo "[TCP test] ${TARGET} -> $HOST:$PORT"
-    docker run --rm --network "container:${TARGET}" busybox sh -lc "nc -vz -w3 $HOST $PORT || true"
+    # DB_URL에서 host:port 뽑기(미매치 시 스킵)
+    HOSTPORT="$(printf '%s' "$DB_URL" | sed -nE 's#^jdbc:[a-zA-Z0-9]+://([^/]+)/.*#\\1#p')"
+    HOST="${HOSTPORT%:*}"; PORT="${HOSTPORT#*:}"
+    [ "$HOST" = "$PORT" ] && PORT=3306
+    if [ -n "${HOSTPORT}" ] && [ -n "${HOST}" ]; then
+      echo "[TCP test] ${TARGET} -> $HOST:$PORT"
+      docker run --rm --network "container:${TARGET}" busybox sh -lc "nc -vz -w3 $HOST $PORT || true"
+    else
+      echo "[WARN] could not parse DB_URL host:port → skip TCP test"
+    fi
 
     echo "STEP[9] ========== last logs (tail) =========="
     docker logs --tail=60 "${TARGET}" || true
@@ -319,7 +319,7 @@ docker logout || true
     fi
 
     echo "STEP[10] ========== cleanup =========="
-    shred -u "${OVERRIDE_FILE}" 2>/dev/null || rm -f "${OVERRIDE_FILE}"
+    rm -f "${OVERRIDE_FILE}"
     echo "STEP[DONE] =========="
     '''
         }
