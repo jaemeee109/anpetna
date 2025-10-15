@@ -248,8 +248,8 @@ docker logout || true
     printf '      SPRING_PROFILES_ACTIVE: "prod"\n' >> "${OVERRIDE_FILE}"
     printf '      SERVER_ADDRESS: "0.0.0.0"\n' >> "${OVERRIDE_FILE}"
     printf '      TOSS_SECRET_KEY: "%s"\n' "${TOSS_SECRET_S}" >> "${OVERRIDE_FILE}"
-    printf '      NAVER_MAP_CLIENT_ID: "%s"\n' "${NAVER_ID_S}" >> "${OVERRIDE_FILE}"
-    printf '      NAVER_MAP_CLIENT_SECRET: "%s"\n' "${NAVER_SECRET_S}" >> "${OVERRIDE_FILE}"
+    printf '      NAVER_GEOCODE_CLIENT_ID: "%s"\n' "${NAVER_ID_S}" >> "${OVERRIDE_FILE}"
+    printf '      NAVER_GEOCODE_CLIENT_SECRET: "%s"\n' "${NAVER_SECRET_S}" >> "${OVERRIDE_FILE}"
     if [ -n "$FRONT_ORIGIN" ]; then
       printf '      FRONT_API_URL: "%s"\n' "${FRONT_ORIGIN_S}" >> "${OVERRIDE_FILE}"
     fi
@@ -312,7 +312,7 @@ docker logout || true
       echo "$FORBIDDEN_ENV"
       exit 1
     fi
-    
+
     FORBIDDEN_CMD=$(docker inspect -f '{{json .Config.Cmd}} {{json .Config.Entrypoint}}' "$CID" \
       | grep -E -- '--management[.]server[.]address=|--server[.]address=' || true)
     if [ -n "$FORBIDDEN_CMD" ]; then
