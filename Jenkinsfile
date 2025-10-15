@@ -222,9 +222,6 @@ docker logout || true
     # FRONT_ORIGIN 은 선택값: 있으면만 주입
     FRONT_ORIGIN="${FRONT_ORIGIN-}"
 
-    # 최종 가드: TARGET 비면 중단
-    [ -n "${TARGET}" ] || { echo "ERROR: TARGET is empty"; exit 1; }
-
     echo "STEP[1] ========== secret length debug =========="
     echo "[DEBUG] Byte-lengths (no secrets printed)"
     printf 'DB_URL bytes = ';   printf '%s' "$DB_URL"   | wc -c
@@ -280,7 +277,8 @@ docker logout || true
     docker ps -a --format 'table {{.Names}}\\t{{.Status}}\\t{{.Image}}' | grep -E 'app-(blue|green)' || true
 
     echo "STEP[6] ========== resolve CID =========="
-    CID="$(docker compose -f "${APP_DIR}/docker-compose.yml" -f "${OVERRIDE_FILE}" ps -q "${TARGET}" || true)"
+    CID="$(docker compose -f "${APP_DIR}/docker-compose.yml" -f "${OVERRIDE_FILE}" ps -q "${TARGET}" 2>/dev/null || true)"
+    : "${CID:=}"     # set -u 안전가드: 미정의→빈값으로 정의
     if [ -z "$CID" ]; then
       echo "ERROR: ${TARGET} not found after up -d"
       docker compose -f "${APP_DIR}/docker-compose.yml" -f "${OVERRIDE_FILE}" ps || true
