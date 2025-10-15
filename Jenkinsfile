@@ -186,7 +186,7 @@ echo "STEP[0] ========== setup vars =========="
 TARGET="app-${NEXT_COLOR}"
 # Build 단계에서 저장한 정확한 태그 사용
 test -f image.tag || { echo "image.tag missing"; exit 1; }
-IMAGE="${DOCKERHUB_REPO}:${IMAGE_TAG_BASE}-${NEXT_COLOR}"
+IMAGE="$(cat image.tag)"
 OVERRIDE_FILE="${WORKSPACE}/override-${TARGET}.yml"
 
 # 필수값 확인
@@ -310,19 +310,23 @@ echo "STEP[DONE] =========="
     TARGET="app-${NEXT_COLOR}"
     echo "[health] TARGET=${TARGET}"
 
-    # (A) 컨테이너 존재/스냅샷
-    t=0
-    while [ $t -lt 60 ]; do
+    # 컨테이너 확인 + 스냅샷
+    t=0; while [ $t -lt 60 ]; do
       docker ps --format '{{.Names}}' | grep -qx "${TARGET}" && break
       sleep 2; t=$((t+2))
     done
     docker ps -a --format 'table {{.Names}}\\t{{.Status}}\\t{{.Image}}' | grep -E 'app-(blue|green)' || true
     docker inspect -f '{{json .NetworkSettings.Networks}}' "${TARGET}" || true
 
-    # (B) 컨테이너 내부에서 8080 열릴 때까지 대기(최대 150초)
+    # (A) 컨테이너 내부: 포트가 실제 LISTEN 하거나 헬스 200 뜰 때까지
     echo "[health] in-container warmup (127.0.0.1)"
     docker exec "${TARGET}" sh -lc '
-      for i in $(seq 1 75); do
+      for i in $(seq 1 90); do
+        if command -v ss >/dev/null 2>&1; then
+          ss -lntp | grep -q ":8080 " && echo "  listen ok (ss)" && exit 0
+        elif command -v netstat >/dev/null 2>&1; then
+          netstat -lntp 2>/dev/null | grep -q ":8080 " && echo "  listen ok (netstat)" && exit 0
+        fi
         code=$(curl -sS -o /dev/null -w "%{http_code}" http://127.0.0.1:8080/actuator/health || true)
         echo "  try#$i => $code"
         [ "$code" = "200" ] && exit 0
@@ -331,7 +335,7 @@ echo "STEP[DONE] =========="
       echo "in-container warmup TIMEOUT"; exit 1
     '
 
-    # (C) 네트워크에서 재확인(최대 120초)
+    # (B) 네트워크에서 재확인
     docker pull curlimages/curl:latest >/dev/null
     SECONDS=0
     until [ $SECONDS -ge 120 ]; do
@@ -347,7 +351,6 @@ echo "STEP[DONE] =========="
       [ "$ok" = "ok" ] && echo "[health] OK (network)" && exit 0
       sleep 3
     done
-
     echo "[health] TIMEOUT (network)"; exit 1
     '''
       }
