@@ -332,19 +332,16 @@ docker logout || true
     set -e
 
     TARGET="app-${NEXT_COLOR}"
-    TARGET="$(printf '%s' "${TARGET}" | tr -d '\r' | xargs)"
+    TARGET="$(printf '%s' "${TARGET}" | tr -d '\\r' | xargs)"
     echo "[health] TARGET=${TARGET}"
     [ -n "${TARGET}" ] || { echo "[health] TARGET empty"; exit 1; }
 
     # 컨테이너 존재 대기(최대 60s)
     t=0
     while [ $t -lt 60 ]; do
-      if docker ps --format '{{.Names}}' | grep -qx "${TARGET}"; then
-        break
-      fi
+      if docker ps --format '{{.Names}}' | grep -qx "${TARGET}"; then break; fi
       sleep 2; t=$((t+2))
     done
-
     if ! docker ps --format '{{.Names}}' | grep -qx "${TARGET}"; then
       echo "[health] ${TARGET} not found"
       docker compose -f "${APP_DIR}/docker-compose.yml" ps || true
@@ -352,32 +349,40 @@ docker logout || true
       exit 1
     fi
 
-    # (A) 컨테이너 네임스페이스로 포트 오픈까지 대기 (툴은 busybox 사용)
-    echo "[health] in-container warmup (port open@127.0.0.1:8080)"
-    docker pull busybox:latest >/dev/null || true
-    docker run --rm --network "container:${TARGET}" busybox sh -lc '
-      for i in $(seq 1 90); do
-        nc -z 127.0.0.1 8080 && echo "  port open" && exit 0
-        echo "  wait port.. (#$i)"
-        sleep 2
-      done
-      echo "  port not open in time"; exit 1
-    '
-
-    # (B) 같은 네임스페이스에서 헬스 200까지 확인 (툴은 curlimages 사용)
-    echo "[health] in-container health (HTTP 200)"
+    # (A) 컨테이너 내부: 포트 오픈/로컬 헬스 (IPv4/IPv6 모두 시도)
+    echo "[health] in-container warmup (localhost v4/v6 + listen check)"
     docker pull curlimages/curl:latest >/dev/null || true
-    docker run --rm --network "container:${TARGET}" curlimages/curl:latest sh -lc '
-      for i in $(seq 1 60); do
-        code=$(curl -sS -o /dev/null -w "%{http_code}" http://127.0.0.1:8080/actuator/health || true)
-        echo "  try#$i => $code"
-        [ "$code" = "200" ] && exit 0
+    A_OK=0
+    set +e
+    docker exec "${TARGET}" sh -lc '
+      for i in $(seq 1 90); do
+        # 1) LISTEN 여부(ss/netstat)
+        if command -v ss >/dev/null 2>&1; then
+          ss -lntp | grep -E ":8080\\b" && echo "  [ss] listen ok" && exit 0
+        elif command -v netstat >/dev/null 2>&1; then
+          netstat -lntp 2>/dev/null | grep -E ":8080\\b" && echo "  [netstat] listen ok" && exit 0
+        fi
+        # 2) curl localhost (IPv4/IPv6 모두)
+        c4=$(curl -sS -o /dev/null -w "%{http_code}" http://127.0.0.1:8080/actuator/health || true)
+        [ "$c4" = "200" ] && echo "  [curl v4] 200" && exit 0
+        c6=$(curl -g -sS -o /dev/null -w "%{http_code}" "http://[::1]:8080/actuator/health" || true)
+        [ "$c6" = "200" ] && echo "  [curl v6] 200" && exit 0
+        echo "  wait.. (#$i) v4=$c4 v6=$c6"
         sleep 2
       done
-      echo "  health TIMEOUT"; exit 1
+      echo "  [A] warmup TIMEOUT"; exit 2
     '
+    A_RC=$?
+    set -e
+    if [ $A_RC -eq 0 ]; then
+      echo "[health][A] OK"
+      A_OK=1
+    else
+      echo "[health][A] not confirmed (rc=$A_RC) → continue to network check"
+    fi
 
-    # (C) 도커 네트워크 경유로 재확인 (Nginx 스위치 전 신뢰성)
+    # (B) 도커 네트워크 경유 health
+    echo "[health] network check via ${DOCKER_NETWORK}"
     SECONDS=0
     until [ $SECONDS -ge 180 ]; do
       ok=$(docker run --rm --network "${DOCKER_NETWORK}" -e TARGET="${TARGET}" curlimages/curl:latest sh -lc '
@@ -389,14 +394,18 @@ docker logout || true
           echo ok;
         fi
       ')
-      [ "$ok" = "ok" ] && echo "[health] OK (network)" && exit 0
+      [ "$ok" = "ok" ] && echo "[health][B] OK" && exit 0
       sleep 3
     done
 
-    echo "[health] TIMEOUT (network)"
-    # 실패 시 디버깅 정보
-    docker logs --tail=120 "${TARGET}" || true
-    docker exec "${TARGET}" sh -lc 'ps -ef | grep -i java | grep -v grep || true' || true
+    # (C) 실패 디버깅 덤프
+    echo "[health] TIMEOUT → dumping logs & processes"
+    docker logs --tail=200 "${TARGET}" || true
+    docker exec "${TARGET}" sh -lc '
+      echo "[ps]"; ps -ef | grep -i "java\\|app.jar" | grep -v grep || true
+      echo "[listen]"; (ss -lntp 2>/dev/null || netstat -lntp 2>/dev/null || true) | cat
+      echo "[env: SERVER/MANAGEMENT]"; env | grep -E "SERVER_ADDRESS|MANAGEMENT_SERVER|SPRING_APPLICATION_JSON" || true
+    ' || true
     exit 1
     '''
       }
