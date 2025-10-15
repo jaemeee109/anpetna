@@ -281,14 +281,14 @@ docker logout || true
 
     echo "STEP[9.1] ========== forbid management/server address in Env/Cmd =========="
     FORBIDDEN_ENV=$(docker inspect "$CID" --format '{{range .Config.Env}}{{println .}}{{end}}' \
-      | grep -Ei 'management\.server\.address|^MANAGEMENT_SERVER_ADDRESS=|^SERVER_ADDRESS=|SPRING_APPLICATION_JSON' || true)
+      | grep -Ei 'management[.]server[.]address|^MANAGEMENT_SERVER_ADDRESS=|^SERVER_ADDRESS=|SPRING_APPLICATION_JSON' || true)
     if [ -n "$FORBIDDEN_ENV" ]; then
       echo "[ERROR] Forbidden management/server address related env detected:"
       echo "$FORBIDDEN_ENV"
       exit 1
     fi
     FORBIDDEN_CMD=$(docker inspect -f '{{json .Config.Cmd}} {{json .Config.Entrypoint}}' "$CID" \
-      | grep -E -- '--management\.server\.address=|--server\.address=' || true)
+      | grep -E -- '--management[.]server[.]address=|--server[.]address=' || true)
     if [ -n "$FORBIDDEN_CMD" ]; then
       echo "[ERROR] Forbidden flags in CMD/Entrypoint:"
       echo "$FORBIDDEN_CMD"
