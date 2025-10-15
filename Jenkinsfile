@@ -180,12 +180,33 @@ docker logout || true
           string(credentialsId: 'naver_geocode_client_secret', variable: 'NAVER_SECRET')
         ]) {
           sh '''#!/bin/sh
-    set -e -o pipefail
+    set -euxo pipefail
+    + # sanitize & fallback
+    + NEXT_COLOR="$(printf '%s' "${NEXT_COLOR-}" | tr -d '\r' | xargs || true)"
+    + echo "[DEBUG] NEXT_COLOR(raw)=${NEXT_COLOR-}"
+    + if [ -z "${NEXT_COLOR}" ]; then
+    +   if [ -f "${NGINX_ACTIVE_VAR}" ]; then
+    +     # active가 app-blue면 NEXT는 green, 반대도 동일
+    +     ACTIVE=$(grep -oE 'app-(blue|green)' "${NGINX_ACTIVE_VAR}" | tail -n1 | cut -d'-' -f2 || true)
+    +     case "$ACTIVE" in
+    +       blue)  NEXT_COLOR=green ;;
+    +       green) NEXT_COLOR=blue  ;;
+    +       *)     NEXT_COLOR=green ;;
+    +     esac
+    +     echo "[DEBUG] NEXT_COLOR(fallback from nginx)=${NEXT_COLOR}"
+    +   else
+    +     NEXT_COLOR=green
+    +     echo "[DEBUG] NEXT_COLOR(fallback default)=${NEXT_COLOR}"
+    +   fi
+    + fi
+    + TARGET="app-${NEXT_COLOR}"
+    + echo "[DEBUG] TARGET=${TARGET}"
 
     echo "STEP[0] ========== setup vars =========="
-    TARGET="app-${NEXT_COLOR}"
+
     test -f image.tag || { echo "image.tag missing"; exit 1; }
-    IMAGE="$(cat image.tag)"
+    IMAGE="$(tr -d '\r' < image.tag | xargs)"
+    echo "[DEBUG] IMAGE=${IMAGE}"
     OVERRIDE_FILE="${WORKSPACE}/override-${TARGET}.yml"
 
     # 필수값 확인
@@ -199,6 +220,9 @@ docker logout || true
     require "${DB_PASS-}"        "DB_PASS"
     # FRONT_ORIGIN 은 선택값: 있으면만 주입
     FRONT_ORIGIN="${FRONT_ORIGIN-}"
+
+    # 최종 가드: TARGET 비면 중단
+    [ -n "${TARGET}" ] || { echo "ERROR: TARGET is empty"; exit 1; }
 
     echo "STEP[1] ========== secret length debug =========="
     echo "[DEBUG] Byte-lengths (no secrets printed)"
@@ -244,11 +268,11 @@ docker logout || true
 
     echo "STEP[3] ========== merged config (non-blocking) =========="
     docker compose -f "${APP_DIR}/docker-compose.yml" -f "${OVERRIDE_FILE}" config \
-      | awk "/${TARGET}:/,/^[^[:space:]]/" || true
+       | awk "/${TARGET}:/,/^[^[:space:]]/" || true
 
     echo "STEP[4] ========== compose up -d ${TARGET} =========="
     docker compose -f "${APP_DIR}/docker-compose.yml" -f "${OVERRIDE_FILE}" pull "${TARGET}" || true
-    docker compose -f "${APP_DIR}/docker-compose.yml" -f "${OVERRIDE_FILE}" up -d "${TARGET}"
+     docker compose -f "${APP_DIR}/docker-compose.yml" -f "${OVERRIDE_FILE}" up -d "${TARGET}"
 
     echo "STEP[5] ========== ps snapshot =========="
     docker compose -f "${APP_DIR}/docker-compose.yml" -f "${OVERRIDE_FILE}" ps || true
@@ -309,15 +333,25 @@ docker logout || true
     set -e
 
     TARGET="app-${NEXT_COLOR}"
+    TARGET="$(printf '%s' "${TARGET}" | tr -d '\r' | xargs)"
     echo "[health] TARGET=${TARGET}"
+    [ -n "${TARGET}" ] || { echo "[health] TARGET empty"; exit 1; }
 
-    # 컨테이너 존재 대기(최대 60초) + 스냅샷
-    t=0; while [ $t -lt 60 ]; do
-      docker ps --format '{{.Names}}' | grep -qx "${TARGET}" && break
+    # 컨테이너 존재 대기(최대 60s)
+    t=0
+    while [ $t -lt 60 ]; do
+      if docker ps --format '{{.Names}}' | grep -qx "${TARGET}"; then
+        break
+      fi
       sleep 2; t=$((t+2))
     done
-    docker ps -a --format 'table {{.Names}}\\t{{.Status}}\\t{{.Image}}' | grep -E 'app-(blue|green)' || true
-    docker inspect -f '{{json .NetworkSettings.Networks}}' "${TARGET}" || true
+
+    if ! docker ps --format '{{.Names}}' | grep -qx "${TARGET}"; then
+      echo "[health] ${TARGET} not found"
+      docker compose -f "${APP_DIR}/docker-compose.yml" ps || true
+      docker ps -a || true
+      exit 1
+    fi
 
     # (A) 컨테이너 네임스페이스로 포트 오픈까지 대기 (툴은 busybox 사용)
     echo "[health] in-container warmup (port open@127.0.0.1:8080)"
