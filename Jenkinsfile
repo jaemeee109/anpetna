@@ -246,6 +246,7 @@ docker logout || true
     printf '      SPRING_DATASOURCE_USERNAME: "%s"\n' "${DB_USER_S}" >> "${OVERRIDE_FILE}"
     printf '      SPRING_DATASOURCE_PASSWORD: "%s"\n' "${DB_PASS_S}" >> "${OVERRIDE_FILE}"
     printf '      SPRING_PROFILES_ACTIVE: "prod"\n' >> "${OVERRIDE_FILE}"
+    printf '      SERVER_ADDRESS: "0.0.0.0"\n' >> "${OVERRIDE_FILE}"
     printf '      TOSS_SECRET_KEY: "%s"\n' "${TOSS_SECRET_S}" >> "${OVERRIDE_FILE}"
     printf '      NAVER_MAP_CLIENT_ID: "%s"\n' "${NAVER_ID_S}" >> "${OVERRIDE_FILE}"
     printf '      NAVER_MAP_CLIENT_SECRET: "%s"\n' "${NAVER_SECRET_S}" >> "${OVERRIDE_FILE}"
@@ -336,6 +337,17 @@ docker logout || true
     echo "[health] TARGET=${TARGET}"
     [ -n "${TARGET}" ] || { echo "[health] TARGET empty"; exit 1; }
 
+    # (A0) docker health 우선 대기
+    echo "[health] wait container health=healthy"
+    t=0
+    while :; do
+      st=$(docker inspect -f '{{.State.Health.Status}}' "${TARGET}" 2>/dev/null || echo "unknown")
+      echo "  state=$st (t=${t}s)"
+      [ "$st" = "healthy" ] && echo "[health] container says healthy" && break
+      [ $t -ge 240 ] && echo "[health] container health timeout" && break
+      sleep 3; t=$((t+3))
+    done
+
     # 컨테이너 존재 대기(최대 60s)
     t=0
     while [ $t -lt 60 ]; do
@@ -355,7 +367,7 @@ docker logout || true
     A_OK=0
     set +e
     docker exec "${TARGET}" sh -lc '
-      for i in $(seq 1 90); do
+      for i in $(seq 1 120); do
         # 1) LISTEN 여부(ss/netstat)
         if command -v ss >/dev/null 2>&1; then
           ss -lntp | grep -E ":8080\\b" && echo "  [ss] listen ok" && exit 0
