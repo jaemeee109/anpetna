@@ -68,10 +68,21 @@ public class BoardServiceImpl implements BoardService {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null) return false;
         for (GrantedAuthority ga : auth.getAuthorities()) {
-            if ("ROLE_ADMIN".equals(ga.getAuthority())) return true; // <- 시큐리티 ROLE 접두사 기준
+            String role = ga.getAuthority();
+            if (role == null) continue;
+            String up = role.trim().toUpperCase();
+            // BoardGuard.isAdmin 과 동일 범위 허용
+            if (up.equals("ADMIN") || up.equals("ROLE_ADMIN")
+                    || up.equals("SUPER_ADMIN") || up.equals("ROLE_SUPER_ADMIN")
+                    || up.equals("MANAGER") || up.equals("ROLE_MANAGER")
+                    || up.equals("1") || up.equals("ROLE_1")) {
+                return true;
+            }
         }
         return false;
     }
+
+
 
     // ★★★ 공통 유틸: "관리자는 통과, 아니면 본인만" 강제
     private void requireOwnerOrAdmin(String ownerMemberId, String actorMemberId, String actionName) {
@@ -265,11 +276,13 @@ public class BoardServiceImpl implements BoardService {
             final String me = (auth != null ? auth.getName() : null);   // ← req.getMemberId() 사용 금지
             final boolean owner = (me != null) && writer.equalsIgnoreCase(me);
 
-            final boolean admin = (auth != null) &&
+            /*final boolean admin = (auth != null) &&
                     auth.getAuthorities().stream()
                             .map(GrantedAuthority::getAuthority)
                             .map(String::toUpperCase)
-                            .anyMatch(s -> s.equals("ROLE_ADMIN") || s.equals("ADMIN"));
+                            .anyMatch(s -> s.equals("ROLE_ADMIN") || s.equals("ADMIN"));*/
+            final boolean admin = isAdmin();
+
 
             if (!owner && !admin) {
                 // 프론트는 403을 감지해 즉시 차단 뷰로 전환(불필요한 추가 로딩 없음)
