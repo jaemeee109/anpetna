@@ -13,9 +13,11 @@ import com.anpetna.member.repository.MemberRepository;
 import jakarta.persistence.PrePersist;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -36,22 +38,46 @@ public class ChatService {
     private final MemberRepository memberRepository;
 
     // 채팅방 개설 사용자와 채팅방 제목을 인자로 받는 채팅방 생성 서비스 로직
-    @Transactional // 추가
+    @Transactional
     public ChatroomEntity createChatroom(MemberEntity member, String title) {
+        // [수정] 입력 가드
+        final String safeTitle = (title == null) ? "" : title.trim();
+        if (safeTitle.isEmpty()) {
+            log.warn("[createChatroom] empty title by memberId={}", (member != null ? member.getMemberId() : "null"));
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "채팅방 제목은 필수입니다.");
+        }
+        if (member == null || member.getMemberId() == null) {
+            log.warn("[createChatroom] null member (authentication problem?)");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "로그인이 필요합니다.");
+        }
+
+        // 방 생성
         ChatroomEntity chatroom = ChatroomEntity.builder()
-                .title(title)
+                .title(safeTitle)
                 .createdAt(LocalDateTime.now())
                 .build();
+        chatroom = chatroomRepository.save(chatroom);
 
-        chatroom = chatroomRepository.save(chatroom);   // 채팅방 생성
+        // 생성자 참여 저장
+        MemberChatroomMapping creatorMap = chatroom.addMember(member);
+        memberChatroomMappingRepository.save(creatorMap);
 
-        // 채팅방 생성 사용자는 생성된 채팅방에 기본적으로 참여하도록 한다.
-        MemberChatroomMapping memberChatroomMapping = chatroom.addMember(member);
-        memberChatroomMappingRepository.save(memberChatroomMapping);
+        // [수정] 관리자 자동 참여 (Optional<MemberEntity> → 일반 if)
+        List<MemberEntity> admins = memberRepository.findAllByMemberRole(MemberRole.ADMIN);
+        /** 생성자와 중복되지 않게, 관리자 전원을 자동 참여 (원한다면 1명만 초대하도록 변경 가능) */
+        for (MemberEntity admin : admins) {
+            if (admin != null
+                    && admin.getMemberId() != null
+                    && !admin.getMemberId().equals(member.getMemberId())) {
+                MemberChatroomMapping adminMap = chatroom.addMember(admin);
+                memberChatroomMappingRepository.save(adminMap);
+            }
+        }
+// [중략]
 
-        //관리자 자동 참여
-        List<MemberEntity> admin = memberRepository.findAllByMemberRole(MemberRole.ADMIN).stream().toList();
-        admin.stream().map(chatroom::addMember).map(memberChatroomMappingRepository::save);
+
+        log.info("[createChatroom] created chatroomId={} title='{}' by memberId={}",
+                chatroom.getId(), safeTitle, member.getMemberId());
 
         return chatroom;
     }
@@ -154,7 +180,15 @@ public class ChatService {
                 .createdAt(LocalDateTime.now())
                 .build();
 
-        return messageRepository.save(message);
+        // =================== 추가 ===================
+        // 1) 저장
+        MessageEntity saved = messageRepository.save(message);
+
+        // 2) 보낸 사람은 방금 메시지를 "본" 상태이므로 즉시 읽음 처리
+        updateLastCheckedAt(member, chatroomId);
+
+        // =================== 추가 ===================
+        return saved; // 수정
     }
 
     // 특정 채팅방에서 작성된 모든 메세지를 불러오는 로직

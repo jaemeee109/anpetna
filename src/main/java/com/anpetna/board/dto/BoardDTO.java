@@ -33,6 +33,9 @@ public class BoardDTO {
     // ★ 추가
     private String category;
 
+    // ★ 추가: 목록에서 제목 옆에 (n) 찍기용
+    private int commentCount;
+
     // 이미지 URL 리스트
     private List<String> imageUrls;
 

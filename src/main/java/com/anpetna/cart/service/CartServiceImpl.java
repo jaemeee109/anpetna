@@ -77,10 +77,11 @@ public class CartServiceImpl implements CartService{
                 });
 
         // 재고 검증 추가
-        int reqQty  = Math.max(1, request.getQuantity());      // 최소 1
-        int curQty  = Math.max(0, cart.getQuantity());         // 장바구니에 이미 담긴 수량
-        int wantQty = curQty + reqQty;                         // 담은 후 총 수량
-        int stock   = Math.max(0, item.getItemStock());        // 상품 현재 재고
+        int reqQty  = Math.max(1, request.getQuantity());
+        int curQty  = Math.max(0, cart.getQuantity());
+        int wantQty = curQty + reqQty;
+        Integer stockVal = item.getItemStock();
+        int stock = (stockVal != null) ? Math.max(0, stockVal) : 0;         // 상품 현재 재고
 
         if (wantQty > stock) {
             throw new ResponseStatusException(
@@ -150,18 +151,23 @@ public class CartServiceImpl implements CartService{
     }
 
     @Override
+    @Transactional
     public UpdateCartItemQuantityRes updateQuantity(String memberId, String itemIdStr, UpdateCartItemQuantityReq request) {
 
         Long itemId = parseItemId(itemIdStr);
 
         // 요청 회원과 요청 상품에 맞는 장바구니 항목을 조회.
         CartEntity cart = cartRepository.findByMember_MemberIdAndItem_ItemId(memberId, itemId)
-                .orElseThrow(() -> new IllegalArgumentException("장바구니에 해당 상품이 없습니다. (itemId=" + itemIdStr + ")"));
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.NOT_FOUND,
+                        "장바구니에 해당 상품이 없습니다. (itemId=" + itemIdStr + ")"
+                ));
 
         // 재고 검증 추가
         ItemEntity item = cart.getItem();
         int nextQty = Math.max(1, request.getQuantity());  // 최소 1
-        int stock   = Math.max(0, item.getItemStock());
+        Integer stockVal = item.getItemStock();
+        int stock = (stockVal != null) ? Math.max(0, stockVal) : 0;
 
         if (nextQty > stock) {
             throw new ResponseStatusException(
@@ -190,7 +196,10 @@ public class CartServiceImpl implements CartService{
         Long itemId = parseItemId(itemIdStr);
 
         CartEntity cart = cartRepository.findByMember_MemberIdAndItem_ItemId(memberId, itemId)
-                .orElseThrow(() -> new IllegalArgumentException("장바구니에 해당 상품이 없습니다. (itemId=" + itemIdStr + ")"));
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.NOT_FOUND,
+                        "장바구니에 해당 상품이 없습니다. (itemId=" + itemIdStr + ")"
+                ));
 
         cartRepository.delete(cart);
 

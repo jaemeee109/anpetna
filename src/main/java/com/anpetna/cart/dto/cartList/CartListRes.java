@@ -19,6 +19,8 @@ public class CartListRes {
 
     private PageDTO page; // 페이징 미사용이면 null 리턴하거나 필드 제거
 
+    private Long cartItemId;
+
     @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
     public static class PageDTO {
         private Integer page;

@@ -19,17 +19,56 @@ public class BoardGuard {
         return a != null && a.isAuthenticated();
     }
 
-    private boolean hasRole(Authentication a, String role) {
+    /*private boolean hasRole(Authentication a, String role) {
         if (a == null) return false;
         for (GrantedAuthority ga : a.getAuthorities()) {
             if (role.equals(ga.getAuthority())) return true;
         }
         return false;
+    }*/
+
+    private static final String ROLE_PREFIX = "ROLE_";
+
+    /**
+     * 문자열 권한을 ROLE_ 접두사 + 대문자로 표준화
+     */
+    private String normalizeRole(String role) {
+        if (role == null || role.isBlank()) return "";
+        String up = role.trim().toUpperCase();
+        return up.startsWith(ROLE_PREFIX) ? up : (ROLE_PREFIX + up);
     }
 
-    private boolean isAdmin(Authentication a) {
-        return hasRole(a, "ROLE_ADMIN");
+    /**
+     * 단일 권한 검사 (ROLE 표준화 포함)
+     */
+    private boolean hasRole(Authentication a, String role) {
+        if (a == null) return false;
+        String wanted = normalizeRole(role);
+        for (GrantedAuthority ga : a.getAuthorities()) {
+            String have = normalizeRole(ga.getAuthority());
+            if (have.equals(wanted)) return true;
+        }
+        return false;
     }
+
+    /**
+     * 여러 권한 중 하나라도 보유하면 true
+     */
+    private boolean hasAnyRole(Authentication a, String... roles) {
+        if (a == null || roles == null || roles.length == 0) return false;
+        for (String r : roles) {
+            if (hasRole(a, r)) return true;
+        }
+        return false;
+    }
+
+    /**
+     * 관리자 판별 — ADMIN/SUPER_ADMIN/MANAGER 등 포함
+     */
+    private boolean isAdmin(Authentication a) {
+        return hasAnyRole(a, "ADMIN", "SUPER_ADMIN", "MANAGER", "ROLE_ADMIN" , "ROLE_1", "1");
+    }
+
 
     private boolean isUser(Authentication a) {
         return hasRole(a, "ROLE_USER") || isAdmin(a);

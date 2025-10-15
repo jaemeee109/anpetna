@@ -16,6 +16,7 @@ import com.anpetna.board.dto.updateBoard.UpdateBoardReq;
 import com.anpetna.board.dto.updateBoard.UpdateBoardRes;
 import com.anpetna.board.event.BoardCreatedEvent;
 import com.anpetna.board.repository.BoardJpaRepository;
+import com.anpetna.board.repository.CommentJpaRepository;
 import com.anpetna.core.coreDto.PageRequestDTO;
 import com.anpetna.core.coreDto.PageResponseDTO;
 import com.anpetna.image.domain.ImageEntity;
@@ -59,6 +60,7 @@ public class BoardServiceImpl implements BoardService {
     private final ModelMapper modelMapper;
     private final ApplicationEventPublisher publisher;
     private final LikeNotificationService likeNotificationService;
+    private final CommentJpaRepository commentJpaRepository;
 
     /* ==================== 관리자 판별용 메서드 추가 ==================== */
     // ★★★ 공통 유틸: 관리자 여부 판별
@@ -66,10 +68,21 @@ public class BoardServiceImpl implements BoardService {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null) return false;
         for (GrantedAuthority ga : auth.getAuthorities()) {
-            if ("ROLE_ADMIN".equals(ga.getAuthority())) return true; // <- 시큐리티 ROLE 접두사 기준
+            String role = ga.getAuthority();
+            if (role == null) continue;
+            String up = role.trim().toUpperCase();
+            // BoardGuard.isAdmin 과 동일 범위 허용
+            if (up.equals("ADMIN") || up.equals("ROLE_ADMIN")
+                    || up.equals("SUPER_ADMIN") || up.equals("ROLE_SUPER_ADMIN")
+                    || up.equals("MANAGER") || up.equals("ROLE_MANAGER")
+                    || up.equals("1") || up.equals("ROLE_1")) {
+                return true;
+            }
         }
         return false;
     }
+
+
 
     // ★★★ 공통 유틸: "관리자는 통과, 아니면 본인만" 강제
     private void requireOwnerOrAdmin(String ownerMemberId, String actorMemberId, String actionName) {
@@ -190,7 +203,12 @@ public class BoardServiceImpl implements BoardService {
             page = boardJpaRepository.findByBoardTypeSafe(boardTypeStr, pageable);
         }
 
-        List<BoardDTO> list = page.map(BoardDTO::new).getContent();
+        List<BoardDTO> list = page.map(entity -> {
+            BoardDTO dto = new BoardDTO(entity);
+            long commentCount = commentJpaRepository.countByBoardId(entity.getBno());
+            dto.setCommentCount((int) commentCount);
+            return dto;
+        }).getContent();
 
         return PageResponseDTO.<BoardDTO>withAll()
                 .pageRequestDTO(pr)
@@ -226,7 +244,12 @@ public class BoardServiceImpl implements BoardService {
             page = boardJpaRepository.findByBoardTypeSafe(type == null ? null : type.name(), pageable);
         }
 
-        List<BoardDTO> list = page.map(BoardDTO::new).getContent();
+        List<BoardDTO> list = page.map(entity -> {
+            BoardDTO dto = new BoardDTO(entity);
+            long commentCount = commentJpaRepository.countByBoardId(entity.getBno());
+            dto.setCommentCount((int) commentCount);
+            return dto;
+        }).getContent();
 
         return PageResponseDTO.<BoardDTO>withAll()
                 .pageRequestDTO(pr)
@@ -243,6 +266,30 @@ public class BoardServiceImpl implements BoardService {
         // B안: 컨트롤러에서 isAuthenticated 체크 후 들어온다고 가정 (서비스는 순수 조회)
         BoardEntity e = boardJpaRepository.findById(req.getBno())
                 .orElseThrow(() -> new RuntimeException("존재하지 않는 게시글 입니다."));
+
+        final boolean secret = Boolean.TRUE.equals(e.getIsSecret());
+        if (secret) {
+            final String writer = String.valueOf(e.getBWriter());
+
+            // 로그인 사용자 정보는 항상 SecurityContext에서 읽어 소유자/관리자 판별
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            final String me = (auth != null ? auth.getName() : null);   // ← req.getMemberId() 사용 금지
+            final boolean owner = (me != null) && writer.equalsIgnoreCase(me);
+
+            /*final boolean admin = (auth != null) &&
+                    auth.getAuthorities().stream()
+                            .map(GrantedAuthority::getAuthority)
+                            .map(String::toUpperCase)
+                            .anyMatch(s -> s.equals("ROLE_ADMIN") || s.equals("ADMIN"));*/
+            final boolean admin = isAdmin();
+
+
+            if (!owner && !admin) {
+                // 프론트는 403을 감지해 즉시 차단 뷰로 전환(불필요한 추가 로딩 없음)
+                throw new AccessDeniedException("FORBIDDEN: secret post");
+            }
+        }
+
 
         e.setBViewCount((e.getBViewCount() == null ? 0 : e.getBViewCount()) + 1);
 
@@ -449,7 +496,12 @@ public class BoardServiceImpl implements BoardService {
         Pageable top5 = PageRequest.of(0, 5);
         return boardJpaRepository.noticeCreateDateTop5(BoardType.NOTICE, top5)
                 .stream()
-                .map(NoticeTop5Res::from)
+                .map(board -> {
+                    NoticeTop5Res dto = NoticeTop5Res.from(board);
+                    long commentCount = commentJpaRepository.countByBoardId(board.getBno());
+                    dto.setCommentCount((int) commentCount);   // ✅ 댓글 수 추가
+                    return dto;
+                })
                 .toList();
     }
 
@@ -459,7 +511,12 @@ public class BoardServiceImpl implements BoardService {
         Pageable top5 = PageRequest.of(0, 5);
         return boardJpaRepository.freeLikeCountTop5(BoardType.FREE, top5)
                 .stream()
-                .map(LikeCountTop5Res::from)
+                .map(board -> {
+                    LikeCountTop5Res dto = LikeCountTop5Res.from(board);
+                    long commentCount = commentJpaRepository.countByBoardId(board.getBno());
+                    dto.setCommentCount((int) commentCount);   // ✅ 댓글 수 추가
+                    return dto;
+                })
                 .toList();
     }
 }
