@@ -332,7 +332,7 @@ docker logout || true
     stage('Healthcheck NEXT') {
       steps {
         sh '''#!/bin/sh
-    set -e
+    set -Eeuo pipefail
 
     TARGET="app-${NEXT_COLOR}"
     TARGET="$(printf '%s' "${TARGET}" | tr -d '\\r' | xargs)"
@@ -350,33 +350,32 @@ docker logout || true
       sleep 3; t=$((t+3))
     done
 
-    # 컨테이너 존재 대기(최대 60s)
+    # 컨테이너 존재 확인 (최대 60s)
     t=0
     while [ $t -lt 60 ]; do
-      if docker ps --format '{{.Names}}' | grep -qx "${TARGET}"; then break; fi
+      docker ps --format '{{.Names}}' | grep -qx "${TARGET}" && break || true
       sleep 2; t=$((t+2))
     done
-    if ! docker ps --format '{{.Names}}' | grep -qx "${TARGET}"; then
+    if ! docker ps --format '{{.Names}}' | grep -qx "${TARGET}" >/dev/null 2>&1; then
       echo "[health] ${TARGET} not found"
       docker compose -f "${APP_DIR}/docker-compose.yml" ps || true
       docker ps -a || true
       exit 1
     fi
 
-    # (A) 컨테이너 내부: 포트 오픈/로컬 헬스 (IPv4/IPv6 모두 시도)
+    # (A) 컨테이너 내부: 필수 게이트
     echo "[health] in-container warmup (localhost v4/v6 + listen check)"
-    docker pull curlimages/curl:latest >/dev/null || true
     A_OK=0
     set +e
     docker exec "${TARGET}" sh -lc '
       for i in $(seq 1 120); do
-        # 1) LISTEN 여부(ss/netstat)
+        # 1) LISTEN 여부
         if command -v ss >/dev/null 2>&1; then
-          ss -lntp | grep -E ":8080\\b" && echo "  [ss] listen ok" && exit 0
+          ss -lntp | grep -E ":8080\\b" >/dev/null && echo "  [ss] listen ok" && exit 0 || true
         elif command -v netstat >/dev/null 2>&1; then
-          netstat -lntp 2>/dev/null | grep -E ":8080\\b" && echo "  [netstat] listen ok" && exit 0
+          netstat -lntp 2>/dev/null | grep -E ":8080\\b" >/dev/null && echo "  [netstat] listen ok" && exit 0 || true
         fi
-        # 2) curl localhost (IPv4/IPv6 모두)
+        # 2) curl localhost (IPv4/IPv6)
         c4=$(curl -sS -o /dev/null -w "%{http_code}" http://127.0.0.1:8080/actuator/health || true)
         [ "$c4" = "200" ] && echo "  [curl v4] 200" && exit 0
         c6=$(curl -g -sS -o /dev/null -w "%{http_code}" "http://[::1]:8080/actuator/health" || true)
@@ -392,35 +391,52 @@ docker logout || true
       echo "[health][A] OK"
       A_OK=1
     else
-      echo "[health][A] not confirmed (rc=$A_RC) → continue to network check"
+      echo "[health][A] FAIL (rc=$A_RC)"
     fi
 
-    # (B) 도커 네트워크 경유 health
-    echo "[health] network check via ${DOCKER_NETWORK}"
-    SECONDS=0
-    until [ $SECONDS -ge 180 ]; do
-      ok=$(docker run --rm --network "${DOCKER_NETWORK}" -e TARGET="${TARGET}" curlimages/curl:latest sh -lc '
-        url="http://$TARGET:8080/actuator/health";
-        code=$(curl -sS -o /tmp/body -w "%{http_code}" "$url" || true);
-        if [ "$code" = "200" ]; then
-          grep -q "\"status\":\"UP\"" /tmp/body && echo ok;
-        elif [ "$code" = "401" ] || [ "$code" = "302" ]; then
-          echo ok;
-        fi
-      ')
-      [ "$ok" = "ok" ] && echo "[health][B] OK" && exit 0
+    # (B) 도커 네트워크 경유: 비차단 참고 체크
+    echo "[health] network check via ${DOCKER_NETWORK} (non-blocking)"
+    B_OK=0
+    end=$(( $(date +%s) + 180 ))
+    while [ "$(date +%s)" -lt "$end" ]; do
+      set +e
+      docker run --rm --network "${DOCKER_NETWORK}" \
+        -e TARGET="${TARGET}" curlimages/curl:latest sh -lc '
+          url="http://$TARGET:8080/actuator/health";
+          code=$(curl -sS -o /tmp/body -w "%{http_code}" "$url" || true);
+          if [ "$code" = "200" ]; then
+            grep -q "\"status\":\"UP\"" /tmp/body && echo ok;
+          elif [ "$code" = "401" ] || [ "$code" = "302" ]; then
+            echo ok;
+          fi
+        ' | grep -qx ok
+      rc=$?
+      set -e
+      if [ $rc -eq 0 ]; then
+        echo "[health][B] OK"
+        B_OK=1
+        break
+      fi
       sleep 3
     done
+    [ $B_OK -eq 1 ] || echo "[health][B] not confirmed (this is non-blocking)"
 
-    # (C) 실패 디버깅 덤프
-    echo "[health] TIMEOUT → dumping logs & processes"
-    docker logs --tail=200 "${TARGET}" || true
-    docker exec "${TARGET}" sh -lc '
-      echo "[ps]"; ps -ef | grep -i "java\\|app.jar" | grep -v grep || true
-      echo "[listen]"; (ss -lntp 2>/dev/null || netstat -lntp 2>/dev/null || true) | cat
-      echo "[env: SERVER/MANAGEMENT]"; env | grep -E "SERVER_ADDRESS|MANAGEMENT_SERVER|SPRING_APPLICATION_JSON" || true
-    ' || true
-    exit 1
+    # (C) 판정
+    if [ $A_OK -ne 1 ]; then
+      echo "[health] FAIL: app is not ready (A gate)"
+      # 디버깅 덤프
+      docker logs --tail=200 "${TARGET}" || true
+      docker exec "${TARGET}" sh -lc '
+        echo "[ps]"; ps -ef | grep -i "java\\|app.jar" | grep -v grep || true
+        echo "[listen]"; (ss -lntp 2>/dev/null || netstat -lntp 2>/dev/null || true) | cat
+        echo "[env: SERVER/MANAGEMENT]"; env | grep -E "SERVER_ADDRESS|MANAGEMENT_SERVER|SPRING_APPLICATION_JSON" || true
+      ' || true
+      exit 1
+    fi
+
+    # (D) 성공 종료
+    echo "[health] PASSED (A=required ok, B=non-blocking ${B_OK})"
+    exit 0
     '''
       }
     }
@@ -430,28 +446,49 @@ docker logout || true
         script {
           try {
             sh '''#!/bin/sh
-set -euxo pipefail
+    set -euo pipefail
 
-printf 'set $active_upstream app-%s:8080;\\n' "${NEXT_COLOR}" > "${NGINX_ACTIVE_VAR}"
-docker exec ${NGINX_CONTAINER} nginx -s reload || docker restart ${NGINX_CONTAINER}
+    # 업스트림 전환
+    printf 'set $active_upstream app-%s:8080;\\n' "${NEXT_COLOR}" > "${NGINX_ACTIVE_VAR}"
 
-docker pull curlimages/curl:latest || true
-docker run --rm --network ${DOCKER_NETWORK} curlimages/curl:latest sh -lc '
-  code=$(curl -s -o /dev/null -w "%{http_code}" "http://'${NGINX_CONTAINER}'/actuator/health");
-  if [ "$code" = "200" ]; then
-    curl -fsS "http://'${NGINX_CONTAINER}'/actuator/health" | grep -q "\"status\":\"UP\"";
-  else
-    [ "$code" = "401" ];
-  fi
-'
-'''
+    # nginx reload (2회까지 재시도)
+    if ! docker exec "${NGINX_CONTAINER}" nginx -s reload; then
+      echo "[switch] reload failed → restarting container"
+      docker restart "${NGINX_CONTAINER}" >/dev/null
+    fi
+
+    # 업스트림 응답 검증 (재시도)
+    docker pull curlimages/curl:latest >/dev/null 2>&1 || true
+    end=$(( $(date +%s) + 60 ))
+    ok=0
+    while [ "$(date +%s)" -lt "$end" ]; do
+      set +e
+      code=$(docker run --rm --network "${DOCKER_NETWORK}" curlimages/curl:latest \
+               curl -s -o /tmp/body -w "%{http_code}" "http://${NGINX_CONTAINER}/actuator/health" || true)
+      body=$(docker run --rm --network "${DOCKER_NETWORK}" curlimages/curl:latest \
+               sh -lc 'curl -s "http://'${NGINX_CONTAINER}'/actuator/health" || true')
+      set -e
+
+      if [ "$code" = "200" ]; then
+        printf "%s" "$body" | grep -q '"status":"UP"' && ok=1 && break || true
+      elif [ "$code" = "401" ] || [ "$code" = "302" ]; then
+        ok=1; break
+      fi
+      sleep 2
+    done
+
+    [ $ok -eq 1 ] && echo "[switch] verification OK" && exit 0
+    echo "[switch] verification FAILED"
+    exit 2
+    '''
           } catch (err) {
+            // 자동 롤백
             sh '''#!/bin/sh
-set +e
-echo "[SWITCH-ROLLBACK] revert to CURRENT"
-printf 'set $active_upstream app-%s:8080;\\n' "${CURRENT_COLOR}" > "${NGINX_ACTIVE_VAR}" || true
-docker exec ${NGINX_CONTAINER} nginx -s reload || docker restart ${NGINX_CONTAINER} || true
-'''
+    set +e
+    echo "[SWITCH-ROLLBACK] revert to CURRENT"
+    printf 'set $active_upstream app-%s:8080;\\n' "${CURRENT_COLOR}" > "${NGINX_ACTIVE_VAR}" || true
+    docker exec "${NGINX_CONTAINER}" nginx -s reload || docker restart "${NGINX_CONTAINER}" || true
+    '''
             error "Switchover verification failed → rolled back to ${env.CURRENT_COLOR}"
           }
         }
