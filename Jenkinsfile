@@ -180,124 +180,125 @@ docker logout || true
           string(credentialsId: 'naver_geocode_client_secret', variable: 'NAVER_SECRET')
         ]) {
           sh '''#!/bin/sh
-set -e -o pipefail
+    set -e -o pipefail
 
-echo "STEP[0] ========== setup vars =========="
-TARGET="app-${NEXT_COLOR}"
-# Build 단계에서 저장한 정확한 태그 사용
-test -f image.tag || { echo "image.tag missing"; exit 1; }
-IMAGE="$(cat image.tag)"
-OVERRIDE_FILE="${WORKSPACE}/override-${TARGET}.yml"
+    echo "STEP[0] ========== setup vars =========="
+    TARGET="app-${NEXT_COLOR}"
+    test -f image.tag || { echo "image.tag missing"; exit 1; }
+    IMAGE="$(cat image.tag)"
+    OVERRIDE_FILE="${WORKSPACE}/override-${TARGET}.yml"
 
-# 필수값 확인
-require(){ v="$1"; n="$2"; if [ -z "$v" ]; then echo "ERROR: $n is required"; exit 1; fi; }
-require "${APP_DIR-}"        "APP_DIR"
-require "${DOCKER_NETWORK-}" "DOCKER_NETWORK"
-require "${DOCKERHUB_REPO-}" "DOCKERHUB_REPO"
-require "${IMAGE_TAG_BASE-}" "IMAGE_TAG_BASE"
-require "${NEXT_COLOR-}"     "NEXT_COLOR"
-require "${DB_URL-}"         "DB_URL"
-require "${DB_USER-}"        "DB_USER"
-require "${DB_PASS-}"        "DB_PASS"
-require "${FRONT_ORIGIN-}"   "FRONT_ORIGIN"   # 추가: 프론트 오리진 필수
+    # 필수값 확인
+    require(){ v="$1"; n="$2"; if [ -z "$v" ]; then echo "ERROR: $n is required"; exit 1; fi; }
+    require "${APP_DIR-}"        "APP_DIR"
+    require "${DOCKER_NETWORK-}" "DOCKER_NETWORK"
+    require "${DOCKERHUB_REPO-}" "DOCKERHUB_REPO"
+    require "${NEXT_COLOR-}"     "NEXT_COLOR"
+    require "${DB_URL-}"         "DB_URL"
+    require "${DB_USER-}"        "DB_USER"
+    require "${DB_PASS-}"        "DB_PASS"
+    # FRONT_ORIGIN 은 선택값: 있으면만 주입
+    FRONT_ORIGIN="${FRONT_ORIGIN-}"
 
-echo "STEP[1] ========== secret length debug =========="
-echo "[DEBUG] Byte-lengths (no secrets printed)"
-printf 'DB_URL bytes = ';   printf '%s' "$DB_URL"   | wc -c
-printf 'DB_USER bytes = ';  printf '%s' "$DB_USER"  | wc -c
-printf 'DB_PASS bytes = ';  printf '%s' "$DB_PASS"  | wc -c
+    echo "STEP[1] ========== secret length debug =========="
+    echo "[DEBUG] Byte-lengths (no secrets printed)"
+    printf 'DB_URL bytes = ';   printf '%s' "$DB_URL"   | wc -c
+    printf 'DB_USER bytes = ';  printf '%s' "$DB_USER"  | wc -c
+    printf 'DB_PASS bytes = ';  printf '%s' "$DB_PASS"  | wc -c
 
-echo "STEP[2] ========== escape & write override =========="
-escq(){ printf '%s' "${1-}" | sed 's/"/\\"/g'; }
-DB_URL_S=$(escq "$DB_URL")
-DB_USER_S=$(escq "$DB_USER")
-DB_PASS_S=$(escq "$DB_PASS")
-TOSS_SECRET_S=$(escq "${TOSS_SECRET-}")
-NAVER_ID_S=$(escq "${NAVER_ID-}")
-NAVER_SECRET_S=$(escq "${NAVER_SECRET-}")
-IMAGE_S=$(escq "$IMAGE")
-FRONT_ORIGIN_S=$(escq "$FRONT_ORIGIN")
+    echo "STEP[2] ========== escape & write override =========="
+    escq(){ printf '%s' "${1-}" | sed 's/"/\\"/g'; }
+    DB_URL_S=$(escq "$DB_URL")
+    DB_USER_S=$(escq "$DB_USER")
+    DB_PASS_S=$(escq "$DB_PASS")
+    TOSS_SECRET_S=$(escq "${TOSS_SECRET-}")
+    NAVER_ID_S=$(escq "${NAVER_ID-}")
+    NAVER_SECRET_S=$(escq "${NAVER_SECRET-}")
+    IMAGE_S=$(escq "$IMAGE")
+    FRONT_ORIGIN_S=$(escq "$FRONT_ORIGIN")
 
-cat > "${OVERRIDE_FILE}" <<EOF
-services:
-  ${TARGET}:
-    image: "${IMAGE}"
-    container_name: ${TARGET}
-    environment:
-      SPRING_DATASOURCE_URL: "${DB_URL_S}"
-      SPRING_DATASOURCE_USERNAME: "${DB_USER_S}"
-      SPRING_DATASOURCE_PASSWORD: "${DB_PASS_S}"
-      SPRING_PROFILES_ACTIVE: "prod"
-      TOSS_SECRET_KEY: "${TOSS_SECRET_S}"
-      NAVER_MAP_CLIENT_ID: "${NAVER_ID_S}"
-      NAVER_MAP_CLIENT_SECRET: "${NAVER_SECRET_S}"
-      # 추가: 프론트에서 호출할 백엔드 오리진
-      FRONT_API_URL: "${FRONT_ORIGIN_S}"
+    # FRONT_API_URL 라인은 FRONT_ORIGIN 있을 때만 생성
+    FRONT_LINE=""
+    [ -n "$FRONT_ORIGIN" ] && FRONT_LINE="      FRONT_API_URL: \\\"${FRONT_ORIGIN_S}\\\""
+
+    cat > "${OVERRIDE_FILE}" <<EOF
+    services:
+      ${TARGET}:
+        image: "${IMAGE_S}"
+        container_name: ${TARGET}
+        environment:
+          SPRING_DATASOURCE_URL: "${DB_URL_S}"
+          SPRING_DATASOURCE_USERNAME: "${DB_USER_S}"
+          SPRING_DATASOURCE_PASSWORD: "${DB_PASS_S}"
+          SPRING_PROFILES_ACTIVE: "prod"
+          TOSS_SECRET_KEY: "${TOSS_SECRET_S}"
+          NAVER_MAP_CLIENT_ID: "${NAVER_ID_S}"
+          NAVER_MAP_CLIENT_SECRET: "${NAVER_SECRET_S}"
+    $(printf "%s\n" "${FRONT_LINE}")
+        networks:
+          - ${DOCKER_NETWORK}
     networks:
-      - ${DOCKER_NETWORK}
-networks:
-  ${DOCKER_NETWORK}:
-    external: true
-EOF
+      ${DOCKER_NETWORK}:
+        external: true
+    EOF
 
-echo "STEP[3] ========== merged config (non-blocking) =========="
-docker compose -f "${APP_DIR}/docker-compose.yml" -f "${OVERRIDE_FILE}" config \
-  | awk "/${TARGET}:/,/^[^[:space:]]/" || true
+    echo "STEP[3] ========== merged config (non-blocking) =========="
+    docker compose -f "${APP_DIR}/docker-compose.yml" -f "${OVERRIDE_FILE}" config \
+      | awk "/${TARGET}:/,/^[^[:space:]]/" || true
 
-echo "STEP[4] ========== compose up -d ${TARGET} =========="
-docker compose -f "${APP_DIR}/docker-compose.yml" -f "${OVERRIDE_FILE}" pull "${TARGET}" || true
-docker compose -f "${APP_DIR}/docker-compose.yml" -f "${OVERRIDE_FILE}" up -d "${TARGET}"
+    echo "STEP[4] ========== compose up -d ${TARGET} =========="
+    docker compose -f "${APP_DIR}/docker-compose.yml" -f "${OVERRIDE_FILE}" pull "${TARGET}" || true
+    docker compose -f "${APP_DIR}/docker-compose.yml" -f "${OVERRIDE_FILE}" up -d "${TARGET}"
 
-echo "STEP[5] ========== ps snapshot =========="
-docker compose -f "${APP_DIR}/docker-compose.yml" -f "${OVERRIDE_FILE}" ps || true
-docker ps -a --format 'table {{.Names}}\\t{{.Status}}\\t{{.Image}}' | grep -E 'app-(blue|green)' || true
+    echo "STEP[5] ========== ps snapshot =========="
+    docker compose -f "${APP_DIR}/docker-compose.yml" -f "${OVERRIDE_FILE}" ps || true
+    docker ps -a --format 'table {{.Names}}\\t{{.Status}}\\t{{.Image}}' | grep -E 'app-(blue|green)' || true
 
-echo "STEP[6] ========== resolve CID =========="
-CID="$(docker compose -f "${APP_DIR}/docker-compose.yml" -f "${OVERRIDE_FILE}" ps -q "${TARGET}" || true)"
-if [ -z "$CID" ]; then
-  echo "ERROR: ${TARGET} not found after up -d"
-  docker compose -f "${APP_DIR}/docker-compose.yml" -f "${OVERRIDE_FILE}" ps || true
-  docker logs --tail=200 "${TARGET}" || true
-  shred -u "${OVERRIDE_FILE}" 2>/dev/null || rm -f "${OVERRIDE_FILE}"
-  exit 1
-fi
-echo "[INFO] ${TARGET} CID=${CID}"
+    echo "STEP[6] ========== resolve CID =========="
+    CID="$(docker compose -f "${APP_DIR}/docker-compose.yml" -f "${OVERRIDE_FILE}" ps -q "${TARGET}" || true)"
+    if [ -z "$CID" ]; then
+      echo "ERROR: ${TARGET} not found after up -d"
+      docker compose -f "${APP_DIR}/docker-compose.yml" -f "${OVERRIDE_FILE}" ps || true
+      docker logs --tail=200 "${TARGET}" || true
+      shred -u "${OVERRIDE_FILE}" 2>/dev/null || rm -f "${OVERRIDE_FILE}"
+      exit 1
+    fi
+    echo "[INFO] ${TARGET} CID=${CID}"
 
-echo "STEP[7] ========== env keys (masked) =========="
-docker inspect "${CID}" --format '{{range .Config.Env}}{{println .}}{{end}}' \
-  | grep -E '^SPRING_DATASOURCE_URL=|^SPRING_DATASOURCE_USERNAME=|^SPRING_DATASOURCE_PASSWORD=|^FRONT_API_URL=' \
-  | sed 's/=.*/=<redacted>/' || true
+    echo "STEP[7] ========== env keys (masked) =========="
+    docker inspect "${CID}" --format '{{range .Config.Env}}{{println .}}{{end}}' \
+      | grep -E '^SPRING_DATASOURCE_URL=|^SPRING_DATASOURCE_USERNAME=|^SPRING_DATASOURCE_PASSWORD=|^FRONT_API_URL=' \
+      | sed 's/=.*/=<redacted>/' || true
 
-echo "STEP[8] ========== DB TCP test =========="
-HOSTPORT=$(printf "%s" "$DB_URL" | sed -E 's#^jdbc:[a-zA-Z0-9]+://([^/]+)/.*#\\1#')
-HOST=${HOSTPORT%:*}; PORT=${HOSTPORT#*:}; [ "$HOST" = "$PORT" ] && PORT=3306
-echo "[TCP test] ${TARGET} -> $HOST:$PORT"
-docker run --rm --network "container:${TARGET}" busybox sh -lc "nc -vz -w3 $HOST $PORT || true"
+    echo "STEP[8] ========== DB TCP test =========="
+    HOSTPORT=$(printf "%s" "$DB_URL" | sed -E 's#^jdbc:[a-zA-Z0-9]+://([^/]+)/.*#\\1#')
+    HOST=${HOSTPORT%:*}; PORT=${HOSTPORT#*:}; [ "$HOST" = "$PORT" ] && PORT=3306
+    echo "[TCP test] ${TARGET} -> $HOST:$PORT"
+    docker run --rm --network "container:${TARGET}" busybox sh -lc "nc -vz -w3 $HOST $PORT || true"
 
-echo "STEP[9] ========== last logs (tail) =========="
-docker logs --tail=60 "${TARGET}" || true
+    echo "STEP[9] ========== last logs (tail) =========="
+    docker logs --tail=60 "${TARGET}" || true
 
-# 추가: 금지 가드 — 관리/서버 bind 옵션 주입 여부 차단
-echo "STEP[9.1] ========== forbid management/server address in Env/Cmd =========="
-FORBIDDEN_ENV=$(docker inspect "$CID" --format '{{range .Config.Env}}{{println .}}{{end}}' \
-  | grep -Ei 'management\\.server\\.address|^MANAGEMENT_SERVER_ADDRESS=|^SERVER_ADDRESS=|SPRING_APPLICATION_JSON' || true)
-if [ -n "$FORBIDDEN_ENV" ]; then
-  echo "[ERROR] Forbidden management/server address related env detected:"
-  echo "$FORBIDDEN_ENV"
-  exit 1
-fi
-FORBIDDEN_CMD=$(docker inspect -f '{{json .Config.Cmd}} {{json .Config.Entrypoint}}' "$CID" \
-  | grep -E -- '--management\\.server\\.address=|--server\\.address=' || true)
-if [ -n "$FORBIDDEN_CMD" ]; then
-  echo "[ERROR] Forbidden flags in CMD/Entrypoint:"
-  echo "$FORBIDDEN_CMD"
-  exit 1
-fi
+    echo "STEP[9.1] ========== forbid management/server address in Env/Cmd =========="
+    FORBIDDEN_ENV=$(docker inspect "$CID" --format '{{range .Config.Env}}{{println .}}{{end}}' \
+      | grep -Ei 'management\.server\.address|^MANAGEMENT_SERVER_ADDRESS=|^SERVER_ADDRESS=|SPRING_APPLICATION_JSON' || true)
+    if [ -n "$FORBIDDEN_ENV" ]; then
+      echo "[ERROR] Forbidden management/server address related env detected:"
+      echo "$FORBIDDEN_ENV"
+      exit 1
+    fi
+    FORBIDDEN_CMD=$(docker inspect -f '{{json .Config.Cmd}} {{json .Config.Entrypoint}}' "$CID" \
+      | grep -E -- '--management\.server\.address=|--server\.address=' || true)
+    if [ -n "$FORBIDDEN_CMD" ]; then
+      echo "[ERROR] Forbidden flags in CMD/Entrypoint:"
+      echo "$FORBIDDEN_CMD"
+      exit 1
+    fi
 
-echo "STEP[10] ========== cleanup =========="
-shred -u "${OVERRIDE_FILE}" 2>/dev/null || rm -f "${OVERRIDE_FILE}"
-echo "STEP[DONE] =========="
-'''
+    echo "STEP[10] ========== cleanup =========="
+    shred -u "${OVERRIDE_FILE}" 2>/dev/null || rm -f "${OVERRIDE_FILE}"
+    echo "STEP[DONE] =========="
+    '''
         }
       }
     }
@@ -310,7 +311,7 @@ echo "STEP[DONE] =========="
     TARGET="app-${NEXT_COLOR}"
     echo "[health] TARGET=${TARGET}"
 
-    # 컨테이너 확인 + 스냅샷
+    # 컨테이너 존재 대기(최대 60초) + 스냅샷
     t=0; while [ $t -lt 60 ]; do
       docker ps --format '{{.Names}}' | grep -qx "${TARGET}" && break
       sleep 2; t=$((t+2))
@@ -318,27 +319,34 @@ echo "STEP[DONE] =========="
     docker ps -a --format 'table {{.Names}}\\t{{.Status}}\\t{{.Image}}' | grep -E 'app-(blue|green)' || true
     docker inspect -f '{{json .NetworkSettings.Networks}}' "${TARGET}" || true
 
-    # (A) 컨테이너 내부: 포트가 실제 LISTEN 하거나 헬스 200 뜰 때까지
-    echo "[health] in-container warmup (127.0.0.1)"
-    docker exec "${TARGET}" sh -lc '
+    # (A) 컨테이너 네임스페이스로 포트 오픈까지 대기 (툴은 busybox 사용)
+    echo "[health] in-container warmup (port open@127.0.0.1:8080)"
+    docker pull busybox:latest >/dev/null || true
+    docker run --rm --network "container:${TARGET}" busybox sh -lc '
       for i in $(seq 1 90); do
-        if command -v ss >/dev/null 2>&1; then
-          ss -lntp | grep -q ":8080 " && echo "  listen ok (ss)" && exit 0
-        elif command -v netstat >/dev/null 2>&1; then
-          netstat -lntp 2>/dev/null | grep -q ":8080 " && echo "  listen ok (netstat)" && exit 0
-        fi
+        nc -z 127.0.0.1 8080 && echo "  port open" && exit 0
+        echo "  wait port.. (#$i)"
+        sleep 2
+      done
+      echo "  port not open in time"; exit 1
+    '
+
+    # (B) 같은 네임스페이스에서 헬스 200까지 확인 (툴은 curlimages 사용)
+    echo "[health] in-container health (HTTP 200)"
+    docker pull curlimages/curl:latest >/dev/null || true
+    docker run --rm --network "container:${TARGET}" curlimages/curl:latest sh -lc '
+      for i in $(seq 1 60); do
         code=$(curl -sS -o /dev/null -w "%{http_code}" http://127.0.0.1:8080/actuator/health || true)
         echo "  try#$i => $code"
         [ "$code" = "200" ] && exit 0
         sleep 2
       done
-      echo "in-container warmup TIMEOUT"; exit 1
+      echo "  health TIMEOUT"; exit 1
     '
 
-    # (B) 네트워크에서 재확인
-    docker pull curlimages/curl:latest >/dev/null
+    # (C) 도커 네트워크 경유로 재확인 (Nginx 스위치 전 신뢰성)
     SECONDS=0
-    until [ $SECONDS -ge 120 ]; do
+    until [ $SECONDS -ge 180 ]; do
       ok=$(docker run --rm --network "${DOCKER_NETWORK}" -e TARGET="${TARGET}" curlimages/curl:latest sh -lc '
         url="http://$TARGET:8080/actuator/health";
         code=$(curl -sS -o /tmp/body -w "%{http_code}" "$url" || true);
@@ -351,7 +359,12 @@ echo "STEP[DONE] =========="
       [ "$ok" = "ok" ] && echo "[health] OK (network)" && exit 0
       sleep 3
     done
-    echo "[health] TIMEOUT (network)"; exit 1
+
+    echo "[health] TIMEOUT (network)"
+    # 실패 시 디버깅 정보 뿌리기
+    docker logs --tail=120 "${TARGET}" || true
+    docker exec "${TARGET}" sh -lc 'ps -ef | grep -i java | grep -v grep || true' || true
+    exit 1
     '''
       }
     }
