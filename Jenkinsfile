@@ -26,7 +26,7 @@ pipeline {
     // 디버그 토글: 1로 켜면 민감값 원문도 출력(주의)
     DEBUG_ENV          = '0'
 
-    // ⬇️ 추가: 프론트 퍼블릭 오리진 (요구사항 반영)
+    // 추가: 프론트 퍼블릭 오리진 (요구사항 반영)
     FRONT_ORIGIN       = 'http://43.201.177.220'
   }
 
@@ -184,6 +184,8 @@ set -e -o pipefail
 
 echo "STEP[0] ========== setup vars =========="
 TARGET="app-${NEXT_COLOR}"
+# Build 단계에서 저장한 정확한 태그 사용
+test -f image.tag || { echo "image.tag missing"; exit 1; }
 IMAGE="${DOCKERHUB_REPO}:${IMAGE_TAG_BASE}-${NEXT_COLOR}"
 OVERRIDE_FILE="${WORKSPACE}/override-${TARGET}.yml"
 
@@ -197,7 +199,7 @@ require "${NEXT_COLOR-}"     "NEXT_COLOR"
 require "${DB_URL-}"         "DB_URL"
 require "${DB_USER-}"        "DB_USER"
 require "${DB_PASS-}"        "DB_PASS"
-require "${FRONT_ORIGIN-}"   "FRONT_ORIGIN"   # ⬅️ 추가: 프론트 오리진 필수
+require "${FRONT_ORIGIN-}"   "FRONT_ORIGIN"   # 추가: 프론트 오리진 필수
 
 echo "STEP[1] ========== secret length debug =========="
 echo "[DEBUG] Byte-lengths (no secrets printed)"
@@ -219,7 +221,7 @@ FRONT_ORIGIN_S=$(escq "$FRONT_ORIGIN")
 cat > "${OVERRIDE_FILE}" <<EOF
 services:
   ${TARGET}:
-    image: "${IMAGE_S}"
+    image: "${IMAGE}"
     container_name: ${TARGET}
     environment:
       SPRING_DATASOURCE_URL: "${DB_URL_S}"
@@ -229,7 +231,7 @@ services:
       TOSS_SECRET_KEY: "${TOSS_SECRET_S}"
       NAVER_MAP_CLIENT_ID: "${NAVER_ID_S}"
       NAVER_MAP_CLIENT_SECRET: "${NAVER_SECRET_S}"
-      # ⬇️ 추가: 프론트에서 호출할 백엔드 오리진
+      # 추가: 프론트에서 호출할 백엔드 오리진
       FRONT_API_URL: "${FRONT_ORIGIN_S}"
     networks:
       - ${DOCKER_NETWORK}
@@ -275,7 +277,7 @@ docker run --rm --network "container:${TARGET}" busybox sh -lc "nc -vz -w3 $HOST
 echo "STEP[9] ========== last logs (tail) =========="
 docker logs --tail=60 "${TARGET}" || true
 
-# ⬇️ 추가: 금지 가드 — 관리/서버 bind 옵션 주입 여부 차단
+# 추가: 금지 가드 — 관리/서버 bind 옵션 주입 여부 차단
 echo "STEP[9.1] ========== forbid management/server address in Env/Cmd =========="
 FORBIDDEN_ENV=$(docker inspect "$CID" --format '{{range .Config.Env}}{{println .}}{{end}}' \
   | grep -Ei 'management\\.server\\.address|^MANAGEMENT_SERVER_ADDRESS=|^SERVER_ADDRESS=|SPRING_APPLICATION_JSON' || true)
@@ -303,60 +305,51 @@ echo "STEP[DONE] =========="
     stage('Healthcheck NEXT') {
       steps {
         sh '''#!/bin/sh
-set -e
+    set -e
 
-TARGET="app-${NEXT_COLOR}"
-echo "[health] TARGET=${TARGET}"
+    TARGET="app-${NEXT_COLOR}"
+    echo "[health] TARGET=${TARGET}"
 
-# 0) 먼저 컨테이너 존재 확인(최대 60초 대기)
-t=0
-while [ $t -lt 60 ]; do
-  if docker ps --format '{{.Names}}' | grep -qx "${TARGET}"; then
-    break
-  fi
-  sleep 2; t=$((t+2))
-done
+    # (A) 컨테이너 존재/스냅샷
+    t=0
+    while [ $t -lt 60 ]; do
+      docker ps --format '{{.Names}}' | grep -qx "${TARGET}" && break
+      sleep 2; t=$((t+2))
+    done
+    docker ps -a --format 'table {{.Names}}\\t{{.Status}}\\t{{.Image}}' | grep -E 'app-(blue|green)' || true
+    docker inspect -f '{{json .NetworkSettings.Networks}}' "${TARGET}" || true
 
-if ! docker ps --format '{{.Names}}' | grep -qx "${TARGET}"; then
-  echo "[health] ${TARGET} container not found"
-  docker ps -a || true
-  exit 1
-fi
+    # (B) 컨테이너 내부에서 8080 열릴 때까지 대기(최대 150초)
+    echo "[health] in-container warmup (127.0.0.1)"
+    docker exec "${TARGET}" sh -lc '
+      for i in $(seq 1 75); do
+        code=$(curl -sS -o /dev/null -w "%{http_code}" http://127.0.0.1:8080/actuator/health || true)
+        echo "  try#$i => $code"
+        [ "$code" = "200" ] && exit 0
+        sleep 2
+      done
+      echo "in-container warmup TIMEOUT"; exit 1
+    '
 
-# 스냅샷
-docker ps -a --format 'table {{.Names}}\\t{{.Status}}\\t{{.Image}}' | grep -E 'app-(blue|green)' || true
-docker inspect -f '{{json .NetworkSettings.Networks}}' "${TARGET}" || true
+    # (C) 네트워크에서 재확인(최대 120초)
+    docker pull curlimages/curl:latest >/dev/null
+    SECONDS=0
+    until [ $SECONDS -ge 120 ]; do
+      ok=$(docker run --rm --network "${DOCKER_NETWORK}" -e TARGET="${TARGET}" curlimages/curl:latest sh -lc '
+        url="http://$TARGET:8080/actuator/health";
+        code=$(curl -sS -o /tmp/body -w "%{http_code}" "$url" || true);
+        if [ "$code" = "200" ]; then
+          grep -q "\"status\":\"UP\"" /tmp/body && echo ok;
+        elif [ "$code" = "401" ] || [ "$code" = "302" ]; then
+          echo ok;
+        fi
+      ')
+      [ "$ok" = "ok" ] && echo "[health] OK (network)" && exit 0
+      sleep 3
+    done
 
-# 1) 네트워크에서 1회 찍어보기(코드+바디 일부)
-docker pull curlimages/curl:latest >/dev/null
-docker run --rm --network "${DOCKER_NETWORK}" curlimages/curl:latest sh -lc '
-  set -e
-  url="http://'"$TARGET"':8080/actuator/health"
-  code=$(curl -sS -o /tmp/body -w "%{http_code}" "$url" || true)
-  head -c 200 /tmp/body || true; echo
-  echo "[health] first-shot code=$code"
-' || true
-
-# 2) 재시도 (변수 사용) ⬇️
-TIMEOUT=${HEALTH_TIMEOUT_SEC:-180}
-SECONDS=0
-until [ $SECONDS -ge $TIMEOUT ]; do
-  ok=$(docker run --rm --network "${DOCKER_NETWORK}" -e TARGET="${TARGET}" curlimages/curl:latest sh -lc '
-    url="http://$TARGET:8080/actuator/health";
-    code=$(curl -sS -o /tmp/body -w "%{http_code}" "$url" || true);
-    if [ "$code" = "200" ]; then
-      grep -q "\"status\":\"UP\"" /tmp/body && echo ok;
-    elif [ "$code" = "401" ] || [ "$code" = "302" ]; then
-      echo ok;
-    fi
-  ')
-  [ "$ok" = "ok" ] && echo "[health] OK" && exit 0
-  sleep 3
-done
-
-echo "[health] TIMEOUT (${TIMEOUT}s)"
-exit 1
-'''
+    echo "[health] TIMEOUT (network)"; exit 1
+    '''
       }
     }
 
