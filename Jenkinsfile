@@ -181,26 +181,26 @@ docker logout || true
         ]) {
           sh '''#!/bin/sh
     set -euxo pipefail
-    + # sanitize & fallback
-    + NEXT_COLOR="$(printf '%s' "${NEXT_COLOR-}" | tr -d '\r' | xargs || true)"
-    + echo "[DEBUG] NEXT_COLOR(raw)=${NEXT_COLOR-}"
-    + if [ -z "${NEXT_COLOR}" ]; then
-    +   if [ -f "${NGINX_ACTIVE_VAR}" ]; then
-    +     # active가 app-blue면 NEXT는 green, 반대도 동일
-    +     ACTIVE=$(grep -oE 'app-(blue|green)' "${NGINX_ACTIVE_VAR}" | tail -n1 | cut -d'-' -f2 || true)
-    +     case "$ACTIVE" in
-    +       blue)  NEXT_COLOR=green ;;
-    +       green) NEXT_COLOR=blue  ;;
-    +       *)     NEXT_COLOR=green ;;
-    +     esac
-    +     echo "[DEBUG] NEXT_COLOR(fallback from nginx)=${NEXT_COLOR}"
-    +   else
-    +     NEXT_COLOR=green
-    +     echo "[DEBUG] NEXT_COLOR(fallback default)=${NEXT_COLOR}"
-    +   fi
-    + fi
-    + TARGET="app-${NEXT_COLOR}"
-    + echo "[DEBUG] TARGET=${TARGET}"
+
+    # sanitize & fallback for NEXT_COLOR
+    NEXT_COLOR="$(printf '%s' "${NEXT_COLOR-}" | tr -d '\r' | xargs || true)"
+    echo "[DEBUG] NEXT_COLOR(raw)=${NEXT_COLOR-}"
+    if [ -z "${NEXT_COLOR}" ]; then
+      if [ -f "${NGINX_ACTIVE_VAR}" ]; then
+        ACTIVE=$(grep -oE 'app-(blue|green)' "${NGINX_ACTIVE_VAR}" | tail -n1 | cut -d'-' -f2 || true)
+        case "$ACTIVE" in
+          blue)  NEXT_COLOR=green ;;
+          green) NEXT_COLOR=blue  ;;
+          *)     NEXT_COLOR=green ;;
+        esac
+        echo "[DEBUG] NEXT_COLOR(fallback from nginx)=${NEXT_COLOR}"
+      else
+        NEXT_COLOR=green
+        echo "[DEBUG] NEXT_COLOR(fallback default)=${NEXT_COLOR}"
+      fi
+    fi
+    TARGET="app-${NEXT_COLOR}"
+    echo "[DEBUG] TARGET=${TARGET}"
 
     echo "STEP[0] ========== setup vars =========="
 
@@ -218,6 +218,7 @@ docker logout || true
     require "${DB_URL-}"         "DB_URL"
     require "${DB_USER-}"        "DB_USER"
     require "${DB_PASS-}"        "DB_PASS"
+
     # FRONT_ORIGIN 은 선택값: 있으면만 주입
     FRONT_ORIGIN="${FRONT_ORIGIN-}"
 
@@ -272,7 +273,7 @@ docker logout || true
 
     echo "STEP[4] ========== compose up -d ${TARGET} =========="
     docker compose -f "${APP_DIR}/docker-compose.yml" -f "${OVERRIDE_FILE}" pull "${TARGET}" || true
-     docker compose -f "${APP_DIR}/docker-compose.yml" -f "${OVERRIDE_FILE}" up -d "${TARGET}"
+    docker compose -f "${APP_DIR}/docker-compose.yml" -f "${OVERRIDE_FILE}" up -d "${TARGET}"
 
     echo "STEP[5] ========== ps snapshot =========="
     docker compose -f "${APP_DIR}/docker-compose.yml" -f "${OVERRIDE_FILE}" ps || true
@@ -395,7 +396,7 @@ docker logout || true
     done
 
     echo "[health] TIMEOUT (network)"
-    # 실패 시 디버깅 정보 뿌리기
+    # 실패 시 디버깅 정보
     docker logs --tail=120 "${TARGET}" || true
     docker exec "${TARGET}" sh -lc 'ps -ef | grep -i java | grep -v grep || true' || true
     exit 1
