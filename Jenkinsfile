@@ -5,6 +5,7 @@ pipeline {
     timestamps()
     ansiColor('xterm')
     disableConcurrentBuilds()
+    buildDiscarder(logRotator(numToKeepStr: '20', artifactNumToKeepStr: '10'))
   }
 
   environment {
@@ -30,6 +31,10 @@ pipeline {
   }
 
   stages {
+
+    stage('Workspace Cleanup') {
+      steps { deleteDir() }
+    }
 
     stage('Preflight') {
       steps {
