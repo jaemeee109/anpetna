@@ -11,6 +11,7 @@ public class TestController {
     @ResponseBody
     public String test() {
         String data = "<h1>deploy succeed</h1>";
+        data += "<h1>CICD test</h1>";
 
         return data;
     }
