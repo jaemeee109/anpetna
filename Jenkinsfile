@@ -27,7 +27,7 @@ pipeline {
     DEBUG_ENV          = '0'
 
     // 추가: 프론트 퍼블릭 오리진 (요구사항 반영)
-    FRONT_ORIGIN       = 'http://43.201.177.220'
+    FRONT_ORIGIN       = 'http://43.201.177.220:3000'
   }
 
   stages {
