@@ -4,9 +4,11 @@ import com.anpetna.image.config.MinioConfig;
 import com.anpetna.image.dto.ImageDTO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import java.io.InputStream;
@@ -17,7 +19,12 @@ import java.io.InputStream;
 @Log4j2
 public class MinioService implements FileService{
 
-    private final MinioConfig minioConfig;
+    private final S3Client s3Client;
+    private final String minioBucketName;
+
+    @Value("${app.upload.url-base}")
+    String urlBase;
+
 
     @Override
     public ImageDTO uploadFile(MultipartFile file, Integer sortOrder) {
@@ -25,22 +32,20 @@ public class MinioService implements FileService{
 
         try {
             String fileName = imageDTO.getFileName();
-            String bucket = minioConfig.getBucket();
 
             // MultipartFile → InputStream
             try (InputStream inputStream = file.getInputStream()) {
                 PutObjectRequest putObjectRequest = PutObjectRequest.builder()
-                        .bucket(bucket)
+                        .bucket(minioBucketName)
                         .key(fileName)
                         .contentType(file.getContentType())
                         .build();
 
-                minioConfig.s3Client().putObject(putObjectRequest,
+                s3Client.putObject(putObjectRequest,
                         RequestBody.fromInputStream(inputStream, file.getSize()));
             }
 
-            // 접근 가능한 URL 구성
-            imageDTO.setUrl(minioConfig.getMinioUrl() + "/" + bucket + "/" + fileName);
+            imageDTO.setUrl(urlBase + "/" + imageDTO.getFileName());
             log.info("[upload] file={}, url={}", fileName, imageDTO.getUrl());
             return imageDTO;
 
@@ -56,8 +61,8 @@ public class MinioService implements FileService{
 
     @Override
     public void deleteFile(String key) {
-        minioConfig.s3Client().deleteObject(DeleteObjectRequest.builder()
-                .bucket(minioConfig.getBucket())
+        s3Client.deleteObject(DeleteObjectRequest.builder()
+                .bucket(minioBucketName)
                 .key(key)
                 .build());
     }

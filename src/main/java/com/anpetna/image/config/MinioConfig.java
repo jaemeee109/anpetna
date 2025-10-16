@@ -41,4 +41,9 @@ public class MinioConfig {
                 .httpClientBuilder(UrlConnectionHttpClient.builder())
                 .build();
     }
+
+    @Bean
+    public String minioBucketName() {
+        return bucket;
+    }
 }

@@ -23,6 +23,7 @@ public class ChatroomEntity {
 
     String title;
 
+    @Builder.Default
     @OneToMany(mappedBy = "chatroom", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<MemberChatroomMapping> memberChatroomMappingSet = new HashSet<>();
 
