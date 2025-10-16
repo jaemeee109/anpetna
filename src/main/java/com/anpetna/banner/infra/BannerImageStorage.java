@@ -2,6 +2,7 @@ package com.anpetna.banner.infra;
 
 import com.anpetna.image.dto.ImageDTO;
 import com.anpetna.image.service.FileService;
+import com.anpetna.image.service.MinioService;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;

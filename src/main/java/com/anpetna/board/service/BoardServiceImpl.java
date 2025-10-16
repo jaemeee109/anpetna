@@ -21,7 +21,8 @@ import com.anpetna.core.coreDto.PageRequestDTO;
 import com.anpetna.core.coreDto.PageResponseDTO;
 import com.anpetna.image.domain.ImageEntity;
 import com.anpetna.image.dto.ImageDTO;
-import com.anpetna.image.service.LocalStorage;
+import com.anpetna.image.service.FileService;
+import com.anpetna.image.service.MinioService;
 import com.anpetna.notification.feature.like.service.LikeNotificationService;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
@@ -56,7 +57,7 @@ public class BoardServiceImpl implements BoardService {
 
     /* ======================= 의존성 주입 ======================= */
     private final BoardJpaRepository boardJpaRepository;
-    private final LocalStorage localStorage;
+    private final FileService fileService;
     private final ModelMapper modelMapper;
     private final ApplicationEventPublisher publisher;
     private final LikeNotificationService likeNotificationService;
@@ -136,7 +137,7 @@ public class BoardServiceImpl implements BoardService {
             for (MultipartFile file : files) {
                 if (file == null || file.isEmpty()) continue;
 
-                ImageDTO imageDTO = localStorage.uploadFile(file, nextSortOrder);
+                ImageDTO imageDTO = fileService.uploadFile(file, nextSortOrder);
                 ImageEntity imageEntity = modelMapper.map(imageDTO, ImageEntity.class);
 
                 if (imageEntity.getSortOrder() == null) imageEntity.setSortOrder(nextSortOrder);
@@ -345,7 +346,7 @@ public class BoardServiceImpl implements BoardService {
                     .toList();
             for (ImageEntity imageEntity : deleteImage) {
                 try {
-                    localStorage.deleteFile(imageEntity.getFileName());
+                    fileService.deleteFile(imageEntity.getFileName());
                 } catch (Exception ignore) {
                 }
                 boardEntity.removeImage(imageEntity);
@@ -380,7 +381,7 @@ public class BoardServiceImpl implements BoardService {
             try {
                 for (MultipartFile file : addFiles) {
                     if (file == null || file.isEmpty()) continue;
-                    ImageDTO imageDTO = localStorage.uploadFile(file, nextSort);
+                    ImageDTO imageDTO = fileService.uploadFile(file, nextSort);
                     uploaded.add(imageDTO.getUrl());
 
                     ImageEntity imageEntity = modelMapper.map(imageDTO, ImageEntity.class);
@@ -391,7 +392,7 @@ public class BoardServiceImpl implements BoardService {
             } catch (RuntimeException ex) {
                 for (String url : uploaded) {
                     try {
-                        localStorage.deleteFile(url);
+                        fileService.deleteFile(url);
                     } catch (Exception ignore) {
                         log.warn("[upload] 삭제 실패 fileName={}, url={}, err={}");
                     }
@@ -435,7 +436,7 @@ public class BoardServiceImpl implements BoardService {
 
         // 2) 파일부터 삭제 (하나라도 실패하면 예외 발생 → DB는 그대로)
         for (String file : fileNames) {
-            localStorage.deleteFile(file);
+            fileService.deleteFile(file);
         }
 
         // 3) 파일이 모두 지워졌다면 DB 삭제

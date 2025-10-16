@@ -26,7 +26,7 @@ public class WebConfig implements WebMvcConfigurer {
     //CORS는 “브라우저가 API 호출할 때 요청을 보내는 출처(origin)”를 체크하니까, 프론트 주소를 정확히 써줘야만 통신이 허용
     //allowedOrigins는 여러 번 호출해도 덮어쓰기라서 마지막 것만 유효 -> 여러 개 origin을 한 번에 지정하기
 
-    @Value("${app.upload.dir}")
+   @Value("${app.upload.dir}")
     private String uploadDir;
 
     @Override

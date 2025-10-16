@@ -177,7 +177,15 @@ docker logout || true
           usernamePassword(credentialsId: 'db_userpass', usernameVariable: 'DB_USER', passwordVariable: 'DB_PASS'),
           string(credentialsId: 'toss_secret_key', variable: 'TOSS_SECRET'),
           string(credentialsId: 'naver_geocode_client_id', variable: 'NAVER_ID'),
-          string(credentialsId: 'naver_geocode_client_secret', variable: 'NAVER_SECRET')
+          string(credentialsId: 'naver_geocode_client_secret', variable: 'NAVER_SECRET'),
+
+          // --- [추가] MinIO 크리덴셜 3종 바인딩 ---
+          string(credentialsId: 'MINIO_URL',    variable: 'MINIO_URL'),
+          string(credentialsId: 'MINIO_BUCKET', variable: 'MINIO_BUCKET'),
+          usernamePassword(credentialsId: 'MINIO_CRED',
+                           usernameVariable: 'MINIO_ACCESS_KEY',
+                           passwordVariable: 'MINIO_SECRET_KEY')
+          // --------------------------------------
         ]) {
           sh '''#!/bin/sh
     set -euxo pipefail
@@ -219,6 +227,13 @@ docker logout || true
     require "${DB_USER-}"        "DB_USER"
     require "${DB_PASS-}"        "DB_PASS"
 
+    # --- [추가] MinIO 필수값 체크 ---
+    require "${MINIO_URL-}"         "MINIO_URL"
+    require "${MINIO_ACCESS_KEY-}"  "MINIO_ACCESS_KEY"
+    require "${MINIO_SECRET_KEY-}"  "MINIO_SECRET_KEY"
+    require "${MINIO_BUCKET-}"      "MINIO_BUCKET"
+    # --------------------------------
+
     # FRONT_ORIGIN 은 선택값
     FRONT_ORIGIN="${FRONT_ORIGIN-}"
 
@@ -227,6 +242,11 @@ docker logout || true
     printf 'DB_URL bytes = ';   printf '%s' "$DB_URL"   | wc -c
     printf 'DB_USER bytes = ';  printf '%s' "$DB_USER"  | wc -c
     printf 'DB_PASS bytes = ';  printf '%s' "$DB_PASS"  | wc -c
+    # --- [참고] MinIO도 길이만 출력(값은 마스킹) ---
+    printf 'MINIO_URL bytes = ';        printf '%s' "$MINIO_URL"        | wc -c
+    printf 'MINIO_ACCESS_KEY bytes = '; printf '%s' "$MINIO_ACCESS_KEY" | wc -c
+    printf 'MINIO_SECRET_KEY bytes = '; printf '%s' "$MINIO_SECRET_KEY" | wc -c
+    printf 'MINIO_BUCKET bytes = ';     printf '%s' "$MINIO_BUCKET"     | wc -c
 
     echo "STEP[2] ========== write override (printf-safe) =========="
     # 값 escape
@@ -235,29 +255,44 @@ docker logout || true
     TOSS_SECRET_S=$(escq "${TOSS_SECRET-}"); NAVER_ID_S=$(escq "${NAVER_ID-}"); NAVER_SECRET_S=$(escq "${NAVER_SECRET-}")
     IMAGE_S=$(escq "$IMAGE"); FRONT_ORIGIN_S=$(escq "$FRONT_ORIGIN")
 
+    # --- [추가] MinIO 값 이스케이프 ---
+    MINIO_URL_S=$(escq "$MINIO_URL")
+    MINIO_ACCESS_KEY_S=$(escq "$MINIO_ACCESS_KEY")
+    MINIO_SECRET_KEY_S=$(escq "$MINIO_SECRET_KEY")
+    MINIO_BUCKET_S=$(escq "$MINIO_BUCKET")
+    # -----------------------------------
+
     # 파일 생성(printf로 안전하게 작성)
     : > "${OVERRIDE_FILE}"
-    printf 'services:\n' >> "${OVERRIDE_FILE}"
-    printf '  %s:\n' "${TARGET}" >> "${OVERRIDE_FILE}"
-    printf '    image: "%s"\n' "${IMAGE_S}" >> "${OVERRIDE_FILE}"
-    printf '    container_name: %s\n' "${TARGET}" >> "${OVERRIDE_FILE}"
-    printf '    environment:\n' >> "${OVERRIDE_FILE}"
-    printf '      SPRING_DATASOURCE_URL: "%s"\n' "${DB_URL_S}" >> "${OVERRIDE_FILE}"
-    printf '      SPRING_DATASOURCE_USERNAME: "%s"\n' "${DB_USER_S}" >> "${OVERRIDE_FILE}"
-    printf '      SPRING_DATASOURCE_PASSWORD: "%s"\n' "${DB_PASS_S}" >> "${OVERRIDE_FILE}"
-    printf '      SPRING_PROFILES_ACTIVE: "prod"\n' >> "${OVERRIDE_FILE}"
-    printf '      SERVER_ADDRESS: "0.0.0.0"\n' >> "${OVERRIDE_FILE}"
-    printf '      TOSS_SECRET_KEY: "%s"\n' "${TOSS_SECRET_S}" >> "${OVERRIDE_FILE}"
-    printf '      NAVER_GEOCODE_CLIENT_ID: "%s"\n' "${NAVER_ID_S}" >> "${OVERRIDE_FILE}"
-    printf '      NAVER_GEOCODE_CLIENT_SECRET: "%s"\n' "${NAVER_SECRET_S}" >> "${OVERRIDE_FILE}"
+    printf 'services:\\n' >> "${OVERRIDE_FILE}"
+    printf '  %s:\\n' "${TARGET}" >> "${OVERRIDE_FILE}"
+    printf '    image: "%s"\\n' "${IMAGE_S}" >> "${OVERRIDE_FILE}"
+    printf '    container_name: %s\\n' "${TARGET}" >> "${OVERRIDE_FILE}"
+    printf '    environment:\\n' >> "${OVERRIDE_FILE}"
+    printf '      SPRING_DATASOURCE_URL: "%s"\\n' "${DB_URL_S}" >> "${OVERRIDE_FILE}"
+    printf '      SPRING_DATASOURCE_USERNAME: "%s"\\n' "${DB_USER_S}" >> "${OVERRIDE_FILE}"
+    printf '      SPRING_DATASOURCE_PASSWORD: "%s"\\n' "${DB_PASS_S}" >> "${OVERRIDE_FILE}"
+    printf '      SPRING_PROFILES_ACTIVE: "prod"\\n' >> "${OVERRIDE_FILE}"
+    printf '      SERVER_ADDRESS: "0.0.0.0"\\n' >> "${OVERRIDE_FILE}"
+    printf '      TOSS_SECRET_KEY: "%s"\\n' "${TOSS_SECRET_S}" >> "${OVERRIDE_FILE}"
+    printf '      NAVER_GEOCODE_CLIENT_ID: "%s"\\n' "${NAVER_ID_S}" >> "${OVERRIDE_FILE}"
+    printf '      NAVER_GEOCODE_CLIENT_SECRET: "%s"\\n' "${NAVER_SECRET_S}" >> "${OVERRIDE_FILE}"
     if [ -n "$FRONT_ORIGIN" ]; then
-      printf '      FRONT_API_URL: "%s"\n' "${FRONT_ORIGIN_S}" >> "${OVERRIDE_FILE}"
+      printf '      FRONT_API_URL: "%s"\\n' "${FRONT_ORIGIN_S}" >> "${OVERRIDE_FILE}"
     fi
-    printf '    networks:\n' >> "${OVERRIDE_FILE}"
-    printf '      - %s\n' "${DOCKER_NETWORK}" >> "${OVERRIDE_FILE}"
-    printf 'networks:\n' >> "${OVERRIDE_FILE}"
-    printf '  %s:\n' "${DOCKER_NETWORK}" >> "${OVERRIDE_FILE}"
-    printf '    external: true\n' >> "${OVERRIDE_FILE}"
+
+    # --- [추가] MinIO 4종 환경변수 주입 ---
+    printf '      MINIO_URL: "%s"\\n'          "${MINIO_URL_S}"          >> "${OVERRIDE_FILE}"
+    printf '      MINIO_ACCESS_KEY: "%s"\\n'   "${MINIO_ACCESS_KEY_S}"   >> "${OVERRIDE_FILE}"
+    printf '      MINIO_SECRET_KEY: "%s"\\n'   "${MINIO_SECRET_KEY_S}"   >> "${OVERRIDE_FILE}"
+    printf '      MINIO_BUCKET: "%s"\\n'       "${MINIO_BUCKET_S}"       >> "${OVERRIDE_FILE}"
+    # -------------------------------------
+
+    printf '    networks:\\n' >> "${OVERRIDE_FILE}"
+    printf '      - %s\\n' "${DOCKER_NETWORK}" >> "${OVERRIDE_FILE}"
+    printf 'networks:\\n' >> "${OVERRIDE_FILE}"
+    printf '  %s:\\n' "${DOCKER_NETWORK}" >> "${OVERRIDE_FILE}"
+    printf '    external: true\\n' >> "${OVERRIDE_FILE}"
 
     echo "STEP[3] ========== merged config (non-blocking) =========="
     docker compose -f "${APP_DIR}/docker-compose.yml" -f "${OVERRIDE_FILE}" config \
@@ -285,7 +320,7 @@ docker logout || true
 
     echo "STEP[7] ========== env keys (masked) =========="
     docker inspect "${CID}" --format '{{range .Config.Env}}{{println .}}{{end}}' \
-      | grep -E '^SPRING_DATASOURCE_URL=|^SPRING_DATASOURCE_USERNAME=|^SPRING_DATASOURCE_PASSWORD=|^FRONT_API_URL=' \
+      | grep -E '^SPRING_DATASOURCE_URL=|^SPRING_DATASOURCE_USERNAME=|^SPRING_DATASOURCE_PASSWORD=|^FRONT_API_URL=|^MINIO_URL=|^MINIO_BUCKET=' \
       | sed 's/=.*/=<redacted>/' || true
 
     echo "STEP[8] ========== DB TCP test =========="

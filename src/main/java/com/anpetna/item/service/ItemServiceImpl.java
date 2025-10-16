@@ -6,7 +6,9 @@ import com.anpetna.image.dto.ExistingImageDTO;
 import com.anpetna.image.dto.ImageDTO;
 import com.anpetna.image.dto.NewImageDTO;
 import com.anpetna.image.repository.ImageRepository;
+import com.anpetna.image.service.FileService;
 import com.anpetna.image.service.LocalStorage;
+import com.anpetna.image.service.MinioService;
 import com.anpetna.item.config.ItemMapper;
 import com.anpetna.item.constant.ItemSellStatus;
 import com.anpetna.item.domain.ItemEntity;
@@ -44,7 +46,7 @@ import com.anpetna.item.constant.ItemSellStatus;
 @Transactional
 public class ItemServiceImpl implements ItemService {
 
-    private final LocalStorage fileService;
+    private final FileService fileService;
     private final ModelMapper modelMapper;
     private final ItemMapper itemMapper;
     private final ItemRepository itemRepository;

@@ -16,7 +16,7 @@ import java.nio.file.*;
 import static java.nio.file.StandardCopyOption.ATOMIC_MOVE;
 import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 
-@Service
+@Service("localStorage")
 @Log4j2
 public class LocalStorage implements FileService {
 

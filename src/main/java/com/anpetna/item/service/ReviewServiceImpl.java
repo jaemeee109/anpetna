@@ -4,7 +4,6 @@ import com.anpetna.core.coreDto.PageRequestDTO;
 import com.anpetna.core.coreDto.PageResponseDTO;
 import com.anpetna.image.domain.ImageEntity;
 import com.anpetna.image.service.FileService;
-import com.anpetna.image.service.LocalStorage;
 import com.anpetna.item.config.ReviewMapper;
 import com.anpetna.item.domain.ItemEntity;
 import com.anpetna.item.domain.ReviewEntity;
@@ -52,7 +51,7 @@ public class ReviewServiceImpl implements ReviewService {
     private final ReviewMapper reviewMapper;
     private final ItemRepository itemRepository;
     private final MemberRepository memberRepository;
-    private final LocalStorage localStorage;
+    private final FileService fileService;
     private final OrdersRepository ordersRepository;
     private final OrderRepository orderRepository;
 
@@ -108,7 +107,7 @@ public class ReviewServiceImpl implements ReviewService {
         if (image != null && !image.isEmpty()) {
             try {
                 // 1) 스토리지 업로드 → 메타 정보(ImageDTO 등) 수령
-                var uploaded = localStorage.uploadFile(image, 0); // sortOrder=0 고정
+                var uploaded = fileService.uploadFile(image, 0); // sortOrder=0 고정
 
                 // 2) 업로드 메타를 DB 엔티티로 변환
                 ImageEntity img = modelMapper.map(uploaded, ImageEntity.class);
@@ -190,7 +189,7 @@ public class ReviewServiceImpl implements ReviewService {
         if (wantRemove && (image == null || image.isEmpty())) {         // ★ 추가
             if (found.getImage() != null && found.getImage().getUrl() != null) { // ★ 추가
                 try {                                                    // ★ 추가
-                    localStorage.deleteFile(found.getImage().getUrl());  // ★ 추가 (물리 파일 정리 시도)
+                    fileService.deleteFile(found.getImage().getUrl());  // ★ 추가 (물리 파일 정리 시도)
                 } catch (Exception ignore) {}                            // ★ 추가
             }                                                            // ★ 추가
             found.setImage(null);                                        // ★ 추가 (연관 해제 → orphanRemoval이면 DB row도 제거)
@@ -200,11 +199,11 @@ public class ReviewServiceImpl implements ReviewService {
             try {
                 // 1) 기존 물리 파일 삭제
                 if (found.getImage() != null && found.getImage().getUrl() != null) {
-                    try { localStorage.deleteFile(found.getImage().getUrl()); } catch (Exception ignore) {}
+                    try { fileService.deleteFile(found.getImage().getUrl()); } catch (Exception ignore) {}
                 }
 
                 // 2) 새 업로드
-                var uploaded = localStorage.uploadFile(image, 0);
+                var uploaded = fileService.uploadFile(image, 0);
 
                 // 3) 기존 ImageEntity 재사용 or 새로 교체 (택1)
                 if (found.getImage() != null) {
@@ -270,7 +269,7 @@ public class ReviewServiceImpl implements ReviewService {
             String url = found.getImage().getUrl();
             if (url != null && !url.isBlank()) {
                 try {
-                    localStorage.deleteFile(url);
+                    fileService.deleteFile(url);
                 } catch (Exception ignore) { /* 실패해도 리뷰 삭제는 진행 */ }
             }
             found.setImage(null);
