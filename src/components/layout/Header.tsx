@@ -370,7 +370,7 @@ function handleLogout() {
             <span className="sep">|</span>
               <Link href="/member/info" className="btn-link">MYPAGE</Link>
               <span className="sep">|</span>
-              <Link href="banner" className="btn-link">BANNER</Link>
+              <Link href="/banner" className="btn-link">BANNER</Link>
               <span className="sep">|</span>
               <Link prefetch={false} href="/member/list">USERS</Link>
               <span className="sep">|</span>
