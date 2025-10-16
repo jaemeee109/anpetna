@@ -1,6 +1,8 @@
 pipeline {
   agent { label 'worker-1' }
 
+  triggers { githubPush() }
+  
   options {
     timestamps()
     ansiColor('xterm')
