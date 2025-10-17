@@ -12,9 +12,6 @@ out
 # 의존성 (빌드 단계에서 npm ci로 다시 설치)
 node_modules
 
-# 환경 파일
-.env.*
-
 # 기타
 Dockerfile
 docker-compose*.yml

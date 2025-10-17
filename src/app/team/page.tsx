@@ -55,7 +55,7 @@ const members: Member[] = [
   {
     name: '이 채 윤',
     title: '',
-    desc: ['VERSION CONTROL | 프로젝트 Git 관리', 'BACKEND | 파일 병합 및 충돌 해결, 상품 '],
+    desc: ['VERSION CONTROL | 프로젝트 Git 관리', 'BACKEND | 파일 병합 및 충돌 해결, 상품, 이미지(사진)', 'DEPLOYMENT | ESXI 세팅, 도커 기반 프론트 배포'],
     git: 'https://github.com/ChaeYun430',
   },
 ];
