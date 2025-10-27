@@ -9,7 +9,7 @@ RUN npm ci --no-audit --no-fund
 FROM node:20-alpine AS builder
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
-COPY .env.production .env
+COPY .env.production .env.production
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build

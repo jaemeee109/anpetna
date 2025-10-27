@@ -172,7 +172,7 @@ async function fetchRoleFromServer(
   ];
 
   const byId = [
-    memberId ? `/member/read/${memberId}` : '',
+    memberId ? `member/read/${memberId}` : '',
   ].filter(Boolean);
 
   for (const base of bases) {

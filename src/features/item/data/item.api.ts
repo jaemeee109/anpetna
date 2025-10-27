@@ -74,7 +74,7 @@ export const itemApi = {
     (typeof window !== 'undefined' ? window.location.origin : '');
 
   // URL에 직접 쿼리스트링 작성 (axios params 사용하지 않음)
-  const url = new URL('/item', origin);
+  const url = new URL('item', origin+'/');
 
   // 카테고리: 'ALL'/빈값이면 미전달 → 전체 조회
   const rawCat = (params.category ?? '').toString().toUpperCase();

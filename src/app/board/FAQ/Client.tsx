@@ -117,7 +117,7 @@ function useFaqList(page: number, size: number) {
           process.env.NEXT_PUBLIC_API_BASE ||
           (typeof window !== 'undefined' ? window.location.origin.replace(':3000', ':8000') : '');
 
-        const url = new URL('/board/readAll', base);
+        const url = new URL('board/readAll', base+'/');
         url.search = new URLSearchParams({
           page: String(page),
           size: String(size),
@@ -232,7 +232,7 @@ export default function FAQClient () {
       const base =
         process.env.NEXT_PUBLIC_API_BASE ||
         (typeof window !== 'undefined' ? window.location.origin.replace(':3000', ':8000') : '');
-      const url = new URL(`/board/delete/${bno}`, base);
+      const url = new URL(`board/delete/${bno}`, base+'/');
 
       const resp = await fetch(url.toString(), {
         method: 'POST',

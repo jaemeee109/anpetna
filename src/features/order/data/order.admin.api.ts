@@ -3,7 +3,7 @@ import http from '@/shared/data/http';
 import { ORDER } from '@/lib/api';
 
 /** 백엔드 표준 엔드포인트 루트 */
-const BASE = ORDER.ROOT;
+const BASE = 'order';
 
 /** 백엔드 상태 Enum (백엔드와 철자 100% 일치) */
 export type OrdersStatus =

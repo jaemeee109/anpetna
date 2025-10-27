@@ -77,7 +77,7 @@ function resolveApiBase(): string {
 function abs(path: string, q?: URLSearchParams): string {
   const base = resolveApiBase();
   const p = withPrefix(path);
-  const u = new URL(p, base);
+  const u = new URL(path, base+'/');
   if (q && q.toString()) u.search = q.toString();
   return u.toString();
 }
@@ -85,7 +85,7 @@ function abs(path: string, q?: URLSearchParams): string {
 /* ========= 클라이언트 ========= */
 export const notificationApi = {
   async unreadCount(): Promise<{ count: number }> {
-    const res = await fetch(abs('/notification/unread-count'), {
+    const res = await fetch(abs('notification/unread-count'), {
       method: 'GET',
       headers: { ...authHeaders() },
       credentials: 'include',
@@ -99,7 +99,7 @@ export const notificationApi = {
     if (params.unreadOnly != null) q.set('unreadOnly', String(params.unreadOnly));
     if (params.page != null) q.set('page', String(params.page as number));
     if (params.size != null) q.set('size', String(params.size));
-    const res = await fetch(abs('/notification', q), {
+    const res = await fetch(abs('notification', q), {
       method: 'GET',
       headers: { ...authHeaders() },
       credentials: 'include',
@@ -109,7 +109,7 @@ export const notificationApi = {
   },
 
   async markRead(nId: number): Promise<{ ok?: boolean } | any> {
-    const res = await fetch(abs(`/notification/${nId}/mark-read`), {
+    const res = await fetch(abs(`notification/${nId}/mark-read`), {
       method: 'PATCH',
       headers: { ...authHeaders() },
       credentials: 'include',
@@ -119,7 +119,7 @@ export const notificationApi = {
   },
 
   async markAllRead(): Promise<{ ok: true; updated: number }> {
-    const res = await fetch(abs('/notification/mark-all-read'), {
+    const res = await fetch(abs('notification/mark-all-read'), {
       method: 'POST',
       headers: { ...authHeaders() },
       credentials: 'include',
@@ -129,7 +129,7 @@ export const notificationApi = {
   },
 
   async remove(nId: number): Promise<{ ok?: boolean } | any> {
-    const res = await fetch(abs(`/notification/${nId}`), {
+    const res = await fetch(abs(`notification/${nId}`), {
       method: 'DELETE',
       headers: { ...authHeaders() },
       credentials: 'include',
@@ -142,7 +142,7 @@ export const notificationApi = {
 
 openStream(onEvent: (type: string, data: any) => void): EventSource {
   const token = getToken();
-  const es: EventSource = new EventSourcePolyfill(abs('/notification/stream'), {
+  const es: EventSource = new EventSourcePolyfill(abs('notification/stream'), {
     headers: {
       Authorization: token.startsWith('Bearer ') ? token : `Bearer ${token}`,
     },
@@ -183,7 +183,7 @@ openStream(onEvent: (type: string, data: any) => void): EventSource {
 
   // 단건 조회
   async readOne(nId: number): Promise<NotificationDTO> {
-    const res = await fetch(abs(`/notification/${nId}`), {
+    const res = await fetch(abs(`notification/${nId}`), {
       method: 'GET',
       headers: { ...authHeaders() },
       credentials: 'include',
@@ -195,7 +195,7 @@ openStream(onEvent: (type: string, data: any) => void): EventSource {
   /* ===== [키워드 구독] ===== */
   keywords: {
     async list(): Promise<ListKeywordRes> {
-      const res = await fetch(abs('/notification/keywords'), {
+      const res = await fetch(abs('notification/keywords'), {
         method: 'GET',
         headers: { ...authHeaders() },
         credentials: 'include',
@@ -205,7 +205,7 @@ openStream(onEvent: (type: string, data: any) => void): EventSource {
     },
 
     async create(req: CreateKeywordReq): Promise<KeywordSubscriptionDTO> {
-      const res = await fetch(abs('/notification/keywords'), {
+      const res = await fetch(abs('notification/keywords'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
         credentials: 'include',
@@ -217,7 +217,7 @@ openStream(onEvent: (type: string, data: any) => void): EventSource {
 
     async remove(kId: number): Promise<{ kId: number; deleted: boolean }> {
       if (!Number.isFinite(kId)) throw new Error('유효하지 않은 kId');
-      const res = await fetch(abs(`/notification/keywords/${encodeURIComponent(String(kId))}`), {
+      const res = await fetch(abs(`notification/keywords/${encodeURIComponent(String(kId))}`), {
         method: 'DELETE',
         headers: { ...authHeaders() },
         credentials: 'include',

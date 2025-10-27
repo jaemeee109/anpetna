@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
 
   let target: URL;
   try {
-    target = new URL(u);
+    target = new URL(u+'/');
   } catch {
     return new Response('Invalid URL', { status: 400 });
   }

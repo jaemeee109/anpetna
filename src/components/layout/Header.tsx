@@ -213,12 +213,12 @@ async function verifyRoleFromServerIfNeeded() {
 
     // 1순위 → my_page/{id}, 실패 시 readOne/{id}
     const candidates = [
-      `/member/my_page/${encodeURIComponent(id)}`,
-      `/member/readOne/${encodeURIComponent(id)}`,
+      `member/my_page/${encodeURIComponent(id)}`,
+      `member/readOne/${encodeURIComponent(id)}`,
     ];
 
     for (const p of candidates) {
-      const url = new URL(p, base);
+      const url = new URL(p, base+'/');
       try {
         const r = await fetch(url.toString(), { credentials: 'include', headers: authHeaders() });
 

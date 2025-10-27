@@ -317,7 +317,7 @@ const totalPages = Number.isFinite(tpNum) && tpNum > 0 ? tpNum : 1;
             // 2) 상대경로(/files/...)면 절대경로로 변환
             const img =
               imgRaw && !/^https?:\/\//i.test(imgRaw)
-                ? new URL(imgRaw.startsWith('/') ? imgRaw : `/${imgRaw}`, IMG_BASE).toString()
+                ? new URL(imgRaw.replace(/^\/+/, ''), IMG_BASE+'/').toString()
                 : imgRaw;
 
             const price = Number(it.itemPrice ?? it.price ?? it.salePrice ?? it.amount ?? 0);

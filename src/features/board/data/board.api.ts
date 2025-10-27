@@ -49,6 +49,7 @@ export async function fetchBoards(params?: FetchBoardsParams) {
 
   // 2) 401이면 토큰으로 재시도(일부 환경에서 목록도 인증 요구하는 경우용)
   const token = getAccessToken();
+
   const r2 = await http.get(`${BASE_PATH}/readAll`, {
     params: { page, size, boardType, keyword },
     headers: token ? { Authorization: `Bearer ${token}` } : {},

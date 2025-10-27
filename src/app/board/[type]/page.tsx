@@ -199,7 +199,7 @@ export default function BoardListPage({
             const qs = new URLSearchParams();
             qs.set('page', String(p));
             if (keyword) qs.set('q', keyword);
-            router.push(`/board/${boardType}?${qs.toString()}`);
+            router.push(`board/${boardType}?${qs.toString()}`);
           }}
         />
       </div>

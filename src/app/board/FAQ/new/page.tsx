@@ -46,7 +46,7 @@ export default function FAQNewPage() {
   }, []);
 
   async function postWithFallback(fd: FormData): Promise<Response> {
-    const r1 = await fetch(new URL('/board/create', base), {
+    const r1 = await fetch(new URL('board/create', base+'/'), {
       method: 'POST',
       credentials: 'include',
       headers: authHeaders(),
@@ -55,7 +55,7 @@ export default function FAQNewPage() {
     if (r1.ok || r1.status !== 404) return r1;
 
     const json = JSON.parse((fd.get('json') as Blob) ? await (fd.get('json') as Blob).text() : '{}');
-    const r2 = await fetch(new URL('/board', base), {
+    const r2 = await fetch(new URL('board', base+'/'), {
       method: 'POST',
       credentials: 'include',
       headers: { ...authHeaders(), 'Content-Type': 'application/json' },

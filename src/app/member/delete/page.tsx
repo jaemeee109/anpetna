@@ -42,7 +42,7 @@ const BASE =
 const API_PREFIX = (process.env.NEXT_PUBLIC_API_PREFIX as string | undefined) ?? '';
 function apiURL(path: string) {
   const normalized = path.startsWith('/') ? path : `/${path}`;
-  return new URL(`${API_PREFIX}${normalized}`, BASE).toString();
+  return new URL(path, BASE+'/').toString();
 }
 
 // ===== memberId 해석 (쿼리 → localStorage → cookie → JWT) =====
@@ -93,7 +93,7 @@ async function onSubmit(e: FormEvent) {
   setOk(null);
 
   try {
-    const url = apiURL(`/member/delete`);
+    const url = apiURL(`member/delete`);
     const resp = await fetch(url, {
       method: 'POST',
       credentials: 'include',

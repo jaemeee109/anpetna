@@ -67,7 +67,7 @@ export default function QnaDetailPage() {
     (async () => {
       try {
         setLoadingPost(true);
-        const url = new URL(`/board/readOne/${bno}`, base).toString();
+        const url = new URL(`board/readOne/${bno}`, base+'/').toString();
         const resp = await fetch(url, {
           credentials: 'include',
           headers: authHeaders(),
@@ -100,7 +100,7 @@ export default function QnaDetailPage() {
   async function fetchComments() {
     setLoadingCmt(true);
     try {
-      const url = new URL('/comment/read', base);
+      const url = new URL('comment/read', base+'/');
       url.search = new URLSearchParams({ bno: String(bno) }).toString();
 
       const resp = await fetch(url.toString(), {
@@ -152,7 +152,7 @@ export default function QnaDetailPage() {
   async function handleDeletePost() {
     if (!post?.bno) return;
     if (!confirm('이 글을 삭제할까요?')) return;
-    const resp = await fetch(new URL(`/board/delete/${post.bno}`, base), {
+    const resp = await fetch(new URL(`board/delete/${post.bno}`, base+'/'), {
       method: 'POST',
       credentials: 'include',
       headers: authHeaders(),
@@ -172,7 +172,7 @@ export default function QnaDetailPage() {
 
     try {
       setSubmitting(true);
-      const resp = await fetch(new URL('/comment/create', base), {
+      const resp = await fetch(new URL('comment/create', base+'/'), {
         method: 'POST',
         credentials: 'include',
         headers: authHeaders({ 'Content-Type': 'application/json' }),
@@ -198,7 +198,7 @@ export default function QnaDetailPage() {
     if (!confirm('이 댓글을 삭제할까요?')) return;
 
     try {
-      const resp = await fetch(new URL(`/comment/${cno}/delete`, base), {
+      const resp = await fetch(new URL(`comment/${cno}/delete`, base+'/'), {
         method: 'POST',
         credentials: 'include',
         headers: authHeaders(),

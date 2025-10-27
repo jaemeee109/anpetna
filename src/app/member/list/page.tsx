@@ -357,7 +357,7 @@ export default function AdminUsersPage() {
     const usp = new URLSearchParams();
     if (q) usp.set('q', q);
     usp.set('page', String(page));
-    router.replace(`/member/list?${usp.toString()}`);
+    router.replace(`list?${usp.toString()}`);
   }, [q, page, router]);
 
   const totalPages = useMemo(

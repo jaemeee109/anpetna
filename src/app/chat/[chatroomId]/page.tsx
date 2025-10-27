@@ -54,7 +54,7 @@ class MiniStomp {
   }
   connect(onOpen?: () => void) {
     // http/https -> ws/wss 치환
-    this.ws = new WebSocket(this.url.replace(/^http/i, 'ws'));
+    this.ws = new WebSocket(this.url.replace(/^http/i, 'ws') + '/ws');
     this.ws.onopen = () => {
       this.sendFrame('CONNECT', { 'accept-version': '1.2', host: '' }, '');
       onOpen?.();

@@ -295,7 +295,7 @@ export default function OrderDetailPage() {
             <div className="items-list">
               {items.map((it: any, idx: number) => {
                 const key = it.orderId ?? it.itemId ?? `idx-${idx}`;
-                const img = toAbs(pickImagePath(it), IMG_BASE) || '/file.svg';
+                const img = toAbs(pickImagePath(it).replace(/^\/+/, ''), IMG_BASE+'/') || '/file.svg';
                 const qty = Number(it.quantity ?? 0);
                 const priceOne = Number(it.price ?? 0);
                 const lineTotal = priceOne * qty;
@@ -309,7 +309,7 @@ export default function OrderDetailPage() {
                   >
                     <div className="order-thumb mr-2 mt-[20px] ml-[30px] mb-[20px]">
                       <Image
-                        src={img}
+                        src={'/api'+img}
                         alt={it?.name ? `${it.name} 썸네일` : '상품 이미지'}
                         width={100}
                         height={100}

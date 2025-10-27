@@ -187,7 +187,7 @@ export default function ItemNewPage() {
       fd.append('thumb', thumb);
       detailFiles.forEach((f) => fd.append('files', f));
 
-      const resp = await fetch(new URL('/item', API_BASE), {
+      const resp = await fetch(new URL('item', API_BASE+'/'), {
         method: 'POST',
         credentials: 'include',
         headers: authHeaders(),

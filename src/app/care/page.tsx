@@ -123,8 +123,8 @@ export default function CarePage() {
     setErr(null);
     try {
       const base = resolveApiBase();
-      const path = all ? '/venue/nearby-all' : '/venue/nearby';
-      const url = new URL(path, base);
+      const path = all ? 'venue/nearby-all' : 'venue/nearby';
+      const url = new URL(path, base+'/');
       const qp: Record<string, string> = { lat: String(lat), lng: String(lng) };
       if (!all) { qp.radiusKm = String(999999); qp.limit = String(10000); }
       url.search = new URLSearchParams(qp).toString();
@@ -185,7 +185,7 @@ export default function CarePage() {
       setTyping(true);
       try {
         const base = resolveApiBase();
-        const url = new URL('/maps/geocode', base);
+        const url = new URL('maps/geocode', base+'/');
         url.search = new URLSearchParams({
           q: query.trim(),
           lat: String(center.lat),
@@ -230,7 +230,7 @@ export default function CarePage() {
 
     try {
       const base = resolveApiBase();
-      const url = new URL('/maps/geocode', base);
+      const url = new URL('maps/geocode', base+'/');
       url.search = new URLSearchParams({
         q: query.trim(),
         lat: String(center.lat),

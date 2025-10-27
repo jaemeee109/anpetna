@@ -127,7 +127,7 @@ export default function QnaPage() {
 
       // ✅ 관리자면 type/keyword 제거 → 전체 QNA
       //    일반회원이면 내 글만(type=w & keyword=memberId)
-      const url = new URL('/board/readAll', base);
+      const url = new URL('board/readAll', base+'/');
       url.searchParams.set('page', '1');
       url.searchParams.set('size', '100');
       url.searchParams.set('boardType', 'QNA');
@@ -198,7 +198,7 @@ export default function QnaPage() {
         list.map(async (r, idx) => {
           const id = (r.bno ?? idx) as number;
           try {
-            const url = new URL('/comment/read', base);
+            const url = new URL('comment/read', base+'/');
             url.search = new URLSearchParams({ bno: String(id) }).toString();
 
             const resp = await fetch(url.toString(), {
@@ -317,7 +317,7 @@ const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     // 첨부가 있으면 아래처럼 추가
     // files.forEach(f => fd.append('files', f));
 
-    const url = new URL('/board/create', base).toString();
+    const url = new URL('board/create', base+'/').toString();
     const resp = await fetch(url, {
       method: 'POST',
       credentials: 'include',

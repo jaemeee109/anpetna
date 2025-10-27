@@ -65,21 +65,21 @@ export default function MemberInfoPage() {
   const [err, setErr] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
 
-  // -------- API URL --------
-  const BASE =
-    (process.env.NEXT_PUBLIC_API_BASE as string | undefined) ||
-    (typeof window !== 'undefined'
-      ? `${window.location.protocol}//${window.location.hostname}${
-          window.location.port
-            ? `:${window.location.port === '3000' ? '8000' : window.location.port}`
-            : ''
-        }`.replace(/:$/, '')
-      : '');
-  function api(path: string) {
-    const prefix = (process.env.NEXT_PUBLIC_API_PREFIX as string | undefined) ?? '/anpetna';
-    const normalized = path.startsWith('/') ? path : `/${path}`;
-    return new URL(`${prefix}${normalized}`, BASE).toString();
-  }
+    // -------- API URL --------
+    const BASE =
+      (process.env.NEXT_PUBLIC_API_BASE as string | undefined) ||
+      (typeof window !== 'undefined'
+        ? `${window.location.protocol}//${window.location.hostname}${
+            window.location.port
+              ? `:${window.location.port === '3000' ? '8000' : window.location.port}`
+              : ''
+          }`.replace(/:$/, '')
+        : '');
+    function api(path: string) {
+      const prefix = (process.env.NEXT_PUBLIC_API_PREFIX as string | undefined) ?? '/anpetna';
+      const normalized = path.startsWith('/') ? path : `/${path}`;
+      return new URL(path, BASE+'/').toString();
+    }
 
   // -------- Auth --------
   function getCookie(name: string) {
@@ -189,8 +189,8 @@ export default function MemberInfoPage() {
       // 상세 조회 시도(여러 경로 순차 시도)
       const tryDetailById = async (id: string): Promise<boolean> => {
         const paths = [
-          `/member/my_page/${encodeURIComponent(id)}`, // 일반 사용자 우선 경로
-          `/member/readOne/${encodeURIComponent(id)}`, // 관리자/권한 차단 시 보조 경로
+          `member/my_page/${encodeURIComponent(id)}`, // 일반 사용자 우선 경로
+          `member/readOne/${encodeURIComponent(id)}`, // 관리자/권한 차단 시 보조 경로
         ];
         for (const p of paths) {
           try {
@@ -249,7 +249,7 @@ export default function MemberInfoPage() {
 
         // 2) 무인자 me 엔드포인트에서 프로필/아이디 확보
         try {
-          const meRes = await fetch(api('/member/readOne'), {
+          const meRes = await fetch(api('member/readOne'), {
             method: 'GET',
             credentials: 'include',
             headers: authHeaders(),
@@ -328,7 +328,7 @@ export default function MemberInfoPage() {
         if (!flat.memberPw) delete flat.memberPw; // 공란이면 덮어쓰기 방지
       }
 
-      const resp = await fetch(api('/member/modify'), {
+      const resp = await fetch(api('member/modify'), {
         method: 'POST',
         credentials: 'include',
         headers: authHeaders({ 'Content-Type': 'application/json' }),

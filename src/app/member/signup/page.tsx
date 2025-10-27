@@ -87,13 +87,12 @@ function apiWithPrefix(path: string) {
   const prefix = typeof raw === 'string' ? raw.trim() : '';
   const normalized = path.startsWith('/') ? path : `/${path}`;
   const finalPath = prefix ? `${prefix}${normalized}` : normalized;
-  return new URL(finalPath, BASE).toString();
+  return new URL(path, BASE+'/').toString();
 }
 
   // 접두어 없이 URL 생성
   function apiNoPrefix(path: string) {
-    const normalized = path.startsWith('/') ? path : `/${path}`;
-    return new URL(normalized, BASE).toString();
+    return new URL(path, BASE+'/').toString();
   }
 
   // 안전 트림 + 기본값
@@ -165,7 +164,7 @@ const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
       memberEtc: '',
     };
 
-    const resp = await fetch(apiWithPrefix('/member/join'), {
+    const resp = await fetch(apiWithPrefix('member/join'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),

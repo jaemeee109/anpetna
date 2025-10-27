@@ -97,7 +97,7 @@ export default function FAQEditPage() {
       try {
         setLoading(true);
         setErrMsg(null);
-        const url = new URL(`/board/readOne/${bno}`, base);
+        const url = new URL(`board/readOne/${bno}`, base+'/');
         const resp = await fetch(url.toString(), {
           credentials: 'include',
           headers: { ...authHeaders() },
@@ -146,7 +146,7 @@ export default function FAQEditPage() {
     setErrMsg(null);
 
     try {
-      const url = new URL(`/board/update/${bno}`, base);
+      const url = new URL(`board/update/${bno}`, base+'/');
       const payload = {
         bTitle: title,
         bContent: content,
