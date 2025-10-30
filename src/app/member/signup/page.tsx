@@ -409,8 +409,8 @@ const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
         <br />
 
         <div className="flex justify-center gap-3">
-          <button type="submit" className="btn-3d btn-white text-black" disabled={submitting}>
-            {submitting ? '처리 중…' : '가입하기'}
+          <button type="submit" className="btn-3d btn-white text-black" disabled={true}>
+            {/*{submitting ? '처리 중…' : '가입하기'}*/ '가입하기'}
           </button>
           <button type="button" className="btn-3d btn-white" onClick={() => router.back()}>
             취소
