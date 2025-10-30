@@ -8,22 +8,22 @@ AnPetNa는 “Animal , Pet and Me” 라는 의미로
 <br>https://www.notion.so/28dd7dcc2c2a80d18315c499eecee58d?v=28dd7dcc2c2a805d896b000cb7fdfdaf&source=copy_link</br>
 <p/>
 - 팀장 : 이 재 은
-[GIT] https://github.com/jaemeee109/
+<br/><strong>[Git]</strong> https://github.com/jaemeee109/
 <p/>
 - 부팀장 : 오승환
-[GIT] https://github.com/OhSeunghwan-Dev
+<br/><strong>[Git]</strong> https://github.com/OhSeunghwan-Dev
 <p/>
 - 팀원 : 박희진
-[GIT] https://github.com/gomong0304
+<br/><strong>[Git]</strong> https://github.com/gomong0304
  <p/>
 - 팀원 : 양지민
-[GIT] https://github.com/jjim318
+<br/><strong>[Git]</strong> https://github.com/jjim318
 <p/>
 - 팀원 : 전우신
-[GIT] https://github.com/WooShinJeon
+<br/><strong>[Git]</strong> https://github.com/WooShinJeon
 <p/>
 - 팀원 : 김수아
-[GIT] https://github.com/SUA1038
+<br/><strong>[Git]</strong> https://github.com/SUA1038
 <p/>
 - 팀원 : 이채윤
-[GIT] https://github.com/ChaeYun430
+<br/><strong>[Git]</strong> https://github.com/ChaeYun430
