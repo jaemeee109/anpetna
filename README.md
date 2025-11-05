@@ -6,7 +6,7 @@
 <p/>백엔드: SpringBoot
 <p/>프론트엔드: React(Next.js)
 <p/> 데이터베이스: MariaDB
-<p/> 배포 : Jenkins + Docker + AWS EC2 + Ubuntu(ESXi) + Blue-Green Deployment
+<p/> 배포 & 운영환경 : Jenkins + Docker + AWS EC2 + Ubuntu(ESXi) + Blue-Green Deployment + HTTPS
 <p/> 알림 :SSE
 <p/> 채팅 : Websocket
 <p/> 버전관리 : Github
