@@ -3,6 +3,13 @@
 <br/>AnPetNa는 “Animal , Pet and Me” 라는 의미로 
 <br/>반려동물 관련 정보를 한 곳에서 보고 (공지, 커뮤니티), 
 <br/>시설 (호텔·병원)을 탐색·예약하고,쇼핑/리뷰/알림까지 지원하는 통합 웹 서비스 입니다
+<p/>Backend: SpringBoot
+<p/>Frontend: React(Next.js)
+<p/>Database: MariaDB
+<p/> 배포 : Jenkins + Docker + AWS EC2 + Ubuntu(ESXi) + Blue-Green Deployment
+<p/> 알림 :SSE
+<p/> 채팅 : Websocket
+<p/> 버전관리 : Github
 <p/>
 <strong>[Notion]</strong> 
 <br>https://www.notion.so/28dd7dcc2c2a80d18315c499eecee58d?v=28dd7dcc2c2a805d896b000cb7fdfdaf&source=copy_link</br>
