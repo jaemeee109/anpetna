@@ -1,5 +1,6 @@
 # anpetna
 <strong>AnPetNa Team Project</strong>
+<p/>2025.08.01~2025.10.24
 <br/>AnPetNa는 “Animal , Pet and Me” 라는 의미로 
 <br/>반려동물 관련 정보를 한 곳에서 보고 (공지, 커뮤니티), 
 <br/>시설 (호텔·병원)을 탐색·예약하고,쇼핑/리뷰/알림까지 지원하는 통합 웹 서비스 입니다
