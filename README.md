@@ -12,7 +12,7 @@
 <p/> 채팅 : Websocket
 <p/> 버전관리 : Github
 <p/>
-<strong>[Notion]</strong> 
+<strong>[문서자료/Notion]</strong> 
 <br>https://www.notion.so/28dd7dcc2c2a80d18315c499eecee58d?v=28dd7dcc2c2a805d896b000cb7fdfdaf&source=copy_link</br>
 <p/>
 - <strong> 팀장 : 이 재 은 </strong>
